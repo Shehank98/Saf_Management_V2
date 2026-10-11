@@ -7,17 +7,16 @@ const c = calcBooking(stateBooking());
 const saved = (() => { try { return JSON.parse(sessionStorage.getItem('yws-contact') || '{}') } catch (e) { return {} } })();
 $('#name').value = saved.name || ''; $('#phone').value = saved.phone || ''; $('#email').value = saved.email || ''; $('#cc').value = saved.cc || '+94';
 const online = CFG.providers && CFG.providers.length > 0;
+/* Private safaris always take the deposit online; the rest is paid on the safari day. (Request-only mode just until a payment gateway is connected.) */
 const ALL = [
-  { v: 'deposit', t: `Pay ${Math.round(CFG.deposit * 100)}% deposit`, d: 'Confirmed instantly. Your QR e-ticket arrives by email. Pay the rest at pickup (cash or card).', best: true, needs: 'online' },
-  { v: 'card', t: 'Pay in full', d: 'Confirmed instantly, e-ticket by email, nothing to pay on the day.', needs: 'online', on: CFG.allowFull },
-  { v: 'later', t: 'Pay at pickup', d: 'Your booking is a request until we confirm it (usually within an hour). Your e-ticket comes after that.', on: CFG.allowLater },
+  { v: 'deposit', t: `Pay ${Math.round(CFG.deposit * 100)}% deposit to confirm`, d: 'Confirmed instantly and your QR e-ticket arrives by email. You pay the rest on the safari day (cash or card).', best: true, needs: 'online' },
+  { v: 'later', t: 'Send a booking request', d: 'Online payment is not switched on yet. We will confirm your booking by email.', needs: 'offline' },
 ];
-const OPTS = ALL.filter(o => (o.needs === 'online' ? online : true) && o.on !== false);
+const OPTS = ALL.filter(o => o.needs === (online ? 'online' : 'offline'));
 if (!OPTS.length) { $('#payOpts').innerHTML = '<div class="note bad">Booking is closed right now. Please contact us.</div>' }
 let pay = P.get('pay'); if (!OPTS.find(o => o.v === pay)) pay = (OPTS.find(o => o.best) || OPTS[0] || {}).v;
 let provider = (CFG.providers[0] || {}).id;
 $('#payOpts').innerHTML = OPTS.map(o => { const due = dueNow(c.total, o.v); return `<button class="opt" data-v="${o.v}" role="radio">${o.best ? '<span class="tag ok best">Recommended</span>' : ''}<span class="radio"></span><b>${o.t}</b><p class="small muted" style="margin:4px 40px 0 0">${o.d}</p><div class="amt">${due ? fmt(due) + ' now' : 'Nothing now'}${due && due < c.total ? ` <span class="small muted" style="font-family:Inter">+ ${fmt(c.total - due)} at pickup</span>` : ''}</div></button>` }).join('');
-if (!online) $('#payOpts').insertAdjacentHTML('afterend', '<p class="small muted" style="margin-top:8px">Online payment is not switched on yet, so bookings are requests that we confirm by email.</p>');
 if (CFG.providers.length > 1) {
   $('#provBox').style.display = 'block';
   $('#provOpts').innerHTML = CFG.providers.map(p => `<button type="button" class="opt" data-p="${p.id}" role="radio" style="padding:12px 14px 12px 44px"><span class="radio"></span><b>${esc(p.label)}</b></button>`).join('');

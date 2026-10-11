@@ -83,9 +83,9 @@ const adminPage = file => U.wrap(async (req, res) => {
 const site = {
   '/': 'customer/index.html', '/book/session': 'customer/01-session.html', '/book/date': 'customer/02-date.html', '/book/group': 'customer/03-group.html',
   '/book/pickup': 'customer/04-pickup-extras.html', '/book/checkout': 'customer/05-checkout.html', '/book/done/:code': 'customer/06-confirmation.html',
-  '/t/:code': 'customer/ticket.html', '/booking': 'customer/my-booking.html', '/s/:id': 'shared/trip.html', '/partners/apply': 'vendor/register.html',
+  '/t/:code': 'customer/ticket.html', '/booking': 'customer/my-booking.html', '/s/:id': 'shared/trip.html', '/partners/apply': 'vendor/register.html', '/shared': 'shared/index.html',
 };
-for (const [route, file] of Object.entries(site)) app.get(route, (req, res, next) => { if (route.startsWith('/t/') || route.startsWith('/s/')) res.set('X-Robots-Tag', 'noindex'); next(); }, page(file));
+for (const [route, file] of Object.entries(site)) app.get(route, (req, res, next) => { if (route.startsWith('/t/') || route.startsWith('/s/') || route === '/shared') res.set('X-Robots-Tag', 'noindex'); next(); }, page(file));
 
 app.get('/admin/login', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('admin/login.html')(req, res); });
 const admin = { '/admin': 'dashboard', '/admin/bookings': 'private', '/admin/shared': 'shared', '/admin/payments': 'payments', '/admin/partners': 'vendors', '/admin/check-in': 'checkin', '/admin/settings': 'settings' };
@@ -120,7 +120,7 @@ app.get('/manifest.webmanifest', manifest('site'));
 app.get('/admin.webmanifest', manifest('admin'));
 app.get('/partner.webmanifest', manifest('partner'));
 
-app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\n'));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /shared\nDisallow: /api/\nDisallow: /pay/\n'));
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), {

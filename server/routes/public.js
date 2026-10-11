@@ -69,9 +69,11 @@ async function authorizedBooking(req) {
 }
 
 r.post('/bookings', limits.booking, U.wrap(async (req, res) => {
-  const body = req.body || {};
-  const online = body.pay !== 'later';
+  const body = { ...(req.body || {}) };
   const enabled = providers.enabled();
+  // Every private safari needs the deposit online. Only while no payment gateway is connected yet does it fall back to a request.
+  body.pay = enabled.length ? 'deposit' : 'later';
+  const online = body.pay !== 'later';
   let providerId = null;
   if (online) {
     providerId = body.provider || (enabled[0] && enabled[0].id);
@@ -168,6 +170,26 @@ r.get('/ticket/:code', limits.lookup, U.wrap(async (req, res) => {
 }));
 
 /* ---------------- Shared trips (link only) ---------------- */
+/** Calendar for the link-only shared-trips site: trips per day, seat counts only (no guest details). */
+r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!/^\d{4}-\d{2}$/.test(month)) throw U.bad('Bad month');
+  const conf = await settings.load();
+  const first = month + '-01', last = U.addDays(U.addMonths(first, 1), -1);
+  const rows = (await query(
+    `SELECT t.id, t.date, t.session_id, t.seat_price, t.seats, t.min_seats, t.status,
+            COUNT(s.*) FILTER (WHERE s.status IN ('RESERVED','PAYMENT_PENDING','PAID'))::int AS held,
+            COUNT(s.*) FILTER (WHERE s.status = 'PAID')::int AS paid
+       FROM shared_trips t LEFT JOIN shared_seats s ON s.trip_id=t.id
+      WHERE t.date BETWEEN $1 AND $2 AND t.date >= $3 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL')
+      GROUP BY t.id ORDER BY t.date, t.session_id`, [first, last, U.todayStr()])).rows;
+  const trips = rows.filter(t => U.localDate(t.date, conf.sessions[t.session_id].start).getTime() > Date.now()).map(t => ({
+    id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, seatsMax: t.seats, free: t.seats - t.held, paid: t.paid, minSeats: t.min_seats,
+    confirmed: t.paid >= t.min_seats, full: t.held >= t.seats,
+  }));
+  res.set('Cache-Control', 'no-store').json({ trips });
+}));
+
 r.get('/shared/:id', limits.lookup, U.wrap(async (req, res) => {
   const v = await shared.publicView(req.params.id);
   if (!v) return res.status(404).json({ invalid: true, error: "This link isn't valid" });

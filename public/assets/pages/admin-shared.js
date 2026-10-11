@@ -1,5 +1,7 @@
 adminShell({ active: 'shared.html', title: 'Shared trips', actions: `<button class="btn sm primary" id="newBtn">+ <span class="hide-sm">Create </span>trip</button>` });
 $('#content .note').innerHTML = $('#content .note').innerHTML.replaceAll('${SETTINGS.minSeats}', CFG.minSeats).replaceAll('${SETTINGS.payWindowH}', CONF.shared.autoCancelH);
+$('#content .note').insertAdjacentHTML('afterend', `<div class="card" style="margin-bottom:14px"><b>Shared trips website</b><p class="small muted" style="margin:4px 0 8px">Guests who ask about shared trips get this one link. They browse a calendar of your scheduled shared trips, see which ones will run, and pick seats. It is not linked from the public site.</p><div class="lnkbox"><code>${CFG.baseUrl}/shared</code><button class="btn sm" id="cpSite">Copy</button></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Hi! Here are our shared safari trips, pick a date and seats: ' + CFG.baseUrl + '/shared')}">Share on WhatsApp</a><a class="btn sm" href="/shared" target="_blank" rel="noopener">Open ↗</a></div></div>`);
+$('#cpSite').onclick = () => { navigator.clipboard?.writeText(CFG.baseUrl + '/shared').catch(() => { }); toast('Link copied') };
 const paidOf = t => t.seats.filter(x => x.pay === 'Paid').length;
 function status(t) {
   if (['Cancelled', 'Completed', 'Started'].includes(t.status)) return t.status;

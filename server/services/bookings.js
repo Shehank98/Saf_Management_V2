@@ -52,10 +52,6 @@ async function create(raw, { admin = null, providerId = null } = {}) {
   const conf = await settings.load();
   const d = cleanInput(raw, conf, { admin: !!admin });
   const pay = admin ? 'later' : d.pay;
-  if (!admin) {
-    if (pay === 'later' && !conf.payments.allowLater) throw U.bad('Pay at pickup is not available right now.');
-    if (pay === 'card' && !conf.payments.allowFull) throw U.bad('Paying in full is not available right now.');
-  }
   // Pickup: free within the radius of our base. The check is done here with real coordinates.
   let pickupKm = null;
   if (d.pmode === 'HOTEL' && !admin) {

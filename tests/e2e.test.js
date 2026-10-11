@@ -94,13 +94,18 @@ test('lookup needs the right phone number', async () => {
   assert.equal((await api('GET', `/api/bookings/${code}`)).status, 404); // no phone, no k
 });
 
-test('pay at pickup is a request until the office confirms', async () => {
-  const r = await api('POST', '/api/bookings', guest({ pay: 'later', date: U.addDays(U.todayStr(), 11), name: 'Arjun' }));
-  assert.equal(r.json.status, 'REQUEST');
-  assert.equal((await emails('cust_request')).length, 1);
+test('private safaris always need the deposit, whatever the browser sends', async () => {
+  const r = await api('POST', '/api/bookings', guest({ pay: 'later', date: U.addDays(U.todayStr(), 11) }));
+  assert.equal(r.json.status, 'PENDING_PAYMENT');
+  assert.equal(r.json.due, Math.round(r.json.total * 0.3));
+  assert.ok(r.json.checkoutUrl);
+});
+
+test('office-made request can be confirmed, which emails the ticket', async () => {
+  const r = await admin('POST', '/api/admin/bookings', { name: 'Arjun', phone: '771111111', email: 'a@x.com', ses: 'evening', date: U.addDays(U.todayStr(), 12), guests: 2, status: 'Request' });
+  assert.equal(r.status, 201);
   const t0 = (await emails('cust_confirmed')).length;
-  const c = await admin('POST', `/api/admin/bookings/${r.json.code}/confirm`);
-  assert.equal(c.status, 200);
+  assert.equal((await admin('POST', `/api/admin/bookings/${r.json.code}/confirm`)).status, 200);
   assert.equal((await emails('cust_confirmed')).length, t0 + 1);
 });
 
@@ -132,14 +137,14 @@ test('closed dates and past dates cannot be booked', async () => {
 });
 
 test('guest cancel: refund follows the policy (100% when more than 48h away)', async () => {
-  const r = await api('POST', '/api/bookings', guest({ date: U.addDays(U.todayStr(), 12), pay: 'card' }));
+  const r = await api('POST', '/api/bookings', guest({ date: U.addDays(U.todayStr(), 13) }));
   await api('POST', `/api/payments/mock/${r.json.checkoutUrl.split('/').pop()}`, { outcome: 'success' });
   const c = await api('POST', `/api/bookings/${r.json.code}/cancel`, { k: r.json.k });
-  assert.equal(c.status, 200); assert.equal(c.json.refund, 38000); assert.equal(c.json.pct, 100);
+  assert.equal(c.status, 200); assert.equal(c.json.refund, 11400); assert.equal(c.json.pct, 100);
   const view = await api('GET', `/api/bookings/${r.json.code}?k=${r.json.k}`);
   assert.equal(view.json.status, 'Cancelled');
   const refunds = (await query(`SELECT * FROM payments WHERE kind='REFUND' AND booking_id=(SELECT id FROM bookings WHERE code=$1)`, [r.json.code])).rows;
-  assert.equal(refunds.length, 1); assert.equal(refunds[0].amount, 38000); assert.equal(refunds[0].status, 'SUCCEEDED');
+  assert.equal(refunds.length, 1); assert.equal(refunds[0].amount, 11400); assert.equal(refunds[0].status, 'SUCCEEDED');
   assert.equal((await emails('cust_cancelled')).length, 1);
 });
 
@@ -258,6 +263,15 @@ test('shared trip: 4 reservations send payment links, 4 paid confirms + tickets,
   const tk = await api('GET', `/api/ticket/${a.json.code}?k=${a.json.k}`);
   assert.equal(tk.json.kind, 'shared'); assert.equal(tk.json.ok, true);
   assert.equal((await api('GET', `/api/ticket/${a.json.code}?k=nope`)).status, 404);
+});
+
+test('shared trips site: calendar lists trips with seat counts only', async () => {
+  const month = U.addDays(U.todayStr(), 8).slice(0, 7);
+  const r = await api('GET', `/api/shared-trips?month=${month}`);
+  assert.equal(r.status, 200);
+  assert.ok(r.json.trips.length >= 1);
+  assert.ok(!JSON.stringify(r.json).includes('Anna'));
+  assert.equal((await fetch(base + '/shared')).status, 200);
 });
 
 test('shared trip: pay-now seat holds the seat, unpaid reservations are released after the deadline', async () => {

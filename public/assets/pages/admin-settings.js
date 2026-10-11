@@ -50,8 +50,8 @@ const SECTIONS = {
   payments: ['Payments', () => `<h3>Payments</h3>
   <div class="g2f" style="margin-top:12px"><div class="field"><label>Deposit for private bookings</label><select class="inp" id="p_dep" ${dis}>${[20, 30, 40, 50].map(p => `<option value="${p / 100}" ${Math.round(CONF.payments.deposit * 100) === p ? 'selected' : ''}>${p}%</option>`).join('')}</select></div><div class="field"><label>Currency</label><select class="inp" disabled><option>LKR</option></select></div></div>
   <div class="sw"><div><b>Online card payments</b><div class="small muted">${CFG.providers.length ? 'Connected: <b>' + CFG.providers.map(p => esc(p.label)).join(', ') + '</b>' : 'No payment gateway is connected yet, so guests can only book “pay at pickup”.'}<br>Gateways are connected with environment variables on the server (see docs/DEPLOY.md): <code>STRIPE_SECRET_KEY</code>, <code>PAYHERE_MERCHANT_ID</code>.</div></div><span class="tag ${CFG.providers.length ? 'ok' : 'warn'}">${CFG.providers.length ? 'On' : 'Not connected'}</span></div>
-  <div class="sw"><div><b>Allow pay in full</b></div>${sw('p_full', CONF.payments.allowFull)}</div><div class="sw"><div><b>Allow pay at pickup</b><div class="small muted">These come in as requests you confirm manually.</div></div>${sw('p_later', CONF.payments.allowLater)}</div>`,
-  () => ({ deposit: num('p_dep'), allowFull: isOn('p_full'), allowLater: isOn('p_later') }), 'payments'],
+  <p class="small muted" style="margin-top:12px">Every private safari needs this deposit online. The rest is paid on the safari day. Shared-trip seats are paid in full.</p>`,
+  () => ({ deposit: num('p_dep'), allowFull: true, allowLater: true }), 'payments'],
 
   notify: ['Emails', () => `<h3>Emails</h3><p class="small muted" style="margin-bottom:10px">All notifications go by email (no SMS or WhatsApp), sent through your Google Apps Script relay.</p>
   <div class="field"><label>Company alerts go to</label><input class="inp" id="n_to" value="${esc(CONF.emails.recipients.join(', '))}" ${dis}></div><div class="hint">Separate several addresses with commas.</div>
