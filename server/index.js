@@ -70,9 +70,18 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // ---------- Pages ----------
 const PAGES_DIR = path.join(__dirname, 'pages');
+// Scripts and styles get ?v=<build> in their URLs, so every deploy is picked up immediately while unchanged builds stay cached.
+const BUILD = (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || Date.now().toString(36);
+const pageCache = new Map();
+function renderPage(file) {
+  if (config.isProd && pageCache.has(file)) return pageCache.get(file);
+  const html = require('fs').readFileSync(path.join(PAGES_DIR, file), 'utf8')
+    .replace(/((?:src|href)="\/(?:assets|vendor)\/[^"?]+)"/g, `$1?v=${BUILD}"`);
+  if (config.isProd) pageCache.set(file, html);
+  return html;
+}
 const page = file => (req, res) => {
-  res.set('Cache-Control', 'no-cache');
-  res.sendFile(path.join(PAGES_DIR, file));
+  res.set('Cache-Control', 'no-cache').type('html').send(renderPage(file));
 };
 const adminPage = file => U.wrap(async (req, res) => {
   if (!(await auth.userFor(req, 'ADMIN'))) return res.redirect('/admin/login');
@@ -132,7 +141,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 }));
 
 app.use((req, res) => {
-  res.status(404).set('Cache-Control', 'no-cache').sendFile(path.join(PAGES_DIR, 'notfound.html'));
+  res.status(404).set('Cache-Control', 'no-cache').type('html').send(renderPage('notfound.html'));
 });
 
 // eslint-disable-next-line no-unused-vars

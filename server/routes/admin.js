@@ -103,6 +103,7 @@ r.post('/bookings/:code/cancel', staff, U.wrap(async (req, res) => {
 r.post('/bookings/:code/pay', staff, U.wrap(async (req, res) => { await bookings.recordPayment(req.params.code, req.body.amount, req.body.method, who(req)); res.json({ ok: true }); }));
 r.post('/bookings/:code/assign', staff, U.wrap(async (req, res) => { await bookings.assignPartners(req.params.code, { jeep: req.body.jeep, guide: req.body.guide }, who(req)); res.json({ ok: true }); }));
 r.post('/bookings/:code/ticket', staff, U.wrap(async (req, res) => { await bookings.resendTicket(req.params.code, who(req)); res.json({ ok: true }); }));
+r.delete('/bookings/:code', owner, U.wrap(async (req, res) => { await bookings.remove(req.params.code, who(req)); res.json({ ok: true }); }));
 r.post('/bookings/:code/complete', staff, U.wrap(async (req, res) => { await bookings.markCompleted(req.params.code, who(req)); res.json({ ok: true }); }));
 
 /* ---------------- Shared trips ---------------- */

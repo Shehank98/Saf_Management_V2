@@ -276,4 +276,21 @@ async function expireHolds() {
   return r.rowCount;
 }
 
-module.exports = { create, applyPayment, getByCode, refundFor, cancel, confirm, decline, recordPayment, markCompleted, assignPartners, resendTicket, expireHolds, sessionStart, HOLD_MIN };
+/** Permanently remove a booking that never ran (cancelled / declined, or untouched with no money on it). */
+async function remove(code, actor) {
+  return tx(async db => {
+    const b0 = await getByCode(db, code);
+    if (!b0) throw U.notFound('Booking not found');
+    const b = (await db.query('SELECT * FROM bookings WHERE id=$1 FOR UPDATE', [b0.id])).rows[0];
+    if (['STARTED', 'COMPLETED'].includes(b.status)) throw U.conflict('A trip that has run cannot be deleted (it is part of your profit records).');
+    const dead = ['CANCELLED', 'DECLINED', 'PENDING_PAYMENT'].includes(b.status);
+    if (!dead && b.paid - b.refunded > 0) throw U.conflict('This booking has money on it. Cancel it (with a refund) first, then delete it.');
+    await db.query('DELETE FROM payout_lines WHERE booking_id=$1', [b.id]);
+    await db.query('DELETE FROM payments WHERE booking_id=$1', [b.id]);
+    await db.query('DELETE FROM bookings WHERE id=$1', [b.id]); // meals, extras, assignments go with it
+    await activity.log(db, 'booking', b.code, `Deleted by ${actor}`, actor);
+    return b;
+  });
+}
+
+module.exports = { remove, create, applyPayment, getByCode, refundFor, cancel, confirm, decline, recordPayment, markCompleted, assignPartners, resendTicket, expireHolds, sessionStart, HOLD_MIN };

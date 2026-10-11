@@ -54,14 +54,14 @@ async function pickSeats() {
   <p class="small muted" style="margin:0">${trip.paid} paid · ${pendN()} reserved · ${maxSeats - heldN()} free. A shared jeep runs once ${minSeats} seats are paid. If it doesn't, you get a full refund.</p></div>
   <div class="stp">${[0, 1, 2].map(i => `<span class="${i <= step ? 'on' : ''}"></span>`).join('')}</div>`;
   }
-  function render(msg) {
+  function render(msg, justPicked) {
     const total = mine.size * trip.price + mealCount() * MEAL_PRICE;
     $('#ba').textContent = fmt(total); $('#bl').textContent = mine.size ? `${mine.size} seat${mine.size > 1 ? 's' : ''}` : 'Pick seats'; $('#bk').style.visibility = step ? 'visible' : 'hidden';
     let h = head();
     if (msg) h += `<div class="note bad" style="margin-top:12px">${esc(msg)}</div>`;
     const rows = Math.ceil(maxSeats / 2);
     if (step === 0) {
-      h += `<div class="cols"><div><h2>Choose your seats</h2><p class="muted">One seat per person. Grey seats are taken.</p><div class="jeep"><div class="ws">WINDSHIELD</div>${Array.from({ length: rows }, (_, r) => `<div class="rowl">${['Front', 'Middle', 'Back'][r] || 'Row ' + (r + 1)}</div><div class="seats" id="r${r}"></div>`).join('')}</div></div>
+      h += `<div class="cols"><div><h2>Choose your seats</h2><p class="muted">One seat per person. Grey seats are taken.</p><div class="jeep ${justPicked ? 'still' : ''}"><div class="hood"><i></i><i></i></div><div class="ws"><span>WINDSHIELD</span></div><div class="drv"><i class="wheel"></i><span>Driver</span></div>${Array.from({ length: rows }, (_, r) => `<div class="rowl">${['Front', 'Middle', 'Back'][r] || 'Row ' + (r + 1)}</div><div class="seats" id="r${r}"></div>`).join('')}</div></div>
     <div class="card" style="align-self:start"><h3>How shared jeeps work</h3><ol class="small" style="padding-left:18px;margin:8px 0 0;line-height:1.8">${online ? '<li>Pick seats and pay now' + (trip.allowLater ? ', or reserve for free' : '') + '.</li>' : '<li>Pick seats and reserve them for free.</li>'}<li>When ${minSeats} seats are reserved, everyone who hasn't paid gets a payment link. You have ${trip.payWindowH} hours to pay.</li><li>Once ${minSeats} seats are paid, the trip is confirmed and your QR e-ticket is emailed.</li><li>Not enough people? Full refund, or move to a private jeep.</li></ol></div></div>`;
       $('#nx').textContent = mine.size ? 'Continue' : 'Pick a seat'; $('#nx').disabled = !mine.size;
     }
@@ -83,9 +83,10 @@ async function pickSeats() {
       $('#nx').textContent = due ? `Pay ${fmt(due)}` : 'Reserve my seat';
     }
     $('#root').innerHTML = h;
+    if (step === 0 && justPicked) { const sb = $('.seat[data-n="' + justPicked + '"]'); if (sb) sb.classList.add('pop') }
     if (step === 0) {
-      for (let r = 0; r < rows; r++) $('#r' + r).innerHTML = [1, 2].map(c => { const n = r * 2 + c; if (n > maxSeats) return ''; const t = taken.has(n), m = mine.has(n); return `<button class="seat ${m ? 'mine' : ''}" data-n="${n}" ${t ? 'disabled' : ''} aria-pressed="${m}">Seat ${n}<small>${t ? 'Taken' : m ? 'Yours' : 'Free'}</small></button>` }).join('');
-      $$('.seat:not(:disabled)').forEach(b => b.onclick = () => { const n = +b.dataset.n; mine.has(n) ? mine.delete(n) : mine.add(n); render() });
+      for (let r = 0; r < rows; r++) $('#r' + r).innerHTML = [1, 2].map(c => { const n = r * 2 + c; if (n > maxSeats) return ''; const t = taken.has(n), m = mine.has(n); return `<button class="seat ${m ? 'mine' : ''} ${t ? 'gone' : ''}" style="--i:${r * 2 + c}" data-n="${n}" ${t ? 'disabled' : ''} aria-pressed="${m}" aria-label="Seat ${n}, ${t ? 'taken' : m ? 'yours' : 'free'}"><span class="hr"></span><b>${n}</b><small>${t ? 'Taken' : m ? 'Yours ✓' : 'Free'}</small><i class="rip"></i></button>` }).join('');
+      $$('.seat:not(:disabled)').forEach(b => b.onclick = () => { const n = +b.dataset.n; mine.has(n) ? mine.delete(n) : mine.add(n); if (navigator.vibrate) navigator.vibrate(25); render(false, n) });
     }
     if (step === 1) {
       const chk = () => { f.name = $('#fn').value.trim(); f.cc = $('#fc').value; f.phone = $('#fp').value.replace(/\D/g, ''); f.email = $('#fe').value.trim(); f.hotel = $('#fh').value.trim(); $('#nx').disabled = !(f.name.length > 1 && f.phone.length >= 7 && /^\S+@\S+\.\S+$/.test(f.email)) };

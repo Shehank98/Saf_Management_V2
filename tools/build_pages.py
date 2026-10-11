@@ -28,7 +28,7 @@ PAGES = {
     'customer/06-confirmation.html': ('customer', ['/assets/qr.js'], '', []),
     'customer/ticket.html': ('customer', ['/assets/qr.js'], '', []),
     'customer/my-booking.html': ('customer', [], '', []),
-    'shared/trip.html': ('customer', [], '', []),
+    'shared/trip.html': ('customer', [], '<link rel="stylesheet" href="/assets/shared-seats.css">', []),
     'vendor/register.html': ('customer', [], '', []),
     'vendor/portal.html': ('partner', ['/assets/qr.js', '/vendor/jsQR.js'], '', []),
     'admin/login.html': ('adminlogin', [], '', []),

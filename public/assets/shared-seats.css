@@ -1,0 +1,51 @@
+/* Shared-trip seat picker: top-down jeep that drives in, seats that pop, rippling picks */
+.invite{background:linear-gradient(120deg,#f7c77e,#f19a5a,#e8825a);background-size:200% 200%;animation:warm 9s ease-in-out infinite alternate}
+@keyframes warm{to{background-position:100% 50%}}
+.invite .sun{animation:spin 40s linear infinite;background:radial-gradient(circle,#fff3c4 30%,#ffe7a8 31%,rgba(255,231,168,0) 70%)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.invite .jp{right:auto;left:-80px;bottom:6px;animation:cruise 9s linear infinite}
+@keyframes cruise{from{left:-90px}to{left:105%}}
+.meter span{background-image:linear-gradient(90deg,rgba(255,255,255,.0),rgba(255,255,255,.35),rgba(255,255,255,0));background-size:60px 100%;animation:shine 2.2s linear infinite}
+@keyframes shine{from{background-position:-60px 0}to{background-position:200px 0}}
+
+.jeep{max-width:340px;padding:100px 26px 30px;border-radius:60px 60px 30px 30px;background:
+  repeating-linear-gradient(90deg,rgba(0,0,0,.05) 0 2px,transparent 2px 14px),linear-gradient(180deg,#738449,#4a5a2d);
+  animation:driveIn .9s cubic-bezier(.2,.8,.2,1) both;box-shadow:0 18px 40px rgba(40,50,20,.35),inset 0 0 0 3px rgba(255,255,255,.12)}
+@keyframes driveIn{from{transform:translateX(-120%) rotate(-3deg);opacity:0}60%{transform:translateX(4%) rotate(1deg)}to{transform:none;opacity:1}}
+.jeep.still{animation:none}
+.jeep::before,.jeep::after{content:"";position:absolute;top:120px;bottom:50px;width:12px;border-radius:8px;background:#1f1a14;box-shadow:inset 0 0 0 2px #3a322a}
+.jeep::before{left:-9px}.jeep::after{right:-9px}
+.jeep .hood{position:absolute;top:10px;left:34px;right:34px;display:flex;justify-content:space-between}
+.jeep .hood i{width:22px;height:10px;border-radius:6px;background:#fff3b0;box-shadow:0 0 14px 4px rgba(255,243,176,.7);animation:blink 3s ease-in-out infinite}
+@keyframes blink{50%{opacity:.55}}
+.jeep .ws{top:30px;left:30px;right:30px;height:30px;border-radius:14px 14px 6px 6px;background:linear-gradient(180deg,rgba(210,235,245,.7),rgba(160,200,220,.35))}
+.jeep .ws span{opacity:.8}
+.jeep .drv{position:absolute;top:68px;right:30px;display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+.jeep .wheel{width:20px;height:20px;border-radius:50%;border:3px solid #2b1a0e;position:relative;animation:steer 4s ease-in-out infinite}
+.jeep .wheel::after{content:"";position:absolute;inset:3px 1px;border-top:3px solid #2b1a0e}
+@keyframes steer{25%{transform:rotate(14deg)}75%{transform:rotate(-14deg)}}
+.jeep .rowl{margin-top:14px}
+.seats{gap:14px}
+.jeep .seat{position:relative;overflow:hidden;height:84px;border-radius:18px 18px 12px 12px;border:0;background:linear-gradient(180deg,#fff7e6,#f1dfba);color:#4a3a22;box-shadow:0 4px 0 #b99a62,0 8px 14px rgba(0,0,0,.25);
+  animation:seatPop .5s cubic-bezier(.3,1.6,.5,1) both;animation-delay:calc(var(--i) * .09s + .5s)}
+@keyframes seatPop{from{opacity:0;transform:translateY(16px) scale(.6)}}
+.jeep .seat .hr{position:absolute;top:6px;left:50%;width:34px;height:9px;margin-left:-17px;border-radius:6px;background:rgba(0,0,0,.12)}
+.jeep .seat b{font:800 24px Fraunces,Georgia,serif;margin-top:8px}
+.jeep .seat small{font-size:11px;font-weight:700;color:#7d6a45}
+.jeep .seat:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 7px 0 #b99a62,0 12px 18px rgba(0,0,0,.28)}
+.jeep .seat:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #b99a62}
+.jeep .seat:not(:disabled):not(.mine)::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px rgba(122,150,60,.0);animation:glow 2.6s ease-in-out infinite;animation-delay:calc(var(--i) * .3s)}
+@keyframes glow{50%{box-shadow:inset 0 0 0 2px rgba(122,150,60,.6)}}
+.jeep .seat.mine{background:linear-gradient(180deg,#ffd08a,#f2a24f);border:0;color:#2b1a0e;box-shadow:0 4px 0 #b3661f,0 0 0 3px #fff,0 0 22px 6px rgba(255,190,100,.7)}
+.jeep .seat.mine small{color:#5a3412}
+.jeep .seat.pop{animation:bounce .45s cubic-bezier(.3,1.8,.5,1)}
+@keyframes bounce{from{transform:scale(.8)}}
+.jeep .seat .rip{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:rgba(255,255,255,.7);opacity:0;pointer-events:none}
+.jeep .seat.pop .rip{animation:ripple .6s ease-out}
+@keyframes ripple{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(14)}}
+.jeep .seat.gone,.seat:disabled{background:linear-gradient(180deg,#8a8072,#6e6558);box-shadow:0 3px 0 #4f483f;color:#ddd3c4;opacity:.85}
+.jeep .seat.gone b{text-decoration:line-through;opacity:.6}
+.jeep .seat.gone small{color:#e9dfd0}
+.jeep .seat.gone::before{content:"🙂";position:absolute;right:8px;top:6px;font-size:14px;filter:grayscale(.6)}
+.stp span{transition:background .4s,transform .4s}.stp span.on{transform:scaleY(1.4)}
+@media (prefers-reduced-motion:reduce){.jeep,.seat,.invite,.invite .jp,.invite .sun,.meter span,.jeep .wheel,.jeep .hood i{animation:none!important}}
