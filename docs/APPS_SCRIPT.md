@@ -24,3 +24,12 @@ Deploy → **Manage deployments → edit → New version**. The URL stays the sa
 ## Limits (Google)
 About **100 emails/day on a free Gmail account** (1,500 on Google Workspace). One booking sends about 2 emails (guest + company), so a free account suits roughly 40 bookings a day. If you hit the limit the app keeps the emails and retries (Settings → Emails shows the status). Use a Workspace account or a dedicated Gmail for the business.
 Emails come from the Google account that owns the script; replies go to the "Bookings email" in Settings.
+
+## Troubleshooting (Admin > Settings > Emails > Check connection tells you which one)
+| Message in the log | Meaning and fix |
+|---|---|
+| `RELAY_SECRET is not set` | In the script editor run `setup()` and copy the secret it prints. |
+| `Unauthorized` / Wrong secret | `APPS_SCRIPT_SECRET` on Railway must be exactly the `RELAY_SECRET` in Script properties. No spaces or quotes. |
+| `replied 404` / URL is wrong | Deploy > Manage deployments, copy the current Web app URL into `APPS_SCRIPT_URL`. Use the URL that ends in `/exec`. |
+| Web app is not public | Redeploy with Who has access = Anyone. |
+Running `testSend()` in the editor only proves the script can send; it does not test the URL or the secret. Use **Check connection** and **Send sample** in the admin instead. After fixing, press **Retry all failed**.

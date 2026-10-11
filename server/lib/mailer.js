@@ -46,6 +46,19 @@ function kick() {
   setImmediate(() => processOutbox().catch(e => console.error('[mail] worker error', e.message)).finally(() => { kicking = false; }));
 }
 
+/** Turn the relay's reply into something the owner can act on. */
+function explain(status, json, text) {
+  const err = json && json.error;
+  if (err) {
+    if (/RELAY_SECRET is not set/i.test(err)) return 'The Apps Script has no RELAY_SECRET saved. In the script editor run setup(), then copy the secret it prints into Railway as APPS_SCRIPT_SECRET.';
+    if (/^Unauthorized/i.test(err)) return 'Wrong secret: APPS_SCRIPT_SECRET on Railway is not the same as RELAY_SECRET in the Apps Script (Project Settings > Script properties).';
+    return err;
+  }
+  if (status === 404 || /unable to open the file|Page Not Found/i.test(text)) return 'The Apps Script URL is wrong or that deployment was deleted. Use Deploy > Manage deployments and copy the current Web app URL into APPS_SCRIPT_URL.';
+  if (/accounts\.google\.com|ServiceLogin|Sign in/i.test(text)) return 'The Web app is not public. Deploy it with Who has access = Anyone.';
+  return `Apps Script replied ${status}: ${text.slice(0, 120).replace(/\s+/g, ' ')}`;
+}
+
 async function sendViaAppsScript(row, conf) {
   const res = await fetch(config.appsScriptUrl, {
     method: 'POST',
@@ -60,7 +73,7 @@ async function sendViaAppsScript(row, conf) {
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* HTML error page from Google */ }
-  if (!res.ok || !json || !json.ok) throw new Error((json && json.error) || `Apps Script replied ${res.status}: ${text.slice(0, 160)}`);
+  if (!res.ok || !json || !json.ok) throw new Error(explain(res.status, json, text));
 }
 
 let warned = false;
@@ -104,6 +117,24 @@ async function processOutbox() {
   }
 }
 
+/** Step by step test of the Apps Script connection, without sending an email. */
+async function checkRelay() {
+  if (!config.appsScriptUrl) return { ok: false, step: 'url', message: 'APPS_SCRIPT_URL is not set on Railway.' };
+  if (!config.appsScriptSecret) return { ok: false, step: 'secret', message: 'APPS_SCRIPT_SECRET is not set on Railway.' };
+  try {
+    const g = await fetch(config.appsScriptUrl, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
+    const t = await g.text(); let j = null; try { j = JSON.parse(t); } catch { /* html */ }
+    if (!j || !j.ok) return { ok: false, step: 'url', message: explain(g.status, j, t) };
+  } catch (e) { return { ok: false, step: 'url', message: 'Could not reach the URL: ' + e.message }; }
+  try {
+    // A deliberately invalid recipient: the script checks the secret first, so "Invalid recipient" proves the secret is right.
+    const r = await fetch(config.appsScriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ secret: config.appsScriptSecret, to: 'check', subject: 'x', html: 'x' }), redirect: 'follow', signal: AbortSignal.timeout(20000) });
+    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch { /* html */ }
+    if (j && /Invalid recipient/.test(j.error || '')) return { ok: true, step: 'done', message: 'Connected. The URL and the secret are correct.', left: null };
+    return { ok: false, step: 'secret', message: explain(r.status, j, t) };
+  } catch (e) { return { ok: false, step: 'secret', message: e.message }; }
+}
+
 /** Send a sample of the real booking confirmation (with QR and buttons) so the owner can see the design in an inbox. */
 async function sendTest(to) {
   const conf = await settings.load();
@@ -123,4 +154,4 @@ async function sendTest(to) {
 
 const recipientsFor = conf => (conf.emails.recipients || []).filter(Boolean);
 
-module.exports = { enqueue, kick, processOutbox, sendTest, recipientsFor };
+module.exports = { enqueue, kick, processOutbox, sendTest, checkRelay, recipientsFor };

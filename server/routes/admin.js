@@ -234,6 +234,12 @@ r.post('/emails/test', owner, U.wrap(async (req, res) => {
   try { await mailer.sendTest(to); } catch (e) { throw new U.HttpError(502, e.message); }
   res.json({ ok: true });
 }));
+r.post('/emails/check', staff, U.wrap(async (req, res) => res.json(await mailer.checkRelay())));
+r.post('/emails/retry-all', staff, U.wrap(async (req, res) => {
+  const x = await query(`UPDATE email_log SET status='PENDING', attempts=0, next_attempt_at=now(), error=NULL WHERE status IN ('FAILED','LOGGED') OR (status='PENDING' AND attempts>0)`);
+  mailer.kick();
+  res.json({ ok: true, queued: x.rowCount });
+}));
 r.post('/emails/:id/retry', staff, U.wrap(async (req, res) => {
   await query(`UPDATE email_log SET status='PENDING', attempts=0, next_attempt_at=now(), error=NULL WHERE id=$1 AND status IN ('FAILED','LOGGED')`, [+req.params.id]);
   mailer.kick();
