@@ -297,6 +297,22 @@ test('shared site: every open date is available; a jeep opens on demand and the 
   assert.equal((await fetch(base + '/shared')).status, 200);
 });
 
+test('shared site: at 4 booked the jeep is "on" with 2 seats left, links are emailed at once, and another jeep can be started', async () => {
+  const date = U.addDays(U.todayStr(), 26), month = date.slice(0, 7);
+  const j1 = (await api('POST', '/api/shared-trips/open', { date, ses: 'morning' })).json.id;
+  const before = (await emails('cust_shared_pay')).length;
+  for (let n = 1; n <= 4; n++) await api('POST', `/api/shared/${j1}/seats`, { seats: [n], name: 'Four ' + n, cc: '+94', phone: '77666600' + n, email: `f${n}@x.com`, pay: 'later' });
+  assert.equal((await emails('cust_shared_pay')).length - before, 4, 'every booked guest gets the payment link as soon as 4 are booked');
+  const dl = (await query(`SELECT pay_deadline FROM shared_seats WHERE trip_id=$1 AND status='PAYMENT_PENDING' LIMIT 1`, [j1])).rows[0].pay_deadline;
+  const hours = (new Date(dl) - Date.now()) / 3600e3;
+  assert.ok(hours > 23 && hours <= 24.01, 'unpaid seats are released after 24h: ' + hours);
+  const day = (await api('GET', `/api/shared-trips?month=${month}&session=morning`)).json.days[date];
+  assert.equal(day.trips.length, 1); assert.equal(day.trips[0].ready, true); assert.equal(day.trips[0].free, 2); assert.equal(day.canOpenNew, true);
+  const fresh = await api('POST', '/api/shared-trips/open', { date, ses: 'morning', fresh: true });
+  assert.notEqual(fresh.json.id, j1, 'another jeep opens');
+  assert.equal((await api('POST', '/api/shared-trips/open', { date, ses: 'morning', fresh: true })).json.id, fresh.json.id, 'the new jeep is reused until it has 4 booked');
+});
+
 test('shared trip: pay-now seat holds the seat, unpaid reservations are released after the deadline', async () => {
   const date = U.addDays(U.todayStr(), 9);
   const id = (await admin('POST', '/api/admin/shared', { date, ses: 'evening' })).json.id;

@@ -12,9 +12,9 @@ const tripLink = t => `${CFG.baseUrl}/s/${t.id}`;
 let tab = 'up', openId = null;
 function list() {
   const T = [['up', 'Upcoming', t => !['Cancelled', 'Completed'].includes(status(t))], ['past', 'Past & cancelled', t => ['Cancelled', 'Completed'].includes(status(t))]];
-  $('#tabs').innerHTML = T.map(([k, l, f]) => `<button data-k="${k}" class="${k === tab ? 'on' : ''}">${l}<span class="c">${SHARED.filter(f).length}</span></button>`).join('');
+  $('#tabs').innerHTML = T.map(([k, l, f]) => `<button data-k="${k}" class="${k === tab ? 'on' : ''}">${l}<span class="c">${SHARED.filter(t => t.seats.length || !t.auto).filter(f).length}</span></button>`).join('');
   $$('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.k; list() });
-  const rows = SHARED.filter(T.find(x => x[0] === tab)[2]).sort((a, b) => tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
+  const rows = SHARED.filter(t => t.seats.length || !t.auto).filter(T.find(x => x[0] === tab)[2]).sort((a, b) => tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
   $('#trips').innerHTML = rows.map(t => {
     const p = paidOf(t), st = status(t), byN = {}; t.seats.forEach(x => byN[x.n] = x);
     return `<button class="trip fade" data-id="${t.id}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="mono small muted">${t.id}</span>${badge(st)}</div>

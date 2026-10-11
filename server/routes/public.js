@@ -201,7 +201,7 @@ r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
     const canOpenNew = U.localDate(d, s.start).getTime() - now >= cutoff && avail.jeepsFree(usage, d, ses, conf.rules.fleet) >= 1;
     const openTrip = trips.find(t => !t.full);
     if (!openTrip && !canOpenNew) { if (trips.length) days[d] = { state: 'full', trips }; continue; }
-    days[d] = { state: trips.some(t => t.ready) ? 'ready' : 'available', price: s.seat, seatsMax: conf.shared.seats, minSeats: conf.shared.minSeats, free: openTrip ? openTrip.free : conf.shared.seats, trips };
+    days[d] = { canOpenNew, state: trips.some(t => t.ready) ? 'ready' : 'available', price: s.seat, seatsMax: conf.shared.seats, minSeats: conf.shared.minSeats, free: openTrip ? openTrip.free : conf.shared.seats, trips };
   }
   res.set('Cache-Control', 'no-store').json({ days, price: s.seat });
 }));
@@ -210,7 +210,7 @@ r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
 r.post('/shared-trips/open', limits.booking, U.wrap(async (req, res) => {
   const date = String(req.body.date || ''), ses = String(req.body.ses || '');
   if (!U.isDate(date)) throw U.bad('Pick a date.');
-  const t = await shared.openJeep(date, ses);
+  const t = await shared.openJeep(date, ses, { fresh: !!req.body.fresh });
   if (!t) throw U.conflict('Sorry, every shared jeep for that session is full or closed.');
   res.json({ id: t.id });
 }));

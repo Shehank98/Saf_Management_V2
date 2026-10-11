@@ -28,12 +28,13 @@ const groupBy = (seats) => { const m = new Map(); seats.forEach(s => { if (!m.ha
  * if a jeep is still free in the fleet. Returns null when everything is full.
  * Call inside a transaction (takes the same per-date lock as private bookings).
  */
-async function ensureOpenJeep(db, date, sessionId, conf, { create = true } = {}) {
+async function ensureOpenJeep(db, date, sessionId, conf, { create = true, fresh = false } = {}) {
   await lockDate(db, date);
   const trips = (await db.query(
     `SELECT t.*, (SELECT COUNT(*)::int FROM shared_seats s WHERE s.trip_id=t.id AND s.status IN ${ACTIVE}) AS held
        FROM shared_trips t WHERE t.date=$1 AND t.session_id=$2 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') ORDER BY t.created_at, t.id`, [date, sessionId])).rows;
-  const open = trips.find(t => t.held < t.seats);
+  // fresh = a jeep that is not already going ahead (used for "open another jeep" once a jeep has 4+ booked)
+  const open = fresh ? trips.find(t => t.held < t.min_seats) : trips.find(t => t.held < t.seats);
   if (open || !create) return open || null;
   const s = conf.sessions[sessionId];
   if (!s || !s.active || avail.dateBlocked(date, s, conf)) return null;
@@ -52,7 +53,7 @@ async function ensureOpenJeep(db, date, sessionId, conf, { create = true } = {})
   }
   return null;
 }
-const openJeep = async (date, sessionId) => { const conf = await settings.load(); return tx(db => ensureOpenJeep(db, date, sessionId, conf)); };
+const openJeep = async (date, sessionId, opts) => { const conf = await settings.load(); return tx(db => ensureOpenJeep(db, date, sessionId, conf, opts)); };
 
 function statusOf(trip, seats) {
   if (['STARTED', 'COMPLETED', 'CANCELLED'].includes(trip.status)) return trip.status;

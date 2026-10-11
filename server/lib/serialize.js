@@ -84,7 +84,7 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
       id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, status: STATUS[t.status], minSeats: t.min_seats, seatsMax: t.seats,
       deadline: U.dateOf(t.auto_cancel_at), deadlineTime: U.hhmm(t.auto_cancel_at),
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
-      startedAt: t.started_at ? U.hhmm(t.started_at) : '',
+      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto,
       seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline })),
     };
   });

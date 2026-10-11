@@ -54,3 +54,5 @@ body:has(.app){zoom:1!important}  /* admin and partner layouts are already fluid
 .app.collapsed .side .me{border:0;padding:6px 0;justify-content:center}
 @media (max-height:760px){.side a.nv{padding:6px 11px}.side .sep{padding:6px 12px 0}.side .logo{margin-bottom:4px}}
 @media (max-width:900px){.app.collapsed{grid-template-columns:1fr}.app.collapsed .lb{display:revert}.app.collapsed .side{align-items:stretch}.app.collapsed .side a.nv,.app.collapsed .collapse-btn{width:auto;justify-content:flex-start}.collapse-btn{display:none}}
+
+.jrow{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
