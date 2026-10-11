@@ -53,10 +53,10 @@ function show() {
   if (tab === 'home') h += `<div class="kpis"><div class="kpi"><div class="l">Next job</div><div class="v" style="font-size:20px">${up[0] ? shortDate(up[0].date) + ' · ' + esc((SESS[up[0].ses] || {}).short) : '—'}</div></div><div class="kpi"><div class="l">Jobs this week</div><div class="v">${up.filter(j => (parseIso(j.date) - TODAY) / 864e5 < 7).length}</div></div><div class="kpi"><div class="l">Owed to you</div><div class="v">${fmt(owed)}</div><div class="d"><a href="#payments">See payments →</a></div></div><div class="kpi"><div class="l">Rating</div><div class="v">★ ${PD.me.rating}</div></div></div>
     <h3 style="margin:20px 0 10px">Coming up</h3>${up.slice(0, 3).map(j => jobCard(j, false)).join('') || '<div class="empty">No jobs yet. The office will email you when a job is offered.</div>'}${up.length ? '<a class="btn" href="#jobs">See all jobs</a>' : ''}`;
   if (tab === 'jobs') h += up.map(j => jobCard(j, true)).join('') || '<div class="empty">No jobs yet</div>';
-  if (tab === 'checkin') h += `<div class="panel" style="max-width:600px"><div class="pb"><p class="muted" style="margin-bottom:12px">At pickup, scan the guest's e-ticket QR. <b>This starts the trip</b>: the guest gets an email and the office sees it live.</p>
+  if (tab === 'checkin') h += `<div class="panel" style="max-width:600px"><div class="pb"><p class="muted" style="margin-bottom:12px">At pickup, scan the guest's e-ticket QR (or type the code), check the details, then tap <b>Start the trip</b>. The guest gets an email and the office sees it live.</p>
     <div class="cam" id="cam"><div class="frame"></div><div class="line"></div><span class="small" style="position:absolute;bottom:10px" id="camNote">Tap “Use camera” to scan</span></div>
     <div style="margin-top:10px"><button class="btn sm" type="button" id="camBtn">📷 Use camera</button></div>
-    <form id="cf" style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="cc" placeholder="Or type the code, e.g. YWS-4821K" style="text-transform:uppercase" autocapitalize="characters"><button class="btn primary">Start</button></form><div id="cres" style="margin-top:12px"></div></div></div>`;
+    <form id="cf" style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="cc" placeholder="Or type the code, e.g. YWS-4821K" style="text-transform:uppercase" autocapitalize="characters"><button class="btn primary">Find</button></form><div id="cres" style="margin-top:12px"></div></div></div>`;
   if (tab === 'payments') {
     const paid = L.filter(l => l.paid), paidY = paid.reduce((a, l) => a + l.amount, 0);
     h += `<div class="kpis"><div class="kpi"><div class="l">Owed to you</div><div class="owed">${fmt(owed)}</div><div class="d muted">${L.filter(l => !l.paid).length} trips · paid by the office</div></div><div class="kpi"><div class="l">Paid to you (last 12 months)</div><div class="owed">${fmt(paidY)}</div><div class="payprog"><span style="width:${paidY / (paidY + owed || 1) * 100}%"></span></div><div class="d muted">${Math.round(paidY / (paidY + owed || 1) * 100)}% of earnings paid out</div></div></div>
@@ -87,7 +87,8 @@ function show() {
     });
   }
   if (tab === 'checkin') {
-    const run = async (text, force = false) => { const el = $('#cres'); el.innerHTML = '<div class="empty">Checking…</div>'; const r = await scanTicket(text, { force }); el.innerHTML = scanResultHTML(r); wireScanResult(r, f => run(text, f)); if (r.kind === 'ok') refresh(true) };
+    let lastForce = false;
+    const run = async (text, force = false, start = false) => { const el = $('#cres'); if (!start) el.innerHTML = '<div class="empty">Checking…</div>'; lastForce = force || lastForce; const r = await scanTicket(text, { force: lastForce, preview: !start }); el.innerHTML = scanResultHTML(r); wireScanResult(r, (f, st) => run(text, f, st)); if (r.kind === 'ok') refresh(true) };
     $('#cf').onsubmit = e => { e.preventDefault(); const v = $('#cc').value.trim(); if (v) run(v) };
     $('#camBtn').onclick = async () => {
       const btn = $('#camBtn'); if (scanner) { stopScanner(); btn.textContent = '📷 Use camera'; $('#camNote').textContent = 'Tap “Use camera” to scan'; return }

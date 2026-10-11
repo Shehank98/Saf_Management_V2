@@ -1,11 +1,13 @@
 adminShell({ active: 'checkin.html', title: 'Ticket check-in' });
-$('#content > p').innerHTML = 'Scan the QR on a guest\'s e-ticket, or type the booking code. <b>The first scan starts the trip</b>: the guest gets a “safari started” email and the dashboard shows it as live. Drivers usually do this from the partner app at pickup.';
+$('#content > p').innerHTML = 'Scan the QR on a guest\'s e-ticket, or type the booking code. After the scan, check the details and tap <b>Start the trip</b>: the guest gets a “safari started” email and the dashboard shows it as live. Drivers usually do this from the partner app at pickup.';
 let scanner = null, busyScan = false;
-async function check(text, force = false) {
-  if (busyScan) return; busyScan = true;
-  const el = $('#res'); el.className = 'res'; el.innerHTML = '<div class="empty">Checking…</div>';
-  const r = await scanTicket(text, { force });
-  el.innerHTML = scanResultHTML(r); wireScanResult(r, f => check(text, f)); busyScan = false;
+let lastText = '', lastForce = false;
+async function check(text, force = false, start = false) {
+  if (busyScan && !start) return; busyScan = true;
+  const el = $('#res'); el.className = 'res'; if (!start) el.innerHTML = '<div class="empty">Checking…</div>';
+  lastText = text; lastForce = force || lastForce;
+  const r = await scanTicket(text, { force: lastForce, preview: !start });
+  el.innerHTML = scanResultHTML(r); wireScanResult(r, (f, st) => check(text, f, st)); busyScan = false;
   if (r.kind === 'ok') reload().catch(() => { });
 }
 $('#f').onsubmit = e => { e.preventDefault(); const v = $('#code').value.trim(); if (v) check(v) };

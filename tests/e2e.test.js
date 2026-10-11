@@ -169,6 +169,10 @@ test('trip start: scan creates STARTED, payout lines and the "started" email; se
   const sig = require('../server/lib/secrets').sign(code);
   const wrongSig = await api('POST', '/api/checkin', { code, sig: 'deadbeef' }, pc);
   assert.equal(wrongSig.json.kind, 'bad');
+  const peek = await api('POST', '/api/checkin', { text: `http://localhost/t/${code}?k=${sig}`, preview: true }, pc);
+  assert.equal(peek.json.kind, 'ready', 'scanning shows the booking and a Start button');
+  assert.equal((await query('SELECT status FROM bookings WHERE code=$1', [code])).rows[0].status, 'CONFIRMED', 'a preview must not start the trip');
+  assert.equal((await emails('cust_started')).length, 0);
   const scan = await api('POST', '/api/checkin', { text: `http://localhost/t/${code}?k=${sig}` }, pc);
   assert.equal(scan.json.kind, 'ok', JSON.stringify(scan.json));
   assert.equal(scan.json.info.balance, out.booking.total);

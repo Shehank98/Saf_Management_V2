@@ -118,11 +118,18 @@ const vendorOpts = (type, sel) => `<option value="">— Not assigned —</option
 const stateNote = st => st === 'OFFERED' ? ' <span class="tiny muted">(waiting for them to accept)</span>' : st === 'ACCEPTED' ? ' <span class="tiny" style="color:var(--ok)">✓ accepted</span>' : '';
 
 /* ===== Ticket scan = trip start (Admin → Check-in and the partner app) ===== */
-async function scanTicket(text, { force = false } = {}) {
-  try { return await POST('/api/checkin', { text, force }) }
+async function scanTicket(text, { force = false, preview = false } = {}) {
+  try { return await POST('/api/checkin', { text, force, preview }) }
   catch (e) { return { kind: 'bad', title: '✕ Could not check in', msg: e.message } }
 }
 function scanResultHTML(r) {
+  if (r.kind === 'ready') {
+    const i = r.info;
+    return `<div class="scanres ok"><div class="big">Ticket found</div><p style="font-size:17px;margin:4px 0 8px"><b>${esc(i.name)}</b> · ${ppl(i.guests)} · ${esc(i.sessionName)}${i.seats ? ' · seat ' + i.seats.join(', ') : ''}</p>
+    <p class="small" style="margin:0 0 6px">Code <b class="mono">${esc(i.code)}</b>${i.mealsText ? ' · <b>Meals:</b> ' + esc(i.mealsText) : ''}</p>
+    <p style="margin:6px 0 12px">Collect from guest: <b style="color:${i.balance ? 'var(--bad)' : 'var(--ok)'}">${i.balance ? fmt(i.balance) : 'nothing, fully paid'}</b></p>
+    <button class="btn primary block" id="startTrip" style="font-size:17px;padding:14px">▶ Start the trip</button></div>`;
+  }
   if (r.kind !== 'ok') return `<div class="scanres ${r.kind}"><div class="big">${esc(r.title)}</div><p>${esc(r.msg || '')}</p>${r.canForce ? '<button class="btn sm" id="force">Start anyway</button>' : ''}${r.info && r.kind === 'warn' ? `<p class="small" style="margin:6px 0 0">${esc(r.info.name)} · ${esc(r.info.sessionName)}</p>` : ''}</div>`;
   const i = r.info;
   return `<div class="scanres ok"><div class="startanim" aria-hidden="true"><div class="road2"></div><div class="flag">🏁</div><div class="car2">${JEEP('#3f5a2e', 64, 40)}</div></div>
@@ -133,6 +140,7 @@ function scanResultHTML(r) {
 }
 function wireScanResult(r, rerun) {
   const f = $('#force'); if (f) f.onclick = () => rerun(true);
+  const st = $('#startTrip'); if (st) st.onclick = () => { st.disabled = true; st.textContent = 'Starting…'; rerun(false, true) };
   if (r.kind === 'ok') toast(`Trip started · email sent to ${esc((r.info.name || '').split(' ')[0])}`);
 }
 

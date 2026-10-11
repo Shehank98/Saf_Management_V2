@@ -17,7 +17,7 @@ function parseScan(body) {
 /** POST /api/checkin { code | text, sig?, force? } for staff or partners. First scan starts the trip. */
 r.post('/', limits.api, auth.requireStaffOrPartner, U.wrap(async (req, res) => {
   const { code, sig } = parseScan(req.body || {});
-  res.set('Cache-Control', 'no-store').json(await trips.checkin({ code, sig, force: !!req.body.force, actor: req.actor }));
+  res.set('Cache-Control', 'no-store').json(await trips.checkin({ code, sig, force: !!req.body.force, preview: !!req.body.preview, actor: req.actor }));
 }));
 
 module.exports = r;

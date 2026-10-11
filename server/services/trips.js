@@ -53,7 +53,7 @@ function canScan(actor, conf, assignedPartnerIds) {
  * POST /api/checkin. The first scan of a confirmed ticket on its day starts the trip:
  * status STARTED, payout lines created, guest emailed, dashboard updated.
  */
-async function checkin({ code, sig, force = false, actor }) {
+async function checkin({ code, sig, force = false, preview = false, actor }) {
   code = U.normCode(code);
   if (!code) return bad('Enter a code', 'Type the booking code or scan the QR.');
   if (sig && !secrets.verify(code, sig)) return bad('✕ Not our ticket', 'This QR code is not valid. Check the code, or the QR may not be ours.');
@@ -61,13 +61,13 @@ async function checkin({ code, sig, force = false, actor }) {
   const today = U.todayStr();
 
   const booking = (await query('SELECT * FROM bookings WHERE code=$1', [code])).rows[0];
-  if (booking) return checkinPrivate(booking, { force, actor, conf, today });
+  if (booking) return checkinPrivate(booking, { force, preview, actor, conf, today });
   const seat = (await query(`SELECT * FROM shared_seats WHERE code=$1 ORDER BY seat_no LIMIT 1`, [code])).rows[0];
-  if (seat) return checkinShared(seat, { force, actor, conf, today });
+  if (seat) return checkinShared(seat, { force, preview, actor, conf, today });
   return bad('✕ Not found', `No ticket with code ${code}. Check the code, or the QR may not be ours.`);
 }
 
-async function checkinPrivate(b0, { force, actor, conf, today }) {
+async function checkinPrivate(b0, { force, preview, actor, conf, today }) {
   const session = conf.sessions[b0.session_id];
   const assigned = (await query(`SELECT partner_id FROM assignments WHERE booking_id=$1 AND status<>'DECLINED'`, [b0.id])).rows.map(r => r.partner_id);
   if (!canScan(actor, conf, assigned)) return bad('✕ Not your trip', `${b0.code} is assigned to another driver.`);
@@ -77,6 +77,8 @@ async function checkinPrivate(b0, { force, actor, conf, today }) {
   const info = b => ({ code: b.code, name: b.lead_name, guests: b.guests, sessionName: session.name, email: b.email, balance: b.total - b.paid, startedAt: b.started_at ? U.hhmm(b.started_at) : null, kind: 'Private' });
   if (b0.status === 'STARTED') return warn('Already started', `${b0.code} started at ${U.hhmm(b0.started_at)}. Nothing else to do.`, { info: info(b0) });
   if (b0.date !== today && !force) return warn('! Different day', `This ticket is for ${U.niceDate(b0.date)} (${session.short}).`, { canForce: true });
+  // Scanning only looks the ticket up; the driver taps "Start the trip" to actually begin.
+  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(b0), mealsText: await mealsText(b0) } };
 
   const started = await tx(async db => {
     const b = (await db.query('SELECT * FROM bookings WHERE id=$1 FOR UPDATE', [b0.id])).rows[0];
@@ -113,7 +115,7 @@ async function mealsText(b) {
   return mealSummary(prefs, b.allergy_note);
 }
 
-async function checkinShared(s0, { force, actor, conf, today }) {
+async function checkinShared(s0, { force, preview, actor, conf, today }) {
   const t0 = (await query('SELECT * FROM shared_trips WHERE id=$1', [s0.trip_id])).rows[0];
   const session = conf.sessions[t0.session_id];
   const assigned = (await query(`SELECT partner_id FROM assignments WHERE shared_trip_id=$1 AND status<>'DECLINED'`, [t0.id])).rows.map(r => r.partner_id);
@@ -126,6 +128,7 @@ async function checkinShared(s0, { force, actor, conf, today }) {
   const info = (startedAt, at) => ({ code: s0.code, name: s0.name, guests: seats.length, sessionName: 'Shared · ' + session.name, email: s0.email, balance: 0, startedAt, kind: 'Shared', seats: seats.map(s => s.seat_no), checkedInAt: at });
   if (seats.every(s => s.checked_in_at)) return warn('Already checked in', `${s0.name} (seat ${seats.map(s => s.seat_no).join(', ')}) is already on board.`, { info: info(t0.started_at ? U.hhmm(t0.started_at) : null) });
   if (t0.date !== today && !force) return warn('! Different day', `This ticket is for ${U.niceDate(t0.date)} (${session.short}).`, { canForce: true });
+  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(t0.started_at ? U.hhmm(t0.started_at) : null), mealsText: '' }, tripRunning: t0.status === 'STARTED' };
 
   const res = await tx(async db => {
     const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1 FOR UPDATE', [t0.id])).rows[0];
