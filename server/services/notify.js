@@ -70,17 +70,17 @@ async function cancelled(db, b, { refund, pct, by }) {
 async function reminder(db, b) {
   const c = await ctx(), v = await bookingView(db, b, c);
   const a = await db.query(
-    `SELECT a.role, p.name, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
+    `SELECT a.role, p.name, p.phone, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
       WHERE a.booking_id=$1 AND a.status<>'DECLINED'`, [b.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
-  await send(db, 'cust_reminder', T.cust_reminder(v, { driver: jeep && jeep.name, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c),
+  await send(db, 'cust_reminder', T.cust_reminder(v, { driver: jeep && jeep.name, driverPhone: jeep && jeep.phone, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c),
     { to: v.email, entity: 'booking', entityId: v.code, qrLink: v.ticketUrl });
 }
 
 async function started(db, b, { startedAt, by }) {
   const c = await ctx(), v = await bookingView(db, b, c);
   const a = await db.query(
-    `SELECT a.role, p.name, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
+    `SELECT a.role, p.name, p.phone, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
       WHERE a.booking_id=$1 AND a.status<>'DECLINED'`, [b.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
   await send(db, 'cust_started', T.cust_started(v, { startedAt, driver: jeep && jeep.name, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c), { to: v.email, entity: 'booking', entityId: v.code });
@@ -92,16 +92,16 @@ async function thanks(db, b) {
   await send(db, 'cust_thanks', T.cust_thanks(v, c), { to: v.email, entity: 'booking', entityId: v.code });
 }
 
-async function jobOffer(db, partner, { role, fee, booking, trip }) {
+async function jobOffer(db, partner, { role, fee, booking, trip, aid }) {
   const c = await ctx();
   const roleLabel = { JEEP: 'Jeep + driver', GUIDE: 'Tracker / guide', MEALS: 'Meal supplier' }[role];
   let j;
   if (booking) {
     const v = await bookingView(db, booking, c);
-    j = { code: v.code, date: v.date, session: v.session, roleLabel, pickupWhere: v.pickupWhere, guests: v.guests, leadName: v.name, phone: v.phone, mealsText: v.mealsText, collect: v.total - v.paid, fee };
+    j = { code: v.code, date: v.date, session: v.session, roleLabel, pickupWhere: v.pickupWhere, guests: v.guests, leadName: v.name, phone: v.phone, mealsText: v.mealsText, collect: v.total - v.paid, fee, aid };
   } else {
     const session = c.conf.sessions[trip.session_id];
-    j = { code: trip.id, date: trip.date, session, roleLabel, pickupWhere: 'several hotels (shared jeep)', guests: trip.heldCount || 0, fee };
+    j = { code: trip.id, date: trip.date, session, roleLabel, pickupWhere: 'several hotels (shared jeep)', guests: trip.heldCount || 0, fee, aid };
   }
   await send(db, 'vendor_job', T.vendor_job(j, c), { to: partner.email, entity: 'partner', entityId: partner.id });
 }

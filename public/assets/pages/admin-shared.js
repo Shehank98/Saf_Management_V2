@@ -58,7 +58,7 @@ function open(id) {
 function seat(t, n) {
   const x = t.seats.find(y => y.n === n), id = t.id;
   if (x) {
-    openModal(`<h3>Seat ${n} · ${esc(x.name)}</h3><dl class="dl" style="margin-top:10px"><dt>Mobile</dt><dd>${esc(x.cc)} ${esc(x.phone)}</dd><dt>Email</dt><dd>${esc(x.email) || '—'}</dd>${x.meal ? `<dt>Meal</dt><dd>${esc(x.meal)}</dd>` : ''}<dt>Payment</dt><dd><span class="tag ${x.pay === 'Paid' ? 'ok' : 'warn'}">${x.pay}</span></dd></dl>
+    openModal(`<h3>Seat ${n} · ${esc(x.name)}</h3><dl class="dl" style="margin-top:10px"><dt>Mobile</dt><dd>${esc(x.cc)} ${esc(x.phone)}</dd><dt>Email</dt><dd>${esc(x.email) || '-'}</dd>${x.meal ? `<dt>Meal</dt><dd>${esc(x.meal)}</dd>` : ''}<dt>Payment</dt><dd><span class="tag ${x.pay === 'Paid' ? 'ok' : 'warn'}">${x.pay}</span></dd></dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${x.pay === 'Pending' ? '<button class="btn ok" id="mp">Mark as paid (cash)</button>' : ''}<button class="btn danger" id="rm">Remove guest</button><button class="btn" data-close>Close</button></div>`);
     const mp = $('#mp'); if (mp) mp.onclick = async e => { if (await act(() => POST(`/api/admin/shared/${id}/seats/${n}/paid`), 'Marked paid · e-tickets go out once the trip has enough paid seats', e.target)) { closeModal(); list(); open(id) } };
     $('#rm').onclick = async e => { if (await act(() => DEL(`/api/admin/shared/${id}/seats/${n}`), 'Guest removed · seat is free again', e.target)) { closeModal(); list(); open(id) } };

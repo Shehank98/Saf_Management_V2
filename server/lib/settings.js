@@ -64,7 +64,7 @@ async function load() {
   if (stored.emails && Array.isArray(stored.emails.recipients)) conf.emails.recipients = stored.emails.recipients;
   conf.sessions = Object.fromEntries(ses.rows.map(r => [r.id, {
     id: r.id, name: r.name, short: r.short, start: r.start_time, end: r.end_time, pickupRaw: r.pickup_time,
-    time: `${fmt12(r.start_time)} – ${fmt12(r.end_time)}`, pickup: fmt12(r.pickup_time),
+    time: `${fmt12(r.start_time)} - ${fmt12(r.end_time)}`, pickup: fmt12(r.pickup_time),
     jeep: r.private_jeep_price, seat: r.shared_seat_price, active: r.active, sort: r.sort,
   }]));
   conf.extras = Object.fromEntries(ex.rows.map(r => [r.id, { id: r.id, name: r.name, price: r.price, per: r.per, active: r.active }]));

@@ -114,7 +114,7 @@ function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').classLi
 function closeModal() { $('#modal')?.classList.remove('show') }
 const STATUS_CLS = { Request: 'warn', 'Deposit paid': 'info', Started: 'live', Confirmed: 'ok', Completed: '', Cancelled: 'bad', Open: 'warn', 'Payment links sent': 'info', Full: 'info' };
 const badge = s => `<span class="tag ${STATUS_CLS[s] ?? ''}">${esc(s)}</span>`;
-const vendorOpts = (type, sel) => `<option value="">— Not assigned —</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
+const vendorOpts = (type, sel) => `<option value="">- Not assigned -</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
 const stateNote = st => st === 'OFFERED' ? ' <span class="tiny muted">(waiting for them to accept)</span>' : st === 'ACCEPTED' ? ' <span class="tiny" style="color:var(--ok)">✓ accepted</span>' : '';
 
 /* ===== Ticket scan = trip start (Admin → Check-in and the partner app) ===== */

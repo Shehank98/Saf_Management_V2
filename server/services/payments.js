@@ -39,7 +39,7 @@ async function complete(paymentId, { amount = null, meta = {} } = {}) {
     if (pay.status === 'SUCCEEDED') return { already: true, payment: pay };
     if (amount != null && Math.abs(amount - pay.amount) > 0.5) {
       await db.query(`UPDATE payments SET status='FAILED', meta = meta || $2::jsonb WHERE id=$1`, [paymentId, JSON.stringify({ mismatch: amount })]);
-      if (pay.booking_id) await activity.log(db, 'booking', pay.booking_id, `Payment amount mismatch (expected ${pay.amount}, gateway said ${amount}) – not applied`, pay.provider);
+      if (pay.booking_id) await activity.log(db, 'booking', pay.booking_id, `Payment amount mismatch (expected ${pay.amount}, gateway said ${amount}) - not applied`, pay.provider);
       throw conflict('Payment amount does not match');
     }
     const upd = await db.query(

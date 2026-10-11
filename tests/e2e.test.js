@@ -163,6 +163,14 @@ test('trip start: scan creates STARTED, payout lines and the "started" email; se
   const out = await require('../server/services/bookings').create({ ...guest({ date: today, pay: 'later', meals: 1, mealPrefs: ['Non-veg', 'Vegan', 'Halal', 'Halal'], cam: 1 }), status: 'Confirmed', sendTicket: false }, { admin: { name: 'Test' } });
   const code = out.booking.code;
   assert.equal((await admin('POST', `/api/admin/bookings/${code}/assign`, { jeep: String(pid), guide: String(gid) })).status, 200);
+  // one-tap Accept from the job email works without logging in, once, and only with the signed link
+  const jobMail = (await emails('vendor_job')).filter(m => m.to_addr === 'sunil@t.lk').pop();
+  const [, aid, k] = jobMail.html.match(/\/partner\/job\/(\d+)\/accept\?k=(\w+)/);
+  assert.equal((await fetch(`${base}/partner/job/${aid}/accept?k=bad`)).status, 200);
+  assert.equal((await query('SELECT status FROM assignments WHERE id=$1', [aid])).rows[0].status, 'OFFERED', 'bad signature changes nothing');
+  assert.match(await (await fetch(`${base}/partner/job/${aid}/accept?k=${k}`)).text(), /Job accepted/);
+  assert.equal((await query('SELECT status FROM assignments WHERE id=$1', [aid])).rows[0].status, 'ACCEPTED');
+  assert.match(await (await fetch(`${base}/partner/job/${aid}/accept?k=${k}`)).text(), /Already answered/);
   // the driver logs in and scans
   const login = await api('POST', '/api/partner/login', { email: 'sunil@t.lk', password: 'driver-pass-1' });
   const pc = login.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');

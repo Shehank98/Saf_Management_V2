@@ -30,7 +30,7 @@ async function show() {
     <div>Lead guest<b>${esc(b.name)}</b></div><div>Phone<b>${esc(b.cc)} ${esc(b.phone)}</b></div><div>Group<b>${ppl(b.guests)} · ${b.jeeps} jeep${b.jeeps > 1 ? 's' : ''}</b></div>
     <div>Pickup<b>${b.pmode === 'hotel' ? esc(b.hotel) : 'Our office'}</b></div>${+b.meals ? `<div>Meals<b>${mealSummary(b)}</b></div>` : ''}<div>Total<b>${fmt(b.total)}</b></div><div>Paid<b style="color:var(--ok)">${fmt(b.paid)}</b></div>
     <div>${cancelled ? 'Refund' : 'Due at pickup'}<b>${cancelled ? fmt(b.refunded) : fmt(b.balance)}</b></div></div></div>
-  ${cancelled ? `<div class="note" style="margin-top:14px">This booking is cancelled. ${b.refunded ? 'Your refund goes back to your card in 5–10 days. ' : ''}<a href="/book/session">Book another safari</a></div>`
+  ${cancelled ? `<div class="note" style="margin-top:14px">This booking is cancelled. ${b.refunded ? 'Your refund goes back to your card in 5-10 days. ' : ''}<a href="/book/session">Book another safari</a></div>`
       : `<div class="acts fade d3" style="margin-top:14px">${conf ? `<a class="btn primary" href="${link('ticket.html', { code: b.code, k: b.k }, false)}">Open e-ticket</a>` : ''}${b.canPay && CFG.providers.length ? `<button class="btn ${conf ? '' : 'primary'}" id="payBal">Pay ${fmt(b.rawStatus === 'PENDING_PAYMENT' ? b.balance : b.balance)} now</button>` : ''}
     <a class="btn" href="mailto:${esc(CFG.email)}?subject=${encodeURIComponent('Booking ' + b.code)}">Email us to change something</a>
     ${b.canCancel ? '<button class="btn ghost" id="cancel" style="color:var(--bad)">Cancel booking</button>' : ''}</div>`}`;

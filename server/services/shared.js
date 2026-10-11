@@ -88,7 +88,7 @@ async function createTrip({ date, ses, price, jeep }, actor) {
     await activity.log(db, 'trip', id, 'Shared trip created', actor);
     if (jeep) {
       const res = await assignments.assign(db, { tripId: id, date, role: 'JEEP', partnerId: +jeep, fee: assignments.feeFor('JEEP', { sessionId: ses, jeeps: 1 }, conf), actor });
-      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role: 'JEEP', fee: res.fee, trip: row })); });
+      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role: 'JEEP', fee: res.fee, trip: row, aid: res.aid })); });
     }
     return row;
   });
@@ -428,7 +428,7 @@ async function assignPartners(tripId, { jeep, guide }, actor) {
       if (pid === undefined) continue;
       const fee = assignments.feeFor(role, { sessionId: t.session_id, jeeps: 1 }, conf);
       const res = await assignments.assign(db, { tripId: t.id, date: t.date, role, partnerId: pid ? +pid : null, fee, actor });
-      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, trip: { ...t, heldCount: held } })); });
+      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, trip: { ...t, heldCount: held }, aid: res.aid })); });
     }
     return t;
   });

@@ -43,7 +43,7 @@ function paint(b) {
   const ics = $('#ics');
   if (ics) ics.onclick = () => {
     const d = b.date.replace(/-/g, '');
-    const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//' + BRAND + '//EN', 'BEGIN:VEVENT', 'UID:' + b.code + '@' + CFG.domain, 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', 'DTSTART:' + d + 'T' + s.start.replace(':', '') + '00', 'DTEND:' + d + 'T' + s.end.replace(':', '') + '00', 'SUMMARY:' + s.name + ' – ' + BRAND, 'DESCRIPTION:Booking ' + b.code + '. Pickup ' + s.pickup + '.', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//' + BRAND + '//EN', 'BEGIN:VEVENT', 'UID:' + b.code + '@' + CFG.domain, 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', 'DTSTART:' + d + 'T' + s.start.replace(':', '') + '00', 'DTEND:' + d + 'T' + s.end.replace(':', '') + '00', 'SUMMARY:' + s.name + ' - ' + BRAND, 'DESCRIPTION:Booking ' + b.code + '. Pickup ' + s.pickup + '.', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/calendar' })); a.download = b.code + '.ics'; a.click();
   };
   if (confirmed && !window.__confetti) {

@@ -103,7 +103,7 @@ async function checkinPrivate(b0, { force, preview, actor, conf, today }) {
     });
     return row;
   });
-  if (!started) { const cur = (await query('SELECT * FROM bookings WHERE id=$1', [b0.id])).rows[0]; return warn('Already started', `${cur.code} started at ${cur.started_at ? U.hhmm(cur.started_at) : '—'}. Nothing else to do.`, { info: info(cur) }); }
+  if (!started) { const cur = (await query('SELECT * FROM bookings WHERE id=$1', [b0.id])).rows[0]; return warn('Already started', `${cur.code} started at ${cur.started_at ? U.hhmm(cur.started_at) : '-'}. Nothing else to do.`, { info: info(cur) }); }
   const meals = started.has_meals ? (await query(`SELECT preference FROM booking_meals WHERE booking_id=$1 ORDER BY guest_no`, [started.id])).rows.map(r => r.preference) : [];
   return { kind: 'ok', title: 'Trip started', info: { ...info(started), meals: meals.length ? meals : null, mealsText: await mealsText(started) } };
 }

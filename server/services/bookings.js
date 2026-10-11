@@ -252,7 +252,7 @@ async function assignPartners(code, { jeep, guide }, actor) {
       if (pid === undefined) continue;
       const fee = assignments.feeFor(role, { sessionId: b.session_id, jeeps: b.jeeps, mealN }, conf);
       const res = await assignments.assign(db, { bookingId: b.id, date: b.date, role, partnerId: pid ? +pid : null, fee, actor });
-      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, booking: b })); });
+      if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, booking: b, aid: res.aid })); });
     }
     return b;
   });

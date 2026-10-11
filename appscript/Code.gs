@@ -1,64 +1,130 @@
 /**
- * Yala Wild Safaris: email relay (Google Apps Script web app)
+ * Safari email relay (Google Apps Script web app)
  * ------------------------------------------------------------------
- * The Railway server builds every email (subject, HTML, QR code image) and POSTs it here.
- * This script checks a shared secret, then sends the message from YOUR Google account.
+ * Your Railway server designs every email (subject, HTML, buttons, QR code image)
+ * and sends it here. This script checks a shared secret and then sends the message
+ * from YOUR Google account. It never stores anything unless you switch on the
+ * optional Sheet log below.
  *
- * Setup (5 minutes), full steps in docs/APPS_SCRIPT.md:
- *   1. script.google.com -> New project -> paste this file (and appsscript.json, see below).
- *   2. Project Settings -> Script properties -> add  RELAY_SECRET  = a long random string.
- *   3. Run the function  setup()  once and approve the permissions.
- *   4. Deploy -> New deployment -> type "Web app" -> Execute as: Me -> Who has access: Anyone.
- *   5. Copy the Web app URL. On Railway set  APPS_SCRIPT_URL = that URL  and
- *      APPS_SCRIPT_SECRET = the same RELAY_SECRET.
+ * SETUP (about 5 minutes)
+ *   1. Go to script.google.com, click New project, paste this whole file into Code.gs.
+ *   2. Project Settings (gear icon), tick "Show appsscript.json manifest file",
+ *      then paste the contents of appsscript.json from the repo.
+ *   3. Run the function  setup()  once (press Run) and approve the permission screen.
+ *      Open View > Logs: it prints a RELAY_SECRET. Copy it.
+ *   4. Run  testSend()  to email yourself a sample.
+ *   5. Deploy > New deployment > type "Web app":
+ *        Execute as: Me
+ *        Who has access: Anyone
+ *      Copy the Web app URL.
+ *   6. On Railway add two variables and redeploy:
+ *        APPS_SCRIPT_URL    = the Web app URL
+ *        APPS_SCRIPT_SECRET = the RELAY_SECRET from step 3
+ *   7. In the admin panel go to Settings > Emails and press "Send sample".
  *
- * Limits (Google): about 100 emails a day on a free Gmail account, about 1,500 a day on Google Workspace.
- * Each message is one email to one person, so a new booking uses about 2 (guest + company).
+ * OPTIONAL Script properties (Project Settings > Script properties)
+ *   ARCHIVE_BCC   An email address that gets a hidden copy of every email (for your records).
+ *   LOG_SHEET_ID  The ID of a Google Sheet. Every email is logged there as one row
+ *                 (time, to, subject, result). The ID is the long text in the Sheet's address.
+ *
+ * GOOGLE LIMITS
+ *   About 100 emails a day on a free Gmail account, about 1,500 on Google Workspace.
+ *   One booking sends about 2 emails (guest and company). If the limit is hit, the server
+ *   keeps the emails and tries again later.
+ *
+ * After you edit this script: Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+ * The Web app URL stays the same.
  */
 
-var MAX_HTML_BYTES = 400 * 1024;   // refuse oversized messages
-var MAX_INLINE_IMAGES = 3;
+var MAX_HTML_CHARS = 400000;   // refuse oversized messages
+var MAX_INLINE_IMAGES = 3;     // QR code etc.
+var EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
-/** The server calls this with JSON: { secret, to, subject, html, inline:[{cid,mime,base64}], replyTo, fromName } */
+/**
+ * The server calls this with JSON:
+ * { secret, to, subject, html, inline: [{ cid, mime, base64 }], replyTo, fromName }
+ */
 function doPost(e) {
+  var to = '';
+  var subject = '';
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    var secret = PropertiesService.getScriptProperties().getProperty('RELAY_SECRET');
-    if (!secret) return reply_({ ok: false, error: 'RELAY_SECRET is not set in Script properties.' });
-    if (!safeEquals_(String(body.secret || ''), secret)) return reply_({ ok: false, error: 'Unauthorized' });
+    var props = PropertiesService.getScriptProperties();
+    var secret = props.getProperty('RELAY_SECRET');
 
-    var to = String(body.to || '').trim();
-    if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(to)) return reply_({ ok: false, error: 'Invalid recipient' });
-    var subject = String(body.subject || '').replace(/[\r\n]+/g, ' ').slice(0, 250);
+    if (!secret) {
+      return reply_({ ok: false, error: 'RELAY_SECRET is not set. Run setup() in the script editor.' });
+    }
+    if (!safeEquals_(String(body.secret || ''), secret)) {
+      return reply_({ ok: false, error: 'Unauthorized' });
+    }
+
+    to = String(body.to || '').trim();
+    if (!EMAIL_RE.test(to)) {
+      return reply_({ ok: false, error: 'Invalid recipient' });
+    }
+    subject = String(body.subject || '').replace(/[\r\n]+/g, ' ').slice(0, 250);
     var html = String(body.html || '');
-    if (!subject || !html) return reply_({ ok: false, error: 'Missing subject or html' });
-    if (html.length > MAX_HTML_BYTES) return reply_({ ok: false, error: 'Message too large' });
+    if (!subject || !html) {
+      return reply_({ ok: false, error: 'Missing subject or html' });
+    }
+    if (html.length > MAX_HTML_CHARS) {
+      return reply_({ ok: false, error: 'Message too large' });
+    }
+    if (MailApp.getRemainingDailyQuota() < 1) {
+      return reply_({ ok: false, error: 'Daily email quota reached. It resets within 24 hours.' });
+    }
 
-    if (MailApp.getRemainingDailyQuota() < 1) return reply_({ ok: false, error: 'Daily email quota reached. It resets within 24 hours.' });
-
-    var options = { htmlBody: html, name: String(body.fromName || 'Yala Wild Safaris').slice(0, 80) };
-    if (body.replyTo && /^[^\s@,;<>]+@[^\s@,;<>]+$/.test(String(body.replyTo))) options.replyTo = String(body.replyTo);
+    var options = {
+      htmlBody: html,
+      name: String(body.fromName || 'Yala Wild Safaris').slice(0, 80)
+    };
+    if (body.replyTo && EMAIL_RE.test(String(body.replyTo))) {
+      options.replyTo = String(body.replyTo);
+    }
+    var archive = props.getProperty('ARCHIVE_BCC');
+    if (archive && EMAIL_RE.test(archive)) {
+      options.bcc = archive;
+    }
 
     var inline = {};
-    (body.inline || []).slice(0, MAX_INLINE_IMAGES).forEach(function (img) {
-      if (!img || !img.cid || !img.base64) return;
-      inline[String(img.cid)] = Utilities.newBlob(Utilities.base64Decode(img.base64), String(img.mime || 'image/png'), String(img.cid) + '.png');
-    });
-    if (Object.keys(inline).length) options.inlineImages = inline;
+    var images = (body.inline || []).slice(0, MAX_INLINE_IMAGES);
+    for (var i = 0; i < images.length; i++) {
+      var img = images[i];
+      if (!img || !img.cid || !img.base64) continue;
+      inline[String(img.cid)] = Utilities.newBlob(
+        Utilities.base64Decode(img.base64),
+        String(img.mime || 'image/png'),
+        String(img.cid) + '.png'
+      );
+    }
+    if (Object.keys(inline).length) {
+      options.inlineImages = inline;
+    }
 
     MailApp.sendEmail(to, subject, htmlToText_(html), options);
+    log_(props, to, subject, 'sent');
     return reply_({ ok: true, remaining: MailApp.getRemainingDailyQuota() });
   } catch (err) {
-    return reply_({ ok: false, error: String(err && err.message ? err.message : err) });
+    var message = String(err && err.message ? err.message : err);
+    try { log_(PropertiesService.getScriptProperties(), to, subject, 'error: ' + message); } catch (ignore) {}
+    return reply_({ ok: false, error: message });
   }
 }
 
-/** Open the Web app URL in a browser to check it is alive (no secrets are revealed). */
+/** Open the Web app URL in a browser to check that it is alive. No secrets are shown. */
 function doGet() {
-  return reply_({ ok: true, service: 'Yala Wild Safaris email relay', remainingToday: MailApp.getRemainingDailyQuota() });
+  return reply_({
+    ok: true,
+    service: 'Safari email relay',
+    emailsLeftToday: MailApp.getRemainingDailyQuota()
+  });
 }
 
-/** Run once from the editor: creates a secret if you have not set one, and triggers the permission prompt. */
+/**
+ * Run this once from the editor. It creates a secret (if you have not set one)
+ * and triggers the permission screen. The secret is shown in View > Logs.
+ */
 function setup() {
   var props = PropertiesService.getScriptProperties();
   var secret = props.getProperty('RELAY_SECRET');
@@ -66,34 +132,83 @@ function setup() {
     secret = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
     props.setProperty('RELAY_SECRET', secret);
   }
-  Logger.log('RELAY_SECRET (copy this into Railway as APPS_SCRIPT_SECRET):\n' + secret);
-  Logger.log('Emails left today: ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Copy this into Railway as APPS_SCRIPT_SECRET:');
+  Logger.log(secret);
+  Logger.log('Emails you can still send today: ' + MailApp.getRemainingDailyQuota());
 }
 
-/** Run from the editor to send yourself a test email (also checks inline images work). */
+/** Run this to email yourself a sample that looks like the real emails (button, card, inline image). */
 function testSend() {
   var me = Session.getEffectiveUser().getEmail();
-  var png = Utilities.newBlob(Utilities.base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), 'image/png', 'dot.png');
+  var dot = Utilities.newBlob(
+    Utilities.base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+    'image/png',
+    'dot.png'
+  );
+  var html =
+    '<div style="background:#f3e8d0;padding:20px">' +
+    '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif">' +
+    '<div style="background:#e8863f;padding:26px;color:#2b160a"><div style="font-size:12px;letter-spacing:2px;font-weight:bold">TEST EMAIL</div>' +
+    '<div style="font:bold 26px Georgia,serif;margin-top:6px">Your email relay works!</div></div>' +
+    '<div style="padding:24px;color:#2b2118;font-size:16px;line-height:1.6">' +
+    'This is how a button looks in your emails.' +
+    '<div style="margin-top:14px"><a href="https://script.google.com" style="display:block;text-align:center;background:#c0682a;color:#fff;' +
+    'text-decoration:none;font-weight:bold;padding:16px;border-radius:14px">Open my e-ticket</a></div>' +
+    '<p style="color:#6f604f;font-size:13px">Inline image test: <img src="cid:dot" width="8" height="8" alt=""></p>' +
+    '</div></div></div>';
   MailApp.sendEmail(me, 'Test from the safari email relay', 'It works.', {
-    htmlBody: '<p style="font:15px Arial">It works! <img src="cid:dot" width="8" height="8"></p>',
-    inlineImages: { dot: png }, name: 'Yala Wild Safaris'
+    htmlBody: html,
+    inlineImages: { dot: dot },
+    name: 'Safari email relay'
   });
   Logger.log('Sent a test email to ' + me);
 }
 
-/* ---------- helpers ---------- */
+/* ------------------------------------------------------------------ */
+/* helpers                                                             */
+/* ------------------------------------------------------------------ */
+
 function reply_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
-/** Constant-time string comparison. */
+
+/** Compare two strings in constant time so the secret cannot be guessed by timing. */
 function safeEquals_(a, b) {
   if (a.length !== b.length) return false;
   var diff = 0;
-  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (var i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
   return diff === 0;
 }
+
+/** Optional: add one row per email to a Google Sheet (set LOG_SHEET_ID in Script properties). */
+function log_(props, to, subject, result) {
+  var id = props.getProperty('LOG_SHEET_ID');
+  if (!id) return;
+  var sheet = SpreadsheetApp.openById(id).getSheets()[0];
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Time', 'To', 'Subject', 'Result']);
+  }
+  sheet.appendRow([new Date(), to, subject, result]);
+}
+
+/** Plain text version for email apps that do not show HTML. */
 function htmlToText_(html) {
-  return html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|tr|div|h\d|li)>/gi, '\n')
-    .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n').trim().slice(0, 4000);
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|tr|div|h\d|li|table)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 6000);
 }

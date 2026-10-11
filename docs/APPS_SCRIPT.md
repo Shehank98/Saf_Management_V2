@@ -5,14 +5,18 @@ The server builds each email and posts it to a small Google Apps Script web app 
 ## Setup (about 5 minutes)
 1. Go to <https://script.google.com> → **New project**. Name it "Safari email relay".
 2. Replace the contents of `Code.gs` with [`appscript/Code.gs`](../appscript/Code.gs).
-3. (Recommended) Project Settings → tick **Show appsscript.json**, then paste in [`appscript/appsscript.json`](../appscript/appsscript.json). It limits the script to sending email only.
+3. (Recommended) Project Settings → tick **Show appsscript.json**, then paste in [`appscript/appsscript.json`](../appscript/appsscript.json). It lists the permissions the script needs: sending email, and (only used if you set `LOG_SHEET_ID`) writing to a Google Sheet.
 4. Run the function **`setup`** (▶). Approve the permissions. Open *Execution log*: it prints a `RELAY_SECRET`. Copy it. (You can also set `RELAY_SECRET` yourself in Project Settings → Script properties.)
-5. Run **`testSend`** to email yourself a test.
+5. Run **`testSend`** to email yourself a sample with a button.
 6. **Deploy → New deployment → Web app**: *Execute as* **Me**, *Who has access* **Anyone**. Copy the Web app URL.
 7. On Railway add `APPS_SCRIPT_URL` = that URL and `APPS_SCRIPT_SECRET` = the secret from step 4. Redeploy.
-8. In the admin: **Settings → Emails → Send test**.
+8. In the admin: **Settings → Emails → Send sample**. You receive a real looking booking confirmation with the QR code and buttons.
 
 "Anyone" only means the URL is reachable; every request must carry the secret, otherwise it is refused.
+
+## Optional extras (Script properties)
+- `ARCHIVE_BCC`: an address that gets a hidden copy of every email.
+- `LOG_SHEET_ID`: a Google Sheet ID; every email is logged as a row (time, to, subject, result).
 
 ## After you change the script
 Deploy → **Manage deployments → edit → New version**. The URL stays the same.

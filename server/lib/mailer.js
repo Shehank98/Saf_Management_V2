@@ -104,13 +104,20 @@ async function processOutbox() {
   }
 }
 
-/** Send a one-off test mail straight away (Admin → Settings → Emails). */
+/** Send a sample of the real booking confirmation (with QR and buttons) so the owner can see the design in an inbox. */
 async function sendTest(to) {
   const conf = await settings.load();
   if (!config.appsScriptUrl) throw new Error('APPS_SCRIPT_URL is not set on the server yet.');
+  const T = require('./emailTemplates'), qr = require('./qr'), U = require('./util');
+  const base = settings.baseUrl(conf), s = conf.sessions.morning || Object.values(conf.sessions)[0];
+  const date = U.addDays(U.todayStr(), 5), code = 'YWS-1234A', link = qr.ticketLink(base, code);
+  const built = T.cust_confirmed({
+    code, firstName: 'Alex', name: 'Alex Morgan', session: { ...s, end12: '10:30 AM' }, date, guests: 4, jeeps: 1, total: 38000, paid: 11400, pickupWhere: 'Lakeside Guest House',
+    extrasText: 'Meal pack (4)', mealsText: '3x Non-veg, 1x Vegetarian', ticketUrl: link, manageUrl: base + '/booking',
+  }, { conf, base });
   await sendViaAppsScript({
-    to_addr: to, subject: 'Test email from ' + conf.business.name,
-    html: '<p style="font:15px Arial">It works! Your Google Apps Script email relay is connected.</p>', inline_images: [], reply_to: null,
+    to_addr: to, subject: '[Sample] ' + built.subject, html: built.html, reply_to: null,
+    inline_images: [{ cid: 'qr', mime: 'image/png', base64: await qr.pngBase64(link) }],
   }, conf);
 }
 

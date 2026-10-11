@@ -84,7 +84,7 @@ const page = file => (req, res) => {
   res.set('Cache-Control', 'no-cache').type('html').send(renderPage(file));
 };
 const adminPage = file => U.wrap(async (req, res) => {
-  if (!(await auth.userFor(req, 'ADMIN'))) return res.redirect('/admin/login');
+  if (!(await auth.userFor(req, 'ADMIN'))) return res.redirect('/admin/login?next=' + encodeURIComponent(req.originalUrl));
   res.set('X-Robots-Tag', 'noindex, nofollow');
   page(file)(req, res);
 });
@@ -105,6 +105,25 @@ app.get('/partner/magic', U.wrap(async (req, res) => {
   if (!p) return res.redirect('/partner?link=expired');
   await auth.startSession(res, 'PARTNER', p.id);
   res.redirect('/partner');
+}));
+// One-tap Accept / Decline from the job email (signed link, no login needed).
+app.get('/partner/job/:aid/:action', U.wrap(async (req, res) => {
+  const { aid, action } = req.params;
+  const ok = ['accept', 'decline'].includes(action) && secrets.verify(`job:${aid}:${action}`, String(req.query.k || ''));
+  const card = (icon, title, msg) => res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${U.esc(title)}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbf6ea;color:#2b2118;font:16px/1.5 system-ui,sans-serif;padding:16px;text-align:center}.c{background:#fff;border:1px solid #e3d4b6;border-radius:20px;padding:30px 24px;max-width:400px;box-shadow:0 10px 28px rgba(60,40,20,.1)}h1{font:700 26px Georgia,serif;margin:8px 0}p{color:#6f604f}a{display:inline-block;margin-top:12px;background:#c0682a;color:#fff;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:12px}</style></head><body><div class="c"><div style="font-size:46px">${icon}</div><h1>${U.esc(title)}</h1><p>${U.esc(msg)}</p><a href="/partner#jobs">Open partner portal</a></div></body></html>`);
+  if (!ok) return card('⚠️', 'Link not valid', 'This link is not valid. Please open the partner portal to answer the job.');
+  const a = (await require('./db').query('SELECT * FROM assignments WHERE id=$1', [+aid])).rows[0];
+  if (!a) return card('🔎', 'Job not found', 'This job is no longer available.');
+  if (a.status !== 'OFFERED') return card('ℹ️', 'Already answered', `You already ${a.status === 'ACCEPTED' ? 'accepted' : 'declined'} this job.`);
+  const status = action === 'accept' ? 'ACCEPTED' : 'DECLINED';
+  const db = require('./db');
+  await db.tx(async c => {
+    await c.query('UPDATE assignments SET status=$2, responded_at=now() WHERE id=$1', [a.id, status]);
+    const p = (await c.query('SELECT name FROM partners WHERE id=$1', [a.partner_id])).rows[0];
+    const code = a.booking_id ? (await c.query('SELECT code FROM bookings WHERE id=$1', [a.booking_id])).rows[0].code : a.shared_trip_id;
+    await require('./lib/activity').log(c, a.booking_id ? 'booking' : 'trip', code, `${p.name} ${status === 'ACCEPTED' ? 'accepted' : 'declined'} the job (from email)`, p.name);
+  });
+  card(status === 'ACCEPTED' ? '✅' : '👍', status === 'ACCEPTED' ? 'Job accepted' : 'Job declined', status === 'ACCEPTED' ? 'Thank you! The office can see it now. Guest details are in your partner portal.' : 'No problem. The office will offer it to someone else.');
 }));
 app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('vendor/portal.html')(req, res); });
 
