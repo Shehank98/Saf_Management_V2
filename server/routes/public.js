@@ -170,24 +170,49 @@ r.get('/ticket/:code', limits.lookup, U.wrap(async (req, res) => {
 }));
 
 /* ---------------- Shared trips (link only) ---------------- */
-/** Calendar for the link-only shared-trips site: trips per day, seat counts only (no guest details). */
+/**
+ * Calendar for the link-only shared-trips site. Every bookable date shows as available: a jeep is opened
+ * automatically for the first guest, and another one when it fills. Seat counts only, never guest details.
+ */
 r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
   const month = String(req.query.month || '');
   if (!/^\d{4}-\d{2}$/.test(month)) throw U.bad('Bad month');
+  const ses = String(req.query.session || '');
   const conf = await settings.load();
+  const s = conf.sessions[ses];
+  if (!s || !s.active) throw U.bad('Unknown session');
   const first = month + '-01', last = U.addDays(U.addMonths(first, 1), -1);
+  const db = { query };
+  const usage = await avail.usageRange(db, first, last);
   const rows = (await query(
-    `SELECT t.id, t.date, t.session_id, t.seat_price, t.seats, t.min_seats, t.status,
-            COUNT(s.*) FILTER (WHERE s.status IN ('RESERVED','PAYMENT_PENDING','PAID'))::int AS held,
-            COUNT(s.*) FILTER (WHERE s.status = 'PAID')::int AS paid
-       FROM shared_trips t LEFT JOIN shared_seats s ON s.trip_id=t.id
-      WHERE t.date BETWEEN $1 AND $2 AND t.date >= $3 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL')
-      GROUP BY t.id ORDER BY t.date, t.session_id`, [first, last, U.todayStr()])).rows;
-  const trips = rows.filter(t => U.localDate(t.date, conf.sessions[t.session_id].start).getTime() > Date.now()).map(t => ({
-    id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, seatsMax: t.seats, free: t.seats - t.held, paid: t.paid, minSeats: t.min_seats,
-    confirmed: t.paid >= t.min_seats, full: t.held >= t.seats,
-  }));
-  res.set('Cache-Control', 'no-store').json({ trips });
+    `SELECT t.id, t.date, t.seat_price, t.seats, t.min_seats,
+            COUNT(x.*) FILTER (WHERE x.status IN ('RESERVED','PAYMENT_PENDING','PAID'))::int AS held,
+            COUNT(x.*) FILTER (WHERE x.status = 'PAID')::int AS paid
+       FROM shared_trips t LEFT JOIN shared_seats x ON x.trip_id=t.id
+      WHERE t.date BETWEEN $1 AND $2 AND t.session_id=$3 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL')
+      GROUP BY t.id ORDER BY t.date, t.created_at, t.id`, [first, last, ses])).rows;
+  const byDate = {};
+  rows.forEach(t => (byDate[t.date] = byDate[t.date] || []).push(t));
+  const days = {};
+  const now = Date.now(), cutoff = conf.shared.autoCancelH * 3600e3;
+  for (let d = first; d <= last; d = U.addDays(d, 1)) {
+    if (avail.dateBlocked(d, s, conf, now) && !(byDate[d] || []).length) continue;
+    const trips = (byDate[d] || []).map((t, i) => ({ id: t.id, jeepNo: i + 1, free: t.seats - t.held, held: t.held, paid: t.paid, seatsMax: t.seats, minSeats: t.min_seats, ready: t.held >= t.min_seats, confirmed: t.paid >= t.min_seats, full: t.held >= t.seats }));
+    const canOpenNew = U.localDate(d, s.start).getTime() - now >= cutoff && avail.jeepsFree(usage, d, ses, conf.rules.fleet) >= 1;
+    const openTrip = trips.find(t => !t.full);
+    if (!openTrip && !canOpenNew) { if (trips.length) days[d] = { state: 'full', trips }; continue; }
+    days[d] = { state: trips.some(t => t.ready) ? 'ready' : 'available', price: s.seat, seatsMax: conf.shared.seats, minSeats: conf.shared.minSeats, free: openTrip ? openTrip.free : conf.shared.seats, trips };
+  }
+  res.set('Cache-Control', 'no-store').json({ days, price: s.seat });
+}));
+
+/** The guest tapped "Choose seats": find (or open) the jeep to book on. */
+r.post('/shared-trips/open', limits.booking, U.wrap(async (req, res) => {
+  const date = String(req.body.date || ''), ses = String(req.body.ses || '');
+  if (!U.isDate(date)) throw U.bad('Pick a date.');
+  const t = await shared.openJeep(date, ses);
+  if (!t) throw U.conflict('Sorry, every shared jeep for that session is full or closed.');
+  res.json({ id: t.id });
 }));
 
 r.get('/shared/:id', limits.lookup, U.wrap(async (req, res) => {

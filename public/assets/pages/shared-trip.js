@@ -39,6 +39,7 @@ async function showPayLink() {
 async function pickSeats() {
   let trip;
   try { trip = await GET(`/api/shared/${encodeURIComponent(TID)}`) } catch (e) { return invalid() }
+  if (trip.full && trip.nextId) { location.replace('/s/' + trip.nextId); return }
   const s = SESS[trip.ses]; let step = 0; let taken = new Set(trip.taken); const mine = new Set();
   const maxSeats = trip.seatsMax, minSeats = trip.minSeats;
   const f = { name: '', cc: '+94', phone: '', email: '', hotel: '', meal: {}, pay: online ? 'card' : 'later', terms: false };
@@ -47,7 +48,7 @@ async function pickSeats() {
   const heldN = () => taken.size, pendN = () => heldN() - trip.paid;
   function head() {
     const need = minSeats - trip.paid;
-    return `<div class="invite fade"><div class="sun"></div><div class="jp">${JEEP('#3f4a28', 96, 60)}</div><div class="eb">You're invited · shared jeep</div><h1>${esc(s.name)}, ${shortDate(trip.date)}</h1>
+    return `<div class="invite fade"><div class="sun"></div><div class="jp">${JEEP('#3f4a28', 96, 60)}</div><div class="eb">Shared jeep ${trip.jeepNo || 1}</div><h1>${esc(s.name)}, ${shortDate(trip.date)}</h1>
   <div class="facts"><div>Time<b>${s.time}</b></div><div>Pickup<b>${s.pickup}</b></div><div>Per seat<b>${fmt(trip.price)}</b></div></div></div>
   <div class="card fade d1" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Will this jeep run?</b><span class="tag ${need <= 0 ? 'ok' : 'warn'}">${need <= 0 ? "Yes, it's confirmed" : `Needs ${need} more paid seat${need > 1 ? 's' : ''}`}</span></div>
   <div class="meter"><span style="width:${trip.paid / maxSeats * 100}%;background:var(--olive)"></span><span style="width:${pendN() / maxSeats * 100}%;background:#d9a441"></span><span id="mm" style="width:${mine.size / maxSeats * 100}%;background:var(--ochre)"></span><div class="mk"></div></div>

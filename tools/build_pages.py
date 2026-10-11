@@ -71,6 +71,10 @@ TEXT = {
         ('<button class="btn sm" id="sim">Simulate a driver scan</button>', ''),
         ('<span class="small muted">Demo numbers</span>', '<span class="small muted">card, cash and bank</span>'),
     ],
+    'admin/shared.html': [
+        ('Shared trips are <b>not shown on the public site</b>. Create a trip, then send its private link to guests who ask (WhatsApp, email). It runs once <b>${SETTINGS.minSeats}</b> seats are paid. If it isn\'t, it auto-cancels ${SETTINGS.payWindowH}h before and refunds everyone.',
+         'Shared trips are <b>automatic</b>. Guests who get your shared-trips link see every open date. The first booking on a date opens Jeep 1; when it is full, Jeep 2 opens, and so on while you have jeeps free. A jeep goes ahead once <b>${SETTINGS.minSeats}</b> seats are paid (the dashboard flags it once that many are booked). If not, it auto-cancels ${SETTINGS.payWindowH}h before start and refunds everyone. You can still create a trip by hand with + Create trip.'),
+    ],
     'admin/login.html': [
         (' value="admin@yalawildsafaris.lk"', ''), (' value="demo-password"', ''),
         ('<a href="#" onclick="toast(\'A reset link would be emailed.\');return false">Forgot password?</a> · Prototype: any values work', 'Forgot your password? Ask the owner to reset it in Settings → Team.'),

@@ -23,6 +23,37 @@ async function activeSeats(db, tripId) {
 }
 const groupBy = (seats) => { const m = new Map(); seats.forEach(s => { if (!m.has(s.code)) m.set(s.code, []); m.get(s.code).push(s); }); return m; };
 
+/**
+ * The jeep guests should book on for a date + session: the first one with a free seat, or a new one
+ * if a jeep is still free in the fleet. Returns null when everything is full.
+ * Call inside a transaction (takes the same per-date lock as private bookings).
+ */
+async function ensureOpenJeep(db, date, sessionId, conf, { create = true } = {}) {
+  await lockDate(db, date);
+  const trips = (await db.query(
+    `SELECT t.*, (SELECT COUNT(*)::int FROM shared_seats s WHERE s.trip_id=t.id AND s.status IN ${ACTIVE}) AS held
+       FROM shared_trips t WHERE t.date=$1 AND t.session_id=$2 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') ORDER BY t.created_at, t.id`, [date, sessionId])).rows;
+  const open = trips.find(t => t.held < t.seats);
+  if (open || !create) return open || null;
+  const s = conf.sessions[sessionId];
+  if (!s || !s.active || avail.dateBlocked(date, s, conf)) return null;
+  if (U.localDate(date, s.start).getTime() - Date.now() < conf.shared.autoCancelH * 3600e3) return null; // too late to fill a new jeep
+  const usage = await avail.usageRange(db, date, date);
+  if (avail.jeepsFree(usage, date, sessionId, conf.rules.fleet) < 1) return null;
+  const autoAt = new Date(U.localDate(date, s.start).getTime() - conf.shared.autoCancelH * 3600e3);
+  for (let i = 0; i < 8; i++) {
+    try {
+      const r = await db.query(
+        `INSERT INTO shared_trips(id, session_id, date, seat_price, seats, min_seats, auto_cancel_at, pay_window_h, auto) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true) RETURNING *`,
+        [U.tripId(), sessionId, date, s.seat, conf.shared.seats, conf.shared.minSeats, autoAt, conf.shared.payWindowH]);
+      await activity.log(db, 'trip', r.rows[0].id, `Jeep ${trips.length + 1} opened automatically for ${date}`, 'System');
+      return { ...r.rows[0], held: 0 };
+    } catch (e) { if (e.code !== '23505') throw e; }
+  }
+  return null;
+}
+const openJeep = async (date, sessionId) => { const conf = await settings.load(); return tx(db => ensureOpenJeep(db, date, sessionId, conf)); };
+
 function statusOf(trip, seats) {
   if (['STARTED', 'COMPLETED', 'CANCELLED'].includes(trip.status)) return trip.status;
   const held = seats.length, paid = seats.filter(s => s.status === 'PAID').length;
@@ -71,7 +102,11 @@ async function publicView(tripId) {
   const seats = await activeSeats({ query }, t.id);
   const s = conf.sessions[t.session_id];
   if (U.localDate(t.date, s.start).getTime() <= Date.now()) return null;
+  const sib = (await query(`SELECT id FROM shared_trips WHERE date=$1 AND session_id=$2 AND status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') ORDER BY created_at, id`, [t.date, t.session_id])).rows.map(x => x.id);
+  let nextId = null;
+  if (seats.length >= t.seats) { const o = await openJeep(t.date, t.session_id).catch(() => null); nextId = o && o.id !== t.id ? o.id : null; }
   return {
+    jeepNo: sib.indexOf(t.id) + 1, nextId,
     id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, seatsMax: t.seats, minSeats: t.min_seats, payWindowH: t.pay_window_h,
     taken: seats.map(x => x.seat_no), paid: seats.filter(x => x.status === 'PAID').length, held: seats.length, allowLater: conf.shared.allowLater,
     full: seats.length >= t.seats,
@@ -116,6 +151,10 @@ async function evaluate(db, tripId) {
   }
   if (newStatus !== before) {
     await db.query('UPDATE shared_trips SET status=$2 WHERE id=$1', [tripId, newStatus]);
+    if (newStatus === 'FULL') { // this jeep is full: open another one for the same day and session if the fleet allows
+      const next = await ensureOpenJeep(db, t.date, t.session_id, conf);
+      if (next) await activity.log(db, 'trip', tripId, `Jeep full · next jeep ${next.id} opened for ${t.date}`, 'System');
+    }
     if (['CONFIRMED', 'FULL'].includes(newStatus) && !['CONFIRMED', 'FULL'].includes(before) && paidSeats.length >= t.min_seats) {
       await activity.log(db, 'trip', tripId, `${paidSeats.length} paid seats · trip confirmed · e-tickets emailed`, 'System');
       await notify.send(db, 'admin_shared_status', T.admin_shared_status({ trip: t, session, kind: 'confirmed', paid: paidSeats.length }, { conf, base }), { to: await notify.toCompany(), entity: 'trip', entityId: tripId });
@@ -258,6 +297,7 @@ async function releaseExpired() {
     });
   }
   for (const id of trips) await tx(db => evaluate(db, id));
+  await query(`DELETE FROM shared_trips t WHERE t.auto AND t.status='OPEN' AND t.created_at < now() - interval '30 minutes' AND NOT EXISTS (SELECT 1 FROM shared_seats s WHERE s.trip_id=t.id)`);
   return rows.length;
 }
 
@@ -393,4 +433,4 @@ async function assignPartners(tripId, { jeep, guide }, actor) {
   });
 }
 
-module.exports = { createTrip, publicView, evaluate, takeSeats, applySeatPayment, payLinkInfo, startPayment, releaseExpired, cancelTrip, autoCancel, addGuest, markPaid, removeGuest, remind, assignPartners, activeSeats, groupBy, payUrl };
+module.exports = { ensureOpenJeep, openJeep, createTrip, publicView, evaluate, takeSeats, applySeatPayment, payLinkInfo, startPayment, releaseExpired, cancelTrip, autoCancel, addGuest, markPaid, removeGuest, remind, assignPartners, activeSeats, groupBy, payUrl };

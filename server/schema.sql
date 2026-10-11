@@ -297,3 +297,6 @@ CREATE TABLE IF NOT EXISTS job_runs (
   job     text PRIMARY KEY,
   last_at timestamptz NOT NULL
 );
+
+-- Jeeps opened automatically by the shared-trips site (empty ones are cleaned up and never block private bookings)
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS auto boolean NOT NULL DEFAULT false;

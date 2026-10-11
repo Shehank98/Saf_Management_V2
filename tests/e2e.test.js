@@ -12,6 +12,7 @@ process.env.ADMIN_EMAIL = 'owner@test.lk';
 process.env.ADMIN_PASSWORD = 'owner-pass-123';
 process.env.APP_URL = 'http://localhost';
 process.env.DISABLE_INTERNAL_SCHEDULER = '1';
+process.env.RATE_LIMIT_MULTIPLIER = '20';
 process.env.TICKET_SECRET = 'test-secret';
 
 const { pool, query } = require('../server/db');
@@ -265,12 +266,34 @@ test('shared trip: 4 reservations send payment links, 4 paid confirms + tickets,
   assert.equal((await api('GET', `/api/ticket/${a.json.code}?k=nope`)).status, 404);
 });
 
-test('shared trips site: calendar lists trips with seat counts only', async () => {
-  const month = U.addDays(U.todayStr(), 8).slice(0, 7);
-  const r = await api('GET', `/api/shared-trips?month=${month}`);
-  assert.equal(r.status, 200);
-  assert.ok(r.json.trips.length >= 1);
-  assert.ok(!JSON.stringify(r.json).includes('Anna'));
+test('shared site: every open date is available; a jeep opens on demand and the next one when it fills', async () => {
+  const date = U.addDays(U.todayStr(), 25), month = date.slice(0, 7);
+  const cal = await api('GET', `/api/shared-trips?month=${month}&session=morning`);
+  assert.equal(cal.status, 200);
+  assert.equal(cal.json.days[date].state, 'available');
+  assert.equal(cal.json.days[date].free, 6);
+  assert.equal(cal.json.days[date].trips.length, 0);
+  // browsing / opening an empty jeep must not use up a private jeep
+  const open = await api('POST', '/api/shared-trips/open', { date, ses: 'morning' });
+  assert.equal(open.status, 200);
+  assert.equal((await api('GET', `/api/availability?date=${date}&session=morning`)).json.jeepsFree, 4);
+  const again = await api('POST', '/api/shared-trips/open', { date, ses: 'morning' });
+  assert.equal(again.json.id, open.json.id, 'same open jeep is reused');
+  // fill all 6 seats of jeep 1
+  for (let n = 1; n <= 6; n++) {
+    const r = await api('POST', `/api/shared/${open.json.id}/seats`, { seats: [n], name: 'Guest ' + n, cc: '+94', phone: '77555500' + n, email: `g${n}@x.com`, pay: 'later' });
+    assert.equal(r.status, 201, JSON.stringify(r.json));
+  }
+  const cal2 = await api('GET', `/api/shared-trips?month=${month}&session=morning`);
+  const trips = cal2.json.days[date].trips;
+  assert.equal(trips.length, 2, 'jeep 2 opened automatically');
+  assert.equal(trips[0].full, true); assert.equal(trips[0].ready, true);
+  assert.equal(trips[1].free, 6);
+  assert.equal(cal2.json.days[date].state, 'ready');
+  assert.equal((await api('POST', '/api/shared-trips/open', { date, ses: 'morning' })).json.id, trips[1].id);
+  // the full jeep's link points guests to the next one; jeep 1 now uses a real jeep
+  assert.equal((await api('GET', `/api/shared/${open.json.id}`)).json.nextId, trips[1].id);
+  assert.equal((await api('GET', `/api/availability?date=${date}&session=morning`)).json.jeepsFree, 3);
   assert.equal((await fetch(base + '/shared')).status, 200);
 });
 

@@ -1,8 +1,9 @@
 const rateLimit = require('express-rate-limit');
 const U = require('../lib/util');
 
+const MULT = +process.env.RATE_LIMIT_MULTIPLIER || 1; // tests raise this; production leaves it at 1
 const limiter = (windowMin, max, message) => rateLimit({
-  windowMs: windowMin * 60 * 1000, limit: max, standardHeaders: true, legacyHeaders: false,
+  windowMs: windowMin * 60 * 1000, limit: max * MULT, standardHeaders: true, legacyHeaders: false,
   skip: req => req.path === '/config.js',   // loaded by <script> tags, so it must never answer with JSON errors
   handler: (req, res) => res.status(429).json({ error: message || 'Too many attempts. Please wait a few minutes and try again.' }),
 });

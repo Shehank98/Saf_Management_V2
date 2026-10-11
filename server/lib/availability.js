@@ -19,8 +19,10 @@ async function usageRange(db, from, to) {
       WHERE date BETWEEN $1 AND $2 AND (${USED_STATUSES}) GROUP BY date, session_id`, [from, to]);
   b.rows.forEach(r => add(r.date, r.session_id, r.n));
   const s = await db.query(
-    `SELECT date, session_id, COUNT(*)::int AS n FROM shared_trips
-      WHERE date BETWEEN $1 AND $2 AND status <> 'CANCELLED' GROUP BY date, session_id`, [from, to]);
+    `SELECT t.date, t.session_id, COUNT(*)::int AS n FROM shared_trips t
+      WHERE t.date BETWEEN $1 AND $2 AND t.status <> 'CANCELLED'
+        AND (NOT t.auto OR EXISTS (SELECT 1 FROM shared_seats s WHERE s.trip_id=t.id AND s.status IN ('RESERVED','PAYMENT_PENDING','PAID')))
+      GROUP BY t.date, t.session_id`, [from, to]);
   s.rows.forEach(r => add(r.date, r.session_id, r.n));
   return out;
 }
