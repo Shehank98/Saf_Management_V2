@@ -23,7 +23,7 @@ PAGES = {
     'customer/01-session.html': ('customer', [], '', []),
     'customer/02-date.html': ('customer', [], '', []),
     'customer/03-group.html': ('customer', [], '', []),
-    'customer/04-pickup-extras.html': ('customer', ['/vendor/leaflet/leaflet.js'], '<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">', []),
+    'customer/04-pickup-extras.html': ('customer', ['/vendor/leaflet/leaflet.js', '/assets/map.js'], '<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">', []),
     'customer/05-checkout.html': ('customer', [], '', []),
     'customer/06-confirmation.html': ('customer', ['/assets/qr.js'], '', []),
     'customer/ticket.html': ('customer', ['/assets/qr.js'], '', []),
@@ -38,7 +38,7 @@ PAGES = {
     'admin/payments.html': ('admin', [], '', []),
     'admin/vendors.html': ('admin', [], '', []),
     'admin/checkin.html': ('admin', ['/vendor/jsQR.js'], '', []),
-    'admin/settings.html': ('admin', ['/vendor/leaflet/leaflet.js'], '<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">', []),
+    'admin/settings.html': ('admin', ['/vendor/leaflet/leaflet.js', '/assets/map.js'], '<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">', []),
 }
 
 # Wording that was prototype-only, or that must now come from Settings.

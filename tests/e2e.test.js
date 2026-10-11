@@ -61,6 +61,15 @@ test('hotel pickup outside the free radius is refused by the server', async () =
   assert.equal(r.status, 400); assert.match(r.json.error, /km away/);
 });
 
+test('maps are Sri Lanka only: pins and the admin base location outside the island are refused', async () => {
+  const far = await api('POST', '/api/bookings', guest({ pmode: 'hotel', hotel: 'Paris Hotel', lat: 48.85, lng: 2.35 }));
+  assert.equal(far.status, 400); assert.match(far.json.error, /outside Sri Lanka/);
+  assert.equal((await admin('PUT', '/api/admin/settings/pickup', { radiusKm: 7, baseLat: 48.85, baseLng: 2.35 })).status, 400);
+  assert.equal((await admin('PUT', '/api/admin/settings/pickup', { radiusKm: 7, baseLat: 6.2833, baseLng: 81.2886 })).status, 200);
+  const near = await api('POST', '/api/bookings', guest({ pmode: 'hotel', hotel: 'Near Hotel', lat: 6.29, lng: 81.29, date: U.addDays(U.todayStr(), 40) }));
+  assert.equal(near.status, 201);
+});
+
 test('private booking: deposit via mock gateway confirms it, emails the ticket and the company', async () => {
   const r = await api('POST', '/api/bookings', guest({ meals: 1, mealPrefs: ['Non-veg', 'Vegan', 'No meal', 'Halal'] }));
   assert.equal(r.status, 201);

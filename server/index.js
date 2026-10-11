@@ -26,7 +26,7 @@ app.use(helmet({
       'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://fonts.gstatic.com'],
       'img-src': ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org'],
-      'connect-src': ["'self'"],
+      'connect-src': ["'self'", 'https://nominatim.openstreetmap.org'],
       'media-src': ["'self'", 'blob:'],
       'worker-src': ["'self'"],
       'manifest-src': ["'self'"],

@@ -180,6 +180,7 @@ r.put('/settings/:section', owner, U.wrap(async (req, res) => {
     for (const k of Object.keys(settings.EVENTS)) events[k] = b.events ? b.events[k] !== false && b.events[k] !== 0 && b.events[k] !== 'off' : true;
     await settings.set('emails', { recipients, events });
   } else if (sec === 'pickup') {
+    if (!U.inSriLanka(+b.baseLat, +b.baseLng)) throw U.bad('The base location must be in Sri Lanka. Search for it or click the map.');
     await settings.set('pickup', { radiusKm: num(b.radiusKm, 0.5, 100, 7), baseLat: num(b.baseLat, -90, 90, 6.2833), baseLng: num(b.baseLng, -180, 180, 81.2886) });
   } else if (sec === 'partners') {
     await settings.set('partners', { scanAny: !!b.scanAny });

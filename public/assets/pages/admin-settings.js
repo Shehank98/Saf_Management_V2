@@ -75,15 +75,23 @@ const SECTIONS = {
 
   pickup: ['Pickup area', () => `<h3>Pickup area</h3><div class="g2f" style="margin-top:12px"><div class="field"><label>Free pickup radius (km)</label><input class="inp" type="number" min="0.5" step="0.5" id="pk_r" value="${CONF.pickup.radiusKm}" ${dis}></div><div class="field"><label>Base location (latitude, longitude)</label><div style="display:flex;gap:8px"><input class="inp" id="pk_lat" value="${CONF.pickup.baseLat}" ${dis}><input class="inp" id="pk_lng" value="${CONF.pickup.baseLng}" ${dis}></div></div></div>
   ${RO ? '' : '<button class="btn sm" id="pk_here" type="button">📍 Use my current location as the base</button>'}
-  <div class="lmap" id="pkmap" style="margin-top:12px"></div><p class="tiny muted">Guests drop a pin on a map; the server measures the real distance from this base and refuses pins outside the radius. Click the map to move the base.</p>`,
+  ${RO ? '' : '<div class="msearch" style="margin-top:12px"><input class="inp" id="pk_search" placeholder="Search a place in Sri Lanka (for example Tissamaharama)" autocomplete="off"><div class="mres" id="pk_res"></div></div>'}
+  <div class="lmap" id="pkmap" style="margin-top:${RO ? 12 : 0}px"></div><p class="tiny muted">The map shows Sri Lanka only. Search for your base, click the map or drag the pin. Guests pick their hotel on the same map; the server measures the real distance from this base and refuses pins outside the free radius.</p>`,
   () => ({ radiusKm: num('pk_r'), baseLat: +$('#pk_lat').value, baseLng: +$('#pk_lng').value }), 'pickup',
   () => {
     const mapEl = $('#pkmap'); if (typeof L === 'undefined') { mapEl.innerHTML = '<p class="small muted" style="padding:12px">Map unavailable.</p>'; return }
-    const map = L.map(mapEl, { scrollWheelZoom: false }).setView([+$('#pk_lat').value, +$('#pk_lng').value], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-    const base = L.marker([+$('#pk_lat').value, +$('#pk_lng').value]).addTo(map), ring = L.circle(base.getLatLng(), { radius: num('pk_r') * 1000, color: '#c0682a', fillOpacity: .08 }).addTo(map);
-    const move = (lat, lng) => { $('#pk_lat').value = lat.toFixed(6); $('#pk_lng').value = lng.toFixed(6); base.setLatLng([lat, lng]); ring.setLatLng([lat, lng]); map.panTo([lat, lng]); dirty = true };
-    if (!RO) { map.on('click', e => move(e.latlng.lat, e.latlng.lng)); $('#pk_r').oninput = () => ring.setRadius((num('pk_r') || 1) * 1000); const h = $('#pk_here'); if (h) h.onclick = () => navigator.geolocation && navigator.geolocation.getCurrentPosition(p => move(p.coords.latitude, p.coords.longitude), () => toast('Could not get your location')) }
+    const c0 = [+$('#pk_lat').value, +$('#pk_lng').value];
+    const map = slMap(mapEl, { center: c0, zoom: 12 });
+    const base = L.marker(c0, { draggable: !RO }).addTo(map), ring = L.circle(c0, { radius: num('pk_r') * 1000, color: '#c0682a', fillOpacity: .08 }).addTo(map);
+    const move = (lat, lng, pan = true) => { if (!inSriLanka(lat, lng)) return toast('That spot is outside Sri Lanka.'); $('#pk_lat').value = lat.toFixed(6); $('#pk_lng').value = lng.toFixed(6); base.setLatLng([lat, lng]); ring.setLatLng([lat, lng]); if (pan) map.setView([lat, lng], Math.max(map.getZoom(), 13)); dirty = true };
+    if (!RO) {
+      map.on('click', e => move(e.latlng.lat, e.latlng.lng, false)); base.on('dragend', () => { const p = base.getLatLng(); move(p.lat, p.lng, false) });
+      $('#pk_r').oninput = () => ring.setRadius((num('pk_r') || 1) * 1000);
+      $('#pk_lat').onchange = $('#pk_lng').onchange = () => move(+$('#pk_lat').value, +$('#pk_lng').value);
+      slSearchBox($('#pk_search'), $('#pk_res'), x => move(x.lat, x.lng));
+      const h = $('#pk_here'); if (h) h.onclick = () => navigator.geolocation && navigator.geolocation.getCurrentPosition(p => move(p.coords.latitude, p.coords.longitude), () => toast('Could not get your location'));
+    }
+    map.fitBounds(ring.getBounds().pad(0.3));
     setTimeout(() => map.invalidateSize(), 200);
   }],
 

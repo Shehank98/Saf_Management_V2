@@ -57,6 +57,7 @@ async function create(raw, { admin = null, providerId = null } = {}) {
   if (d.pmode === 'HOTEL' && !admin) {
     if (!d.hotel) throw U.bad('Please add your hotel name.');
     if (d.lat == null || d.lng == null || !isFinite(d.lat) || !isFinite(d.lng)) throw U.bad('Drop a pin on the map so the driver can find you.');
+    if (!U.inSriLanka(d.lat, d.lng)) throw U.bad('That pin is outside Sri Lanka. Please drop it on your hotel.');
     pickupKm = Math.round(U.haversineKm(conf.pickup.baseLat, conf.pickup.baseLng, d.lat, d.lng) * 10) / 10;
     if (pickupKm > conf.pickup.radiusKm) throw U.bad(`That pin is ${pickupKm} km away. Free pickup is within ${conf.pickup.radiusKm} km, so please choose "I'll come to your office".`);
   }

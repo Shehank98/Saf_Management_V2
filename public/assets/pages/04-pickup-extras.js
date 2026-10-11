@@ -41,17 +41,19 @@ function place(lat, lng, fly) {
   validate();
 }
 if (typeof L !== 'undefined') {
-  map = L.map('map', { scrollWheelZoom: false, tap: true }).setView(BASE, 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-  L.circle(BASE, { radius: RADIUS_KM * 1000, color: '#c0682a', weight: 2, fillColor: '#c0682a', fillOpacity: .08 }).addTo(map);
+  map = slMap('map', { center: BASE, zoom: 12 });
+  const ring = L.circle(BASE, { radius: RADIUS_KM * 1000, color: '#c0682a', weight: 2, fillColor: '#c0682a', fillOpacity: .08 }).addTo(map);
   L.circleMarker(BASE, { radius: 7, color: '#2b2118', weight: 2, fillColor: '#fff', fillOpacity: 1 }).addTo(map).bindTooltip('Our base', { permanent: true, direction: 'top', offset: [0, -6] });
+  map.fitBounds(ring.getBounds().pad(0.25));
   map.on('click', e => place(e.latlng.lat, e.latlng.lng));
   if (P.has('lat')) place(+P.get('lat'), +P.get('lng'));
+  $('#map').insertAdjacentHTML('beforebegin', '<div class="msearch"><input class="inp" id="msearch" placeholder="Search your hotel or town in Sri Lanka" autocomplete="off"><div class="mres" id="mres"></div></div>');
+  slSearchBox($('#msearch'), $('#mres'), x => { place(x.lat, x.lng, true); if (!$('#hotel').value.trim()) { $('#hotel').value = x.short; validate() } });
   setTimeout(() => map.invalidateSize(), 300);
 }
 $('#locate').onclick = () => {
   if (!navigator.geolocation) return toast('Your browser cannot share its location. Tap the map instead.');
-  navigator.geolocation.getCurrentPosition(p => place(p.coords.latitude, p.coords.longitude, true), () => toast('Could not get your location. Tap the map instead.'), { enableHighAccuracy: true, timeout: 10000 });
+  navigator.geolocation.getCurrentPosition(p => inSriLanka(p.coords.latitude, p.coords.longitude) ? place(p.coords.latitude, p.coords.longitude, true) : toast('Your location is outside Sri Lanka. Search for your hotel instead.'), () => toast('Could not get your location. Tap the map instead.'), { enableHighAccuracy: true, timeout: 10000 });
 };
 function validate() {
   $$('.opt').forEach(o => { const on = o.dataset.v === mode; o.classList.toggle('on', on); o.setAttribute('aria-checked', on) });

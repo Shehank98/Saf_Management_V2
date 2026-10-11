@@ -76,3 +76,9 @@ body:has(.app){zoom:1!important}  /* admin and partner layouts are already fluid
   .modal .card{max-width:calc(100vw - 24px)}
 }
 @media (max-width:520px){.hero3 .jp{display:none}}
+
+/* map place search */
+.msearch{position:relative;margin-bottom:8px}
+.mres{display:none;position:absolute;left:0;right:0;top:100%;z-index:1000;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);max-height:240px;overflow:auto;margin-top:4px}
+.mres button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;font-size:13.5px;border-bottom:1px solid var(--line)}
+.mres button:hover{background:var(--sand)}

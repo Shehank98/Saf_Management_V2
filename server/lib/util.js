@@ -69,3 +69,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 module.exports.haversineKm = haversineKm;
+
+/** Rough bounding box of Sri Lanka. */
+const inSriLanka = (lat, lng) => lat >= 5.7 && lat <= 10.0 && lng >= 79.4 && lng <= 82.2;
+module.exports.inSriLanka = inSriLanka;
