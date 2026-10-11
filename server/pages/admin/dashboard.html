@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard – Admin</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.two{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:1000px){.two{grid-template-columns:1fr}}
+.act{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.act:last-child{border-bottom:0}
+.act .i{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.act .t{flex:1;min-width:0}.act .t b{display:block;font-size:14px}.act .t span{font-size:12.5px;color:var(--muted)}
+.sched{display:grid;gap:10px}
+.slot{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.slot .tm{font-weight:800;font-size:13px}.slot .tm span{display:block;font-weight:600;color:var(--muted);font-size:11.5px}
+@media (max-width:520px){.slot{grid-template-columns:1fr}}
+.chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding-top:10px}
+.chart .b{flex:1;background:var(--ochre);border-radius:5px 5px 0 0;position:relative;min-height:3px;transform-origin:bottom;animation:grow .8s cubic-bezier(.3,.7,.3,1) both}
+.chart .b.dep{background:var(--olive)}
+.chart .b:hover::after{content:attr(data-v);position:absolute;bottom:100%;left:50%;transform:translate(-50%,-4px);background:var(--ink);color:var(--paper);font-size:11px;padding:3px 6px;border-radius:6px;white-space:nowrap}
+@keyframes grow{from{transform:scaleY(0)}}
+.axis{display:flex;gap:5px;font-size:10px;color:var(--muted);margin-top:4px}.axis span{flex:1;text-align:center}
+
+.live{margin-top:14px;border-color:color-mix(in srgb,var(--info) 40%,var(--line))}
+.live .ph h3{display:flex;align-items:center;gap:8px}
+.live .ph h3 i{width:10px;height:10px;border-radius:50%;background:var(--info);animation:livepulse 1.4s ease-out infinite;color:var(--info)}
+.lgrid{display:grid;grid-template-columns:1.4fr 1fr;gap:0}
+@media (max-width:900px){.lgrid{grid-template-columns:1fr}}
+.lt{padding:12px 16px;border-bottom:1px solid var(--line)}
+.lt:last-child{border-bottom:0}
+.lt .row1{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
+.trackline{position:relative;height:34px;margin:8px 0 2px}
+.trackline .rd{position:absolute;left:0;right:0;top:22px;height:4px;border-radius:99px;background:var(--sand)}
+.trackline .done{position:absolute;left:0;top:22px;height:4px;border-radius:99px;background:var(--info);transition:width 1s}
+.trackline .car{position:absolute;top:0;transform:translateX(-50%);transition:left 1s;animation:bob .5s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translate(-50%,-2px)}}
+.trackline .end{position:absolute;right:-4px;top:12px;font-size:14px}
+.ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.feed{border-left:1px solid var(--line);padding:6px 16px 12px;max-height:280px;overflow:auto}
+@media (max-width:900px){.feed{border-left:0;border-top:1px solid var(--line)}}
+.feed .ev{display:flex;gap:10px;padding:8px 0;font-size:13px;border-bottom:1px dashed var(--line);animation:fade .4s both}
+.feed .ev b.t{font-family:ui-monospace,monospace;color:var(--muted);min-width:44px}
+.feed .ev.new{background:color-mix(in srgb,var(--info) 10%,transparent);border-radius:8px;padding:8px}
+</style>
+</head>
+<body>
+<main id="content">
+  <div class="kpis" id="kpis"></div>
+  <div class="panel live"><div class="ph"><h3><i></i>Live now</h3></div><div class="lgrid"><div id="lives"></div><div class="feed" id="feed"></div></div></div>
+  <div class="two">
+    <div class="panel"><div class="ph"><h3>Needs your action</h3><span class="tag warn" id="actCount"></span></div><div class="pb" id="actions"></div></div>
+    <div class="panel"><div class="ph"><h3>Today &amp; tomorrow</h3><a class="small" href="/admin/bookings">All bookings →</a></div><div class="pb sched" id="sched"></div></div>
+  </div>
+  <div class="two">
+    <div class="panel"><div class="ph"><h3>Money received, last 14 days</h3><span class="small muted">card, cash and bank</span></div><div class="pb"><div class="chart" id="chart"></div><div class="axis" id="axis"></div></div></div>
+    <div class="panel"><div class="ph"><h3>Shared trips</h3><a class="small" href="/admin/shared">Manage →</a></div><div class="pb" id="sh"></div></div>
+  </div>
+</main>
+
+<script src="/api/admin/data.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/assets/qr.js"></script>
+<script src="/assets/pages/admin-dashboard.js"></script>
+</body>
+</html>

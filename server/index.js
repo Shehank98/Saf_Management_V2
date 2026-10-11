@@ -97,6 +97,27 @@ app.get('/partner/magic', U.wrap(async (req, res) => {
 }));
 app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('vendor/portal.html')(req, res); });
 
+// Web app manifests (home-screen install). Generated so the app name follows the business name in Settings.
+const manifest = (kind) => U.wrap(async (req, res) => {
+  const brand = (await settings.load()).business.name;
+  const icons = [
+    { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: '/icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ];
+  const defs = {
+    site: { name: brand, short_name: brand.split(' ').slice(0, 2).join(' ').slice(0, 14), description: 'Book private jeep safaris', start_url: '/?source=pwa', scope: '/', id: '/', theme_color: '#c0682a', background_color: '#fbf6ea',
+      shortcuts: [{ name: 'Book a safari', url: '/book/session' }, { name: 'My booking', url: '/booking' }] },
+    admin: { name: brand + ' Admin', short_name: 'Safari Admin', description: 'Bookings, trips and partners', start_url: '/admin?source=pwa', scope: '/admin', id: '/admin', theme_color: '#2b2118', background_color: '#2b2118',
+      shortcuts: [{ name: 'Ticket check-in', url: '/admin/check-in' }, { name: 'Private bookings', url: '/admin/bookings' }, { name: 'Shared trips', url: '/admin/shared' }] },
+    partner: { name: brand + ' Partner', short_name: 'Partner', description: 'Jobs, ticket scanning and payments for partners', start_url: '/partner?source=pwa', scope: '/partner', id: '/partner', theme_color: '#3f5a2e', background_color: '#fbf6ea',
+      shortcuts: [{ name: 'Scan tickets', url: '/partner#checkin' }, { name: 'My jobs', url: '/partner#jobs' }, { name: 'Payments', url: '/partner#payments' }] },
+  };
+  res.type('application/manifest+json').set('Cache-Control', 'public, max-age=300').json({ ...defs[kind], display: 'standalone', orientation: 'portrait', lang: 'en', icons });
+});
+app.get('/manifest.webmanifest', manifest('site'));
+app.get('/admin.webmanifest', manifest('admin'));
+app.get('/partner.webmanifest', manifest('partner'));
+
 app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\n'));
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------

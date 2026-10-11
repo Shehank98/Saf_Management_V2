@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Booking confirmed</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+main.wrap{padding:28px 16px 80px;max-width:780px}
+.hero2{text-align:center;padding:6px 0 20px}
+.tick{width:84px;height:84px;margin:0 auto 14px}
+.tick circle{stroke-dasharray:240;stroke-dashoffset:240;animation:draw .7s ease forwards}
+.tick path{stroke-dasharray:60;stroke-dashoffset:60;animation:draw .4s .6s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.hour{width:84px;height:84px;margin:0 auto 14px;border-radius:50%;border:5px solid var(--warn);display:grid;place-items:center;font-size:34px;color:var(--warn);animation:fade .5s}
+.grid2{display:grid;grid-template-columns:1fr 200px;gap:18px;align-items:start}
+@media (max-width:620px){.grid2{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.kv div{font-size:12px;color:var(--muted)}.kv b{display:block;font-size:15px;color:var(--ink)}
+.qrbox{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+.qrbox .tiny{color:#6f604f}
+.mail{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.mail:last-child{border-bottom:0}
+.mail .ic{width:38px;height:38px;border-radius:10px;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none;font-weight:800}
+.acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:16px}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
+.confetti i{position:absolute;top:-20px;width:8px;height:14px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="hero2" id="hero"></div>
+  <div class="card fade d1"><div class="grid2"><div>
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px"><div><span class="tiny muted" style="letter-spacing:.1em;text-transform:uppercase">Booking code</span><div style="font:800 22px ui-monospace,Menlo,monospace;letter-spacing:.06em" id="code"></div></div><span class="tag" id="status" style="align-self:center;font-size:12px"></span></div>
+    <div class="kv" id="kv"></div></div>
+    <div id="qrSide"></div></div></div>
+  <div class="acts" id="acts"></div>
+  <div class="card fade d2" style="margin-top:16px"><h3 style="margin-bottom:6px">What happens next</h3><div id="mails"></div></div>
+</main>
+<div class="confetti" id="confetti"></div>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/assets/qr.js"></script>
+<script src="/assets/pages/06-confirmation.js"></script>
+</body>
+</html>

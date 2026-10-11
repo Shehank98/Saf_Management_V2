@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Private bookings – Admin</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.log{list-style:none;padding:0;margin:0;font-size:13px}
+.log li{padding:6px 0 6px 18px;position:relative;border-left:2px solid var(--line);margin-left:4px}
+.log li::before{content:"";position:absolute;left:-6px;top:11px;width:10px;height:10px;border-radius:50%;background:var(--olive)}
+.log li span{color:var(--muted);font-size:12px;margin-left:6px}
+.payrow{display:flex;justify-content:space-between;font-size:14px;padding:4px 0}
+.cards-m{display:none}
+@media (max-width:700px){.tblw{display:none}.cards-m{display:grid;gap:10px}}
+.mcard{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);cursor:pointer}
+</style>
+</head>
+<body>
+<main id="content">
+  <div class="panel">
+    <div class="ph"><div class="tabs2" id="tabs"></div><div class="toolbar"><input class="inp search" id="q" placeholder="Search name, code, phone…" style="min-height:38px;padding:8px 12px"><select class="inp" id="ses" style="min-height:38px;padding:6px 10px;width:auto"><option value="">All sessions</option></select></div></div>
+    <div class="tblw"><table class="t"><thead><tr><th>Code</th><th>Guest</th><th>Safari</th><th>People</th><th>Payment</th><th>Jeep</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="cards-m pb" id="mrows"></div>
+  </div>
+</main>
+
+<script src="/api/admin/data.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/assets/qr.js"></script>
+<script src="/assets/pages/admin-private.js"></script>
+</body>
+</html>

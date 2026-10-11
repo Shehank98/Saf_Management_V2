@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checkout</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.phone{display:grid;grid-template-columns:110px 1fr;gap:8px}
+@media (max-width:520px){.row2{grid-template-columns:1fr}}
+.opt .amt{font-family:Fraunces,serif;font-weight:700;font-size:20px;color:var(--ochre);margin-top:6px}
+.opt .best{position:absolute;top:-10px;left:14px}
+.cardbox{margin-top:14px;display:none}
+.cardbox.show{display:block;animation:fade .3s ease}
+.cc{position:relative}
+.cc .brand{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--muted)}
+.demo{font-size:12px;background:var(--info-bg);color:var(--info);padding:8px 10px;border-radius:10px;margin-bottom:12px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:12px}
+.chk input{width:20px;height:20px;accent-color:var(--ochre);margin-top:2px;flex:none}
+.overlay{position:fixed;inset:0;z-index:80;background:rgba(251,246,234,.94);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+:root[data-theme="dark"] .overlay{background:rgba(23,19,15,.94)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .overlay{background:rgba(23,19,15,.94)}}
+.overlay.show{display:flex}
+.road{width:260px;height:6px;border-radius:99px;background:var(--sand);position:relative;overflow:visible}
+.road .j{position:absolute;top:-26px;left:0;animation:go 1.8s ease-in-out forwards}
+@keyframes go{to{left:calc(100% - 40px)}}
+.road .f{position:absolute;inset:0 auto 0 0;background:var(--ochre);border-radius:99px;animation:fl 1.8s ease-in-out forwards}
+@keyframes fl{from{width:0}to{width:100%}}
+</style>
+</head>
+<body>
+<main class="wrap shell">
+  <div>
+    <div class="head fade"><h1>Almost done</h1><p>No account needed. Your booking confirmation and e-ticket link are sent to your email.</p></div>
+    <div class="card fade d1">
+      <h3 style="margin-bottom:12px">Your details</h3>
+      <div class="field"><label for="name">Full name</label><input class="inp" id="name" autocomplete="name"><span class="errmsg" id="eName"></span></div>
+      <div class="field"><label for="phone">Mobile number <span class="muted" style="font-weight:400">(only for the driver on the day)</span></label><div class="phone"><select class="inp" id="cc" aria-label="Country code"><option>+94</option><option>+44</option><option>+49</option><option>+33</option><option>+91</option><option>+1</option><option>+61</option><option>+31</option><option>+86</option></select><input class="inp" id="phone" inputmode="tel" autocomplete="tel-national" placeholder="77 123 4567"></div><span class="errmsg" id="ePhone"></span></div>
+      <div class="field"><label for="email">Email (for your receipt)</label><input class="inp" id="email" type="email" autocomplete="email"><span class="errmsg" id="eEmail"></span></div>
+    </div>
+    <h3 style="margin:22px 0 10px">How would you like to pay?</h3>
+    <div class="grid fade d2" style="gap:10px" role="radiogroup" aria-label="Payment" id="payOpts"></div>
+    <div class="card cardbox" id="cardBox"><div class="field" id="provBox" style="display:none"><label>Pay with</label><div class="grid" id="provOpts" style="gap:8px"></div></div><p class="small muted" style="margin:0">🔒 When you tap the button you will pay on a secure page run by <b id="provName">our payment partner</b>. Your card details never touch our website, and the amount is set by the server, not by your browser.</p></div>
+    <div class="note bad" id="subErr" style="display:none;margin-top:12px"></div>
+    <label class="chk fade d3"><input type="checkbox" id="terms"><span>I agree to the cancellation policy: <span id="termsText"></span></span></label>
+  </div>
+  <aside class="aside card" id="aside"></aside>
+</main>
+<div class="overlay" id="overlay"><div class="road"><div class="f"></div><div class="j">%JEEP%</div></div><b id="ovText">Processing payment…</b><span class="small muted">Please don't close this page</span></div>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/assets/pages/05-checkout.js"></script>
+</body>
+</html>

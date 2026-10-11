@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Payments & profit – Admin</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.bar-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--sand);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:7px 12px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.kpi .v{font-variant-numeric:tabular-nums}
+.kpi.hero{background:linear-gradient(135deg,color-mix(in srgb,var(--c-profit) 14%,var(--card)),var(--card));border-color:color-mix(in srgb,var(--c-profit) 35%,var(--line))}
+.two{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:1000px){.two{grid-template-columns:1fr}}
+/* stacked bar chart */
+.chart{position:relative;height:220px;display:flex;align-items:flex-end;gap:10px;padding:8px 4px 0;border-bottom:1px solid var(--line)}
+.chart .col{flex:1;display:flex;flex-direction:column-reverse;gap:2px;height:100%;justify-content:flex-start;cursor:pointer;position:relative}
+.chart .col .seg2{border-radius:0;transform-origin:bottom;animation:grow .8s cubic-bezier(.3,.7,.3,1) both}
+.chart .col .cost{background:var(--c-cost)}
+.chart .col .prof{background:var(--c-profit);border-radius:4px 4px 0 0}
+.chart .col:hover{filter:brightness(1.08)}
+.chart .grid{position:absolute;left:0;right:0;border-top:1px dashed var(--line);font-size:10px;color:var(--muted)}
+.chart .grid span{position:absolute;top:-14px;left:0}
+@keyframes grow{from{transform:scaleY(0)}}
+.xaxis{display:flex;gap:10px;padding:6px 4px 0}.xaxis span{flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.legend{display:flex;gap:16px;font-size:13px;margin-bottom:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tip{position:fixed;z-index:100;pointer-events:none;background:var(--ink);color:var(--paper);padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.5;opacity:0;transition:opacity .12s;box-shadow:var(--shadow)}
+.tip.show{opacity:1}
+.hbar{display:grid;grid-template-columns:90px 1fr 90px;gap:10px;align-items:center;padding:8px 0;font-size:14px}
+.hbar .track{height:12px;border-radius:99px;background:var(--sand);overflow:hidden}
+.hbar .track span{display:block;height:100%;background:var(--c-profit);border-radius:99px;transform-origin:left;animation:growx .8s cubic-bezier(.3,.7,.3,1) both}
+@keyframes growx{from{transform:scaleX(0)}}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.t tfoot td{font-weight:800;border-top:2px solid var(--line);background:var(--sand)}
+.pos{color:var(--ok)}.neg{color:var(--bad)}
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;animation:fade .4s both}
+.pcard .owed{font-family:Fraunces,serif;font-size:24px;font-weight:700}
+.pcard.zero .owed{color:var(--muted)}
+.chk{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.chk input{width:18px;height:18px;accent-color:var(--olive)}
+.chk span:nth-child(2){flex:1}
+.paid-anim{animation:stamp .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes stamp{0%{transform:scale(1.6) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+<main id="content">
+  <div class="bar-top"><div class="tabs2" id="tabs"></div><div class="toolbar"><div class="seg" id="range"></div><button class="btn sm" id="csv">⬇ Export CSV</button></div></div>
+  <div id="pane"></div>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script src="/api/admin/data.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/assets/pages/admin-payments.js"></script>
+</body>
+</html>

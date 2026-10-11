@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Partner portal</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/partner.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Partner">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.login{min-height:100vh;display:grid;place-items:center;padding:16px;background:linear-gradient(180deg,#6b7b45,#3f5a2e);position:relative;overflow:hidden}
+.login .card{max-width:380px;width:100%;padding:24px;position:relative;z-index:1}
+.login .hill{position:absolute;left:-10%;right:-10%;bottom:-40px;height:160px;border-radius:50% 50% 0 0;background:#2f4220}
+.login .rd{position:absolute;bottom:40px;animation:drv 11s linear infinite;z-index:0}
+@keyframes drv{from{left:-120px}to{left:110%}}
+.job{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px;animation:fade .4s both}
+.job.new{border:2px solid var(--ochre);box-shadow:0 0 0 4px color-mix(in srgb,var(--ochre) 15%,transparent)}
+.job.live{border:2px solid var(--info)}
+.job .top2{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.job .when{font-family:Fraunces,serif;font-size:20px;font-weight:700}
+.job .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.job .kv div{font-size:12px;color:var(--muted)}.job .kv b{display:block;font-size:14.5px;color:var(--ink)}
+.job .acts{display:flex;gap:8px;flex-wrap:wrap}
+.pax{margin:8px 0 0;padding:0;list-style:none;font-size:14px}.pax li{padding:6px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;gap:8px}
+.meals{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.meals span{background:var(--sand);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:520px}
+.cal .h{font-size:11px;text-align:center;color:var(--muted);font-weight:700}
+.cal button{aspect-ratio:1;border:1px solid var(--line);border-radius:10px;background:var(--paper);font-weight:700;font-size:13px;position:relative;min-width:0}
+.cal button.off{background:var(--bad-bg);color:var(--bad);text-decoration:line-through;border-color:transparent}
+.cal button.jb::after{content:"";position:absolute;bottom:5px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--ochre)}
+.cal button:disabled{opacity:.5}
+.cam{aspect-ratio:4/3;border-radius:14px;background:#1b1510;display:grid;place-items:center;color:#cdbfa5;position:relative;overflow:hidden}
+.cam .fr{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:14px}
+.cam .ln{position:absolute;left:18%;right:18%;height:2px;background:#f2b56b;box-shadow:0 0 12px #f2b56b;animation:scan 2s ease-in-out infinite}
+@keyframes scan{0%,100%{top:20%}50%{top:78%}}
+.chips2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chips2 button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;font-size:12px;font-weight:700;font-family:ui-monospace,monospace}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.owed{font-family:Fraunces,serif;font-size:34px;font-weight:700}
+.payprog{height:10px;border-radius:99px;background:var(--sand);overflow:hidden;margin:10px 0 4px}.payprog span{display:block;height:100%;background:var(--olive);border-radius:99px;animation:growx 1s cubic-bezier(.3,.7,.3,1) both;transform-origin:left}
+@keyframes growx{from{transform:scaleX(0)}}
+</style>
+</head>
+<body>
+<div id="loginView"></div>
+<main id="content" hidden></main>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/assets/qr.js"></script>
+<script src="/vendor/jsQR.js"></script>
+<script src="/assets/pages/partner-portal.js"></script>
+</body>
+</html>

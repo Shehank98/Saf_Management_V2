@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin login</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+body{min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,var(--sky1),var(--sky2) 60%,var(--hill2));padding:16px}
+.box{width:100%;max-width:400px}
+.box .card{padding:26px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:16px;font-family:Fraunces,serif;font-weight:700;font-size:22px;color:#2b160a}
+.brand .mk{width:40px;height:40px;border-radius:12px;background:#2b1a0e;display:grid;place-items:center}
+.road{height:44px;position:relative;overflow:hidden;margin-top:14px}
+.road .j{position:absolute;bottom:4px;animation:d 7s linear infinite}
+@keyframes d{from{left:-60px}to{left:110%}}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="brand"><span class="mk"><svg viewBox="0 0 40 24" width="30" height="19" aria-hidden="true"><path d="M2 10 L8 10 L11 3 L29 3 L32 10 L39 11 L39 18 L1 18 Z" fill="#c0682a"/><circle cx="9" cy="19" r="4" fill="#2b1a0e"/><circle cx="31" cy="19" r="4" fill="#2b1a0e"/></svg></span>Yala Wild Safaris</div>
+  <form class="card fade" id="f">
+    <h2 style="margin-bottom:4px">Staff sign in</h2><p class="small muted">Admin panel for bookings, trips and partners.</p>
+    <div class="field" style="margin-top:14px"><label for="e">Email</label><input class="inp" id="e" type="email" autocomplete="username"></div>
+    <div class="field"><label for="p">Password</label><input class="inp" id="p" type="password" autocomplete="current-password"></div>
+    <span class="errmsg" id="err"></span>
+    <button class="btn primary block" style="margin-top:6px">Sign in</button>
+    <p class="tiny muted" style="margin:12px 0 0;text-align:center">Forgot your password? Ask the owner to reset it in Settings → Team.</p>
+    <div class="road"><div class="j"><svg viewBox="0 0 40 24" width="30" height="19" aria-hidden="true"><path d="M2 10 L8 10 L11 3 L29 3 L32 10 L39 11 L39 18 L1 18 Z" fill="#c0682a"/><circle cx="9" cy="19" r="4" fill="#2b1a0e"/><circle cx="31" cy="19" r="4" fill="#2b1a0e"/></svg></div></div>
+  </form>
+</div>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/pages/admin-login.js"></script>
+</body>
+</html>

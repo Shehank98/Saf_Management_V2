@@ -3,6 +3,7 @@ const pricing = require('./pricing');
 const providers = require('../payments');
 const settings = require('./settings');
 const U = require('./util');
+const secrets = require('./secrets');
 
 const TYPE_LABEL = { JEEP_DRIVER: 'Jeep + driver', GUIDE: 'Tracker / guide', MEAL_SUPPLIER: 'Meal supplier' };
 const ROLE_LABEL = { JEEP: 'Jeep + driver', GUIDE: 'Tracker', MEALS: 'Meals', CAMERA: 'Camera' };
@@ -59,7 +60,7 @@ async function bookings(db, where = 'TRUE', params = []) {
       pay: PAY_UI[b.pay_option], paid: b.paid, total: b.total, refunded: b.refunded, jeeps: b.jeeps, status: uiStatus(b), declined: b.status === 'DECLINED',
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
       created: U.dateOf(b.created_at), notes: b.notes || '', startedAt: b.started_at ? U.hhmm(b.started_at) : '', startedBy: b.started_by || '',
-      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by,
+      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code),
     };
   });
 }

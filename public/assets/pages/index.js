@@ -1,0 +1,11 @@
+mount();
+motes($('.hero'), 18);
+$('#yr').textContent = new Date().getFullYear();
+$('#policyText').textContent = policyText();
+$('#qSes').innerHTML = Object.entries(SESS).map(([k, s]) => `<option value="${k}">${s.short} · ${s.time.replace(/ /g, '')}</option>`).join('');
+const maxPeople = Math.max(12, CFG.fleet * CFG.maxPerJeep);
+$('#qG').innerHTML = Array.from({ length: Math.min(maxPeople, 24) }, (_, i) => `<option ${i + 1 === 4 ? 'selected' : ''}>${i + 1}</option>`).join('');
+const d = $('#qDate'); d.min = D(1); d.value = D(7);
+$('#quick').onsubmit = e => { e.preventDefault(); go('02-date.html', { ses: $('#qSes').value, date: d.value, guests: $('#qG').value }) };
+const SKY = { morning: ['#f9d68f', '#f3a466'], evening: ['#f19a5a', '#8a4a6a'], full: ['#9fd0e6', '#f3d79a'] };
+$('#sessCards').innerHTML = Object.entries(SESS).map(([k, s]) => `<div class="card"><div style="height:70px;margin:-18px -18px 14px;border-radius:16px 16px 0 0;background:linear-gradient(180deg,${(SKY[k] || SKY.morning)[0]},${(SKY[k] || SKY.morning)[1]})"></div><div class="t">${esc(s.name)}</div><p class="small muted">${s.time} · pickup ${s.pickup}</p><p style="margin:0"><span class="price">${fmt(s.jeep)}</span> <span class="small muted">/ jeep</span></p><a class="btn" style="margin-top:10px" href="/book/date?ses=${k}">Book ${esc(s.short.toLowerCase())}</a></div>`).join('');

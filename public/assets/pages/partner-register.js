@@ -1,0 +1,45 @@
+mount();
+
+let st=0;const f={type:'',name:'',nic:'',phone:'',email:'',area:'Tissamaharama',langs:new Set(['Sinhala','English']),plate:'',model:'',year:'',seats:'6',lic:'',exp:'',files:{},bank:'',branch:'',accName:'',accNo:'',agree:false};let sending=false,failMsg='';
+const TYPES=[['Jeep + driver','You own a safari jeep and drive it.'],['Tracker / guide','You spot wildlife and guide guests in the park.'],['Meal supplier','You prepare breakfast boxes and packed lunches.']];
+const DOCS=()=>f.type==='Jeep + driver'?['NIC (both sides)','Driving licence','Vehicle revenue licence','Insurance (covers paying passengers)','Jeep photos (outside + seats)']:f.type==='Tracker / guide'?['NIC (both sides)','Guide / tracker licence']:['NIC (both sides)','Business registration','Food handling certificate'];
+const NAMES=['What you offer','About you',()=>f.type==='Jeep + driver'?'Your jeep':f.type==='Tracker / guide'?'Experience':'Your kitchen','Documents','Payout & submit'];
+function valid(){if(st===0)return!!f.type;if(st===1)return f.name.length>1&&f.nic.length>=9&&f.phone.replace(/\D/g,'').length>=9&&/^\S+@\S+\.\S+$/.test(f.email);
+  if(st===2)return f.type==='Jeep + driver'?f.plate.length>=5&&+f.year>1990:f.type==='Tracker / guide'?f.lic.length>2:true;
+  if(st===3)return DOCS().every(d=>f.files[d]);if(st===4)return f.bank&&f.accName&&f.accNo.length>=6&&f.agree;}
+function render(){
+  if(st===5){$('#root').innerHTML=`<div class="card done fade"><div style="font-size:48px">🌿</div><h1>Application sent!</h1><p class="muted" style="max-width:460px;margin:8px auto 0">Thanks, ${esc(f.name.split(' ')[0])}. We'll review your documents within 2 working days. We've emailed a copy to <b>${esc(f.email)}</b>, and you'll get your partner login once you're approved.</p><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><a class="btn primary" href="/partner">Partner portal</a><a class="btn" href="/">Back to website</a></div></div>`;return}
+  const nm=NAMES.map(n=>typeof n==='function'?n():n);
+  let h=`<div class="hero3 fade"><div class="jp">${JEEP('#2b3a1a',130,82)}</div><h1>Become a partner</h1><p style="margin-top:6px">Drive, track or cook for ${esc(BRAND)}. Get steady safari jobs in Yala, paid on time.</p><div class="perks"><span>✓ Choose your days</span><span>✓ Job offers by email</span><span>✓ Monthly payouts</span></div></div>
+  <div class="prog">${nm.map((_,i)=>`<span class="${i<=st?'on':''}"></span>`).join('')}</div><div class="stepl">Step ${st+1} of 5 · ${nm[st]}</div><div class="card fade">`;
+  if(st===0)h+=`<h2 style="margin-bottom:12px">What do you offer?</h2><div class="grid" style="gap:10px">${TYPES.map(([t,d])=>`<button class="opt ${f.type===t?'on':''}" data-t="${t}"><span class="radio"></span><b>${t}</b><p class="small muted" style="margin:4px 0 0">${d}</p></button>`).join('')}</div>`;
+  if(st===1)h+=`<h2 style="margin-bottom:12px">About you</h2><div class="g2f"><div class="field"><label for="i_name">Full name</label><input class="inp" id="i_name" value="${esc(f.name)}"></div><div class="field"><label for="i_nic">NIC number</label><input class="inp" id="i_nic" value="${esc(f.nic)}"></div>
+    <div class="field"><label for="i_phone">Mobile number</label><input class="inp" id="i_phone" inputmode="tel" value="${esc(f.phone)}" placeholder="+94 77 123 4567"></div><div class="field"><label for="i_email">Email</label><input class="inp" id="i_email" type="email" value="${esc(f.email)}"></div></div>
+    <div class="field"><label for="i_area">Where are you based?</label><select class="inp" id="i_area">${['Tissamaharama','Kirinda','Palatupana','Kataragama','Other'].map(a=>`<option ${a===f.area?'selected':''}>${a}</option>`).join('')}</select></div>
+    <div class="field"><label>Languages you speak</label><div class="langs">${['Sinhala','Tamil','English','German','French','Chinese','Russian'].map(l=>`<button type="button" data-l="${l}" class="${f.langs.has(l)?'on':''}">${l}</button>`).join('')}</div></div>`;
+  if(st===2)h+=f.type==='Jeep + driver'?`<h2 style="margin-bottom:12px">Your jeep</h2><div class="g2f"><div class="field"><label for="i_plate">Number plate</label><input class="inp" id="i_plate" value="${esc(f.plate)}" placeholder="SP-PK-1234" style="text-transform:uppercase"></div><div class="field"><label for="i_model">Make &amp; model</label><input class="inp" id="i_model" value="${esc(f.model)}" placeholder="Mitsubishi L200"></div>
+    <div class="field"><label for="i_year">Year</label><input class="inp" id="i_year" type="number" value="${esc(f.year)}" placeholder="2018"></div><div class="field"><label for="i_seats">Guest seats</label><select class="inp" id="i_seats">${[4,5,6,7,8].map(n=>`<option ${String(n)===f.seats?'selected':''}>${n}</option>`).join('')}</select></div></div><p class="small muted">Jeeps must be safari-fitted with a roof hatch or open top.</p>`
+    :f.type==='Tracker / guide'?`<h2 style="margin-bottom:12px">Your experience</h2><div class="g2f"><div class="field"><label for="i_lic">Guide licence number</label><input class="inp" id="i_lic" value="${esc(f.lic)}"></div><div class="field"><label for="i_exp">Years in Yala</label><input class="inp" id="i_exp" type="number" value="${esc(f.exp)}"></div></div>`
+    :`<h2 style="margin-bottom:12px">Your kitchen</h2><div class="field"><label for="i_model">Business name</label><input class="inp" id="i_model" value="${esc(f.model)}"></div><div class="field"><label for="i_exp">Meals per day you can supply</label><input class="inp" id="i_exp" type="number" value="${esc(f.exp)}"></div>`;
+  if(st===3)h+=`<h2 style="margin-bottom:4px">Upload documents</h2><p class="small muted" style="margin-bottom:12px">Photos or PDFs, up to 10 MB each. Only our team sees these.</p>${DOCS().map((d,i)=>`<label class="drop ${f.files[d]?'has':''}"><input type="file" accept="image/*,.pdf" data-d="${d}" ${d.includes('photos')?'multiple':''}><b>${f.files[d]?'✓ ':''}${d}</b><span class="small muted">${f.files[d]?esc(f.files[d].map(x=>x.name).join(', ')):'Tap to upload'}</span></label>`).join('')}`;
+  if(st===4)h+=`<h2 style="margin-bottom:12px">Where should we pay you?</h2><div class="g2f"><div class="field"><label for="i_bank">Bank</label><select class="inp" id="i_bank"><option value="">Choose…</option>${['Bank of Ceylon','Commercial Bank','HNB','Sampath Bank','People\'s Bank','NSB'].map(b=>`<option ${b===f.bank?'selected':''}>${b}</option>`).join('')}</select></div><div class="field"><label for="i_branch">Branch</label><input class="inp" id="i_branch" value="${esc(f.branch)}"></div>
+    <div class="field"><label for="i_accName">Account name</label><input class="inp" id="i_accName" value="${esc(f.accName)}"></div><div class="field"><label for="i_accNo">Account number</label><input class="inp" id="i_accNo" inputmode="numeric" value="${esc(f.accNo)}"></div></div>
+    <label class="small" style="display:flex;gap:10px;align-items:flex-start;margin-top:6px"><input type="checkbox" id="i_agree" ${f.agree?'checked':''} style="width:20px;height:20px;accent-color:var(--ochre)"> I agree to the partner terms: arrive on time, keep the jeep safe and clean, and follow park rules.</label>`;
+  if(failMsg&&st===4)h+=`<div class="note bad" style="margin-top:12px">${esc(failMsg)}</div>`;
+  h+=`</div><div class="nav2"><button class="btn ghost" id="bk" ${st===0?'style="visibility:hidden"':''}>← Back</button><button class="btn primary" id="nx">${st===4?'Submit application':'Continue'}</button></div>`;
+  $('#root').innerHTML=h;
+  $$('.opt').forEach(o=>o.onclick=()=>{f.type=o.dataset.t;render()});
+  $$('.langs button').forEach(b=>b.onclick=()=>{const l=b.dataset.l;f.langs.has(l)?f.langs.delete(l):f.langs.add(l);b.classList.toggle('on')});
+  $$('[id^="i_"]').forEach(i=>i.addEventListener(i.type==='checkbox'||i.tagName==='SELECT'?'change':'input',()=>{const k=i.id.slice(2);f[k]=i.type==='checkbox'?i.checked:i.value.trim();upd()}));
+  $$('.drop input').forEach(i=>i.onchange=()=>{const fl=[...i.files];if(!fl.length)return;const big=fl.find(x=>x.size>10*1024*1024);if(big){toast('\u26a0 '+esc(big.name)+' is over 10 MB. Please choose a smaller photo or PDF.',4200);return}f.files[i.dataset.d]=fl;render()});
+  $('#bk').onclick=()=>{st--;render()};$('#nx').onclick=async()=>{if(!valid()||sending)return;if(st<4){st++;render();scrollTo(0,0);return}
+    sending=true;$('#nx').disabled=true;$('#nx').textContent='Sending\u2026';failMsg='';
+    try{const fd=new FormData();
+      Object.entries({type:f.type,name:f.name,nic:f.nic,phone:f.phone,email:f.email,area:f.area,langs:[...f.langs].join(','),plate:f.plate,model:f.model,year:f.year,seats:f.seats,lic:f.lic,exp:f.exp,bank:f.bank,branch:f.branch,accName:f.accName,accNo:f.accNo}).forEach(([k,v])=>fd.append(k,v||''));
+      DOCS().forEach(d=>(f.files[d]||[]).forEach(file=>fd.append('doc:'+d,file,file.name)));
+      await api('POST','/api/partners/apply',fd);st=5;render();scrollTo(0,0)}
+    catch(e){failMsg=e.message;render()}finally{sending=false}};
+  upd();
+}
+function upd(){$('#nx').disabled=!valid()}
+render();

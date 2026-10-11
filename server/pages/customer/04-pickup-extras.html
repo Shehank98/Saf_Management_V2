@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pickup and extras</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css"><style>
+.map{position:relative;width:100%;aspect-ratio:4/3;border-radius:14px;overflow:hidden;cursor:crosshair;border:1px solid var(--line);background:
+ radial-gradient(circle at 30% 70%,#9fbf86 0 8%,transparent 9%),radial-gradient(circle at 75% 25%,#9fbf86 0 10%,transparent 11%),
+ radial-gradient(ellipse at 62% 62%,#8fc0d6 0 7%,transparent 8%),linear-gradient(135deg,#e6d6a8,#d8c08a)}
+.map .road{position:absolute;background:#f6ecd2;opacity:.9}
+.map .ring{position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:2px dashed var(--leaf);background:rgba(63,90,46,.12)}
+.map .base{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:700;color:#2b1a0e}
+.map .base i{width:16px;height:16px;border-radius:50%;background:#2b1a0e;border:3px solid #fff;box-shadow:0 0 0 0 rgba(43,26,14,.5);animation:ping 2s infinite}
+@keyframes ping{to{box-shadow:0 0 0 18px rgba(43,26,14,0)}}
+.map .pin{position:absolute;width:26px;height:36px;transform:translate(-50%,-100%);display:none;animation:drop .35s ease}
+@keyframes drop{from{transform:translate(-50%,-160%);opacity:0}}
+.map .lbl{position:absolute;font-size:10px;font-weight:700;color:#5a4a2a;opacity:.8}
+.map .hint{position:absolute;left:10px;bottom:10px;background:rgba(255,253,247,.9);color:#2b2118;font-size:12px;font-weight:600;padding:5px 9px;border-radius:8px}
+.ex{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+.ex:last-child{border-bottom:0}
+.ex .ic{width:44px;height:44px;border-radius:12px;background:var(--sand);display:grid;place-items:center;flex:none}
+.ex .t{flex:1}
+.ex .pr{font-weight:700;color:var(--ochre);font-size:14px}
+.more{display:none;margin-top:10px}
+.more.show{display:block;animation:fade .3s ease}
+.mrow{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;margin-bottom:6px;animation:fade .3s both}
+.mrow .gn{font-size:13px;font-weight:600}.mrow .inp{min-height:40px;padding:7px 10px}
+.quick{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.quick button{border:1px solid var(--line);background:var(--paper);border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700}
+.quick button:hover{border-color:var(--olive);color:var(--olive)}
+</style>
+</head>
+<body>
+<main class="wrap shell">
+  <div>
+    <div class="head fade"><h1>Pickup &amp; extras</h1><p id="sub"></p></div>
+    <div class="grid g2 fade d1" role="radiogroup" aria-label="Pickup">
+      <button class="opt" data-v="hotel" role="radio"><span class="radio"></span><b>Pick me up from my hotel</b><p class="small muted" style="margin:4px 0 0">Free within <span data-cfg="radiusKm">7</span> km of our base.</p></button>
+      <button class="opt" data-v="office" role="radio"><span class="radio"></span><b>I'll come to your office</b><p class="small muted" style="margin:4px 0 0">Tissamaharama base. We'll email you the exact location.</p></button>
+    </div>
+    <div class="card fade d2" style="margin-top:14px" id="hotelBox">
+      <div class="field"><label for="hotel">Hotel or guesthouse name</label><input class="inp" id="hotel" placeholder="e.g. Lakeside Guest House"></div>
+      <label class="small" style="font-weight:600">Drop a pin on your hotel</label>
+      <div class="lmap" id="map" role="application" aria-label="Map: tap to drop a pin on your hotel"></div>
+      <div style="margin-top:8px"><button class="btn sm" type="button" id="locate">📍 Use my location</button></div>
+      <div id="pinOut" style="margin-top:10px"></div>
+      <p class="tiny muted" style="margin-top:6px">Tap the map to drop the pin. The distance from our base is checked when you book.</p>
+    </div>
+    <h3 style="margin:24px 0 8px">Add extras</h3>
+    <div class="card fade d3" id="extras"></div>
+    <div class="field" style="margin-top:14px"><label for="notes">Anything we should know? (optional)</label><textarea class="inp" id="notes" rows="3" placeholder="Birthday, mobility needs, child seat…"></textarea></div>
+  </div>
+  <aside class="aside card" id="aside"></aside>
+</main>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/assets/pages/04-pickup-extras.js"></script>
+</body>
+</html>

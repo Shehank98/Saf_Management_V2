@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vendors – Admin</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.doc{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;font-size:14px}
+.doc .ic{width:30px;height:30px;border-radius:8px;background:var(--sand);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)}
+.doc span{flex:1}
+.stars{color:#d9a441;letter-spacing:1px}
+.photo{height:110px;border-radius:12px;background:linear-gradient(180deg,#f7c77e,#d89a5b);display:grid;place-items:center;margin-bottom:10px}
+</style>
+</head>
+<body>
+<main id="content">
+  <div class="panel">
+    <div class="ph"><div class="tabs2" id="tabs"></div><div class="toolbar"><select class="inp" id="type" style="min-height:38px;padding:6px 10px;width:auto"><option value="">All types</option><option>Jeep + driver</option><option>Tracker / guide</option><option>Meal supplier</option></select><a class="btn sm" href="/partners/apply" target="_blank">Registration form ↗</a></div></div>
+    <div class="tblw" id="tbl"></div>
+  </div>
+</main>
+
+<script src="/api/admin/data.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/assets/pages/admin-vendors.js"></script>
+</body>
+</html>

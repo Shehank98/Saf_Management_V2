@@ -3,6 +3,7 @@ const U = require('../lib/util');
 
 const limiter = (windowMin, max, message) => rateLimit({
   windowMs: windowMin * 60 * 1000, limit: max, standardHeaders: true, legacyHeaders: false,
+  skip: req => req.path === '/config.js',   // loaded by <script> tags, so it must never answer with JSON errors
   handler: (req, res) => res.status(429).json({ error: message || 'Too many attempts. Please wait a few minutes and try again.' }),
 });
 

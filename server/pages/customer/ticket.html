@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your safari e-ticket</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+main.wrap{padding:24px 16px 60px;max-width:460px}
+.tk{background:var(--card);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line);animation:fade .6s ease both}
+.tk .art{position:relative;height:150px;background:linear-gradient(180deg,#f7c77e,#f19a5a 70%,#d89a5b);overflow:hidden;color:#2b160a}
+.tk .art .sun{position:absolute;right:40px;top:40px;width:60px;height:60px;border-radius:50%;background:#ffe7a8;box-shadow:0 0 50px 20px rgba(255,220,140,.6)}
+.tk .art .h1{position:absolute;left:-10%;right:-10%;bottom:0;height:56px;background:#b8743f;border-radius:50% 50% 0 0}
+.tk .art .h2{position:absolute;left:0;right:0;bottom:0;height:26px;background:#7a4a2a}
+.tk .art .jp{position:absolute;bottom:18px;animation:drv 9s linear infinite}
+@keyframes drv{from{left:-80px}to{left:110%}}
+.tk .art .ttl{position:absolute;left:18px;top:16px}
+.tk .art .ttl b{font-family:Fraunces,serif;font-size:22px;display:block}
+.tk .art .ttl span{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.tk .sec{padding:18px 20px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.kv b{display:block;font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0}
+.tear{border-top:2px dashed var(--line);margin:0 20px;position:relative}
+.tear::before,.tear::after{content:"";position:absolute;top:-12px;width:22px;height:22px;border-radius:50%;background:var(--paper)}
+.tear::before{left:-32px}.tear::after{right:-32px}
+.qrwrap{background:#fff;border-radius:16px;padding:12px;max-width:240px;margin:0 auto;border:1px solid var(--line)}
+.code{text-align:center;font:800 24px ui-monospace,Menlo,monospace;letter-spacing:.1em;margin-top:10px}
+.state{display:flex;justify-content:center;margin-top:8px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.locked{text-align:center;padding:30px 20px}
+.onway{display:flex;gap:12px;align-items:center;background:var(--info-bg);color:var(--ink);padding:12px 20px;animation:fade .5s .3s both}
+.onway .paw{font-size:24px;animation:pawstep 1.2s ease-in-out infinite}
+@keyframes pawstep{50%{transform:translateY(-4px) rotate(-10deg)}}
+</style>
+</head>
+<body>
+<main class="wrap"><div id="root"></div></main>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/assets/qr.js"></script>
+<script src="/assets/pages/ticket.js"></script>
+</body>
+</html>

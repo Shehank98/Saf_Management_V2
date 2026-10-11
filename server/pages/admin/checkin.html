@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ticket check-in – Admin</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/admin.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.wrap2{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:980px}
+@media (max-width:820px){.wrap2{grid-template-columns:1fr}}
+.cam{position:relative;aspect-ratio:4/3;border-radius:16px;background:#1b1510;overflow:hidden;display:grid;place-items:center;color:#cdbfa5}
+.cam .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px}
+.cam .line{position:absolute;left:18%;right:18%;height:2px;background:#f2b56b;box-shadow:0 0 12px #f2b56b;animation:scan 2s ease-in-out infinite}
+@keyframes scan{0%,100%{top:20%}50%{top:78%}}
+.res{border-radius:16px;min-height:260px;display:flex;flex-direction:column;justify-content:center;animation:fade .3s}
+.res>div{width:100%}
+.res.ok{background:var(--ok-bg)}.res.bad{background:var(--bad-bg)}.res.idle{background:var(--card);border:1px dashed var(--line);text-align:center;color:var(--muted)}
+.big{font-family:Fraunces,serif;font-size:30px;font-weight:700}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;font-size:12px;font-weight:700;font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<main id="content">
+  <p class="muted" style="max-width:640px;margin-bottom:14px">Scan the QR on a guest's e-ticket, or type the booking code. Drivers can do the same from their partner app. Each ticket can be checked in once.</p>
+  <div class="wrap2">
+    <div class="panel"><div class="pb">
+      <div class="cam" id="cam"><div class="frame"></div><div class="line"></div><span class="small" style="position:absolute;bottom:12px" id="camNote">Tap “Use camera” to scan a QR</span></div>
+      <form id="f" style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="code" placeholder="Booking code, e.g. YWS-4821K" style="text-transform:uppercase"><button class="btn primary">Check in</button></form>
+      <div style="margin-top:10px"><button class="btn sm" type="button" id="camBtn">📷 Use camera</button></div>
+    </div></div>
+    <div class="res idle" id="res"><div style="font-size:40px">▣</div><p style="margin:8px 0 0">Waiting for a scan…</p></div>
+  </div>
+</main>
+
+<script src="/api/admin/data.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/admin.js"></script>
+<script src="/vendor/jsQR.js"></script>
+<script src="/assets/pages/admin-checkin.js"></script>
+</body>
+</html>

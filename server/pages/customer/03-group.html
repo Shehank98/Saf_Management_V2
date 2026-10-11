@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Group size</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.counter{display:flex;align-items:center;gap:14px}
+.counter button{width:50px;height:50px;border-radius:14px;border:1px solid var(--line);background:var(--paper);font-size:24px;font-weight:700}
+.counter button:disabled{opacity:.35}
+.counter .v{font-family:Fraunces,serif;font-size:42px;font-weight:700;min-width:54px;text-align:center}
+.fleet{display:flex;gap:20px;flex-wrap:wrap;margin-top:18px;min-height:110px}
+.fj{display:flex;flex-direction:column;align-items:center;gap:6px;animation:drivein .5s ease both}
+@keyframes drivein{from{opacity:0;transform:translateX(-40px)}}
+.ppl{display:flex;gap:3px}.ppl i{width:11px;height:11px;border-radius:50%;background:var(--line);transition:background .2s}.ppl i.on{background:var(--ochre)}
+.kids{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+@media (max-width:520px){.kids{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap shell">
+  <div>
+    <div class="head fade"><h1>Who's coming?</h1><p id="sub"></p></div>
+    <div class="card fade d1">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap"><div><b>Travellers</b><p class="small muted" style="margin:0">Everyone in your group, including children.</p></div>
+      <div class="counter"><button id="minus" aria-label="Fewer people">−</button><span class="v" id="gv" aria-live="polite"></span><button id="plus" aria-label="More people">+</button></div></div>
+      <div class="fleet" id="fleet"></div>
+      <div class="note" id="pnote" style="margin-top:14px"></div>
+    </div>
+    <div class="card fade d2" style="margin-top:14px"><b>Children under 12?</b><p class="small muted" style="margin:4px 0 8px">Helps us bring child seats. Doesn't change the price.</p>
+      <div class="kids"><div class="field" style="margin:0"><label for="kids">Number of children</label><select class="inp" id="kids"></select></div></div></div>
+  </div>
+  <aside class="aside card" id="aside"></aside>
+</main>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/assets/pages/03-group.js"></script>
+</body>
+</html>

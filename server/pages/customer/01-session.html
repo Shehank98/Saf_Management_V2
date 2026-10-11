@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Choose your session</title>
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+.sky{height:150px;border-radius:12px;margin-bottom:14px;position:relative;overflow:hidden}
+.sky .hz{position:absolute;left:0;right:0;bottom:0;height:40px;background:#7a4a2a}
+.sky .hz2{position:absolute;left:-10%;right:-10%;bottom:28px;height:40px;border-radius:50% 50% 0 0;background:#a8703f}
+.sky .sun{position:absolute;width:46px;height:46px;border-radius:50%;left:50%;margin-left:-23px;box-shadow:0 0 40px 14px rgba(255,220,140,.6)}
+.morning .sky{background:linear-gradient(180deg,#9cc6dd,#f6cf8e 70%,#f3a466)}
+.morning .sun{background:#ffe9a8;bottom:20px;animation:sunup 4s ease-out infinite alternate}
+@keyframes sunup{from{bottom:-10px}to{bottom:80px}}
+.evening .sky{background:linear-gradient(180deg,#5e3a5c,#e2794a 65%,#f6b26b)}
+.evening .sun{background:#ffc070;animation:sundown 4s ease-in infinite alternate}
+@keyframes sundown{from{bottom:90px}to{bottom:-10px}}
+.full .sky{background:linear-gradient(180deg,#7fbbe0,#cfe6ee 75%,#f3d79a)}
+.full .sun{background:#fff1b8;offset-path:path('M -60 140 Q 140 -60 340 140');animation:arc 6s linear infinite;left:0;top:0;margin:0}
+@keyframes arc{from{offset-distance:0%}to{offset-distance:100%}}
+.opt h3{font-size:21px;margin-bottom:4px}
+.price{font-family:Fraunces,serif;font-size:22px;font-weight:700;color:var(--ochre)}
+.kv{display:flex;gap:16px;flex-wrap:wrap;margin:8px 0}
+.kv div{font-size:13px}.kv b{display:block;font-size:15px}
+.bird{position:absolute;top:30px;width:20px;height:8px;animation:fl 9s linear infinite}
+@keyframes fl{from{left:-10%}to{left:110%}}
+</style>
+</head>
+<body>
+<main class="wrap shell">
+  <div>
+    <div class="head fade"><h1>When do you want to go?</h1><p id="sub"></p></div>
+    <div class="grid g3" role="radiogroup" aria-label="Session" id="opts"></div>
+    <div class="note fade d3" style="margin-top:16px" id="tip"></div>
+  </div>
+  <aside class="aside card" id="aside"></aside>
+</main>
+
+<script src="/api/config.js"></script>
+<script src="/assets/core.js"></script>
+<script src="/assets/customer.js"></script>
+<script src="/assets/pages/01-session.js"></script>
+</body>
+</html>
