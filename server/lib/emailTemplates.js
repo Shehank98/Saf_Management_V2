@@ -306,7 +306,7 @@ function vendor_approved(pt, { loginUrl }, c) {
     html: layout({
       kind: 'vendor', small: 'Application approved', title: `Welcome to ${esc(c.conf.business.name)}`,
       body: p('Your account is active. Tap the button to log in, then set your available days and accept jobs.')
-        + cta(loginUrl, 'Open partner portal') + muted(`This first link works once and expires in 24 hours. After that, log in at ${esc(c.base)}/partner with your email, or ask for a new login link.`),
+        + cta(loginUrl, 'Open partner portal') + muted(`This first link works once and expires in 24 hours. After that, log in at ${esc(c.base)}/partner with your email and the password you chose when you applied (or ask for a login link).`),
     }),
   };
 }

@@ -351,7 +351,7 @@ test('shared trip: cancelling at the deadline refunds paid seats and offers a pr
 
 test('partner application: documents are stored privately and the office is emailed', async () => {
   const fd = new FormData();
-  Object.entries({ type: 'Tracker / guide', name: 'Hasini Kumari', nic: '199012345678', phone: '+94 71 885 6061', email: 'hasini@x.lk', area: 'Kirinda', lic: 'GL-1234', exp: '5', bank: 'HNB', accName: 'H Kumari', accNo: '123456789', langs: 'Sinhala,English' }).forEach(([k, v]) => fd.append(k, v));
+  Object.entries({ type: 'Tracker / guide', name: 'Hasini Kumari', nic: '199012345678', phone: '+94 71 885 6061', email: 'hasini@x.lk', area: 'Kirinda', lic: 'GL-1234', exp: '5', bank: 'HNB', accName: 'H Kumari', accNo: '123456789', langs: 'Sinhala,English', password: 'hasini-pass-1' }).forEach(([k, v]) => fd.append(k, v));
   fd.append('doc:NIC (both sides)', new Blob([Buffer.from('fake image')], { type: 'image/png' }), 'nic.png');
   fd.append('doc:Guide / tracker licence', new Blob([Buffer.from('%PDF-1.4')], { type: 'application/pdf' }), 'licence.pdf');
   const r = await fetch(base + '/api/partners/apply', { method: 'POST', body: fd });
@@ -369,6 +369,8 @@ test('partner application: documents are stored privately and the office is emai
   const token = mail.html.match(/magic\?token=([\w-]+)/)[1];
   const m1 = await fetch(`${base}/partner/magic?token=${token}`, { redirect: 'manual' });
   assert.equal(m1.status, 302); assert.ok(m1.headers.get('set-cookie').includes('yws_partner'));
+  const pl = await api('POST', '/api/partner/login', { email: 'hasini@x.lk', password: 'hasini-pass-1' });
+  assert.equal(pl.status, 200, 'the password chosen when applying works after approval');
   const m2 = await fetch(`${base}/partner/magic?token=${token}`, { redirect: 'manual' });
   assert.match(m2.headers.get('location'), /expired/, 'login links work once');
 });

@@ -23,6 +23,7 @@ async function apply(raw, files) {
   const phone = String(raw.phone || '').trim().slice(0, 30);
   const nic = String(raw.nic || '').trim().slice(0, 30);
   if (name.length < 2 || nic.length < 9 || U.digits(phone).length < 9 || !U.validEmail(email)) throw U.bad('Please check your name, NIC, phone and email.');
+  if (String(raw.password || '').length < 8) throw U.bad('Please choose a password with at least 8 characters.');
   if (!String(raw.bank || '').trim() || !String(raw.accName || '').trim() || String(raw.accNo || '').length < 6) throw U.bad('Please add your bank details so we can pay you.');
   if (type === 'JEEP_DRIVER' && (String(raw.plate || '').trim().length < 5 || U.int(raw.year, 0) < 1990)) throw U.bad('Please add your number plate and the jeep year.');
   if (type === 'GUIDE' && String(raw.lic || '').trim().length < 3) throw U.bad('Please add your guide licence number.');
@@ -38,11 +39,11 @@ async function apply(raw, files) {
 
   return tx(async db => {
     const r = await db.query(
-      `INSERT INTO partners(type, name, nic, phone, email, area, languages, vehicle_plate, vehicle_model, vehicle_year, seats, licence_no, years_experience, bank_name, branch, account_name, account_no)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      `INSERT INTO partners(type, name, nic, phone, email, area, languages, vehicle_plate, vehicle_model, vehicle_year, seats, licence_no, years_experience, bank_name, branch, account_name, account_no, password_hash)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [type, name, nic, phone, email, String(raw.area || '').slice(0, 60), langs, String(raw.plate || '').toUpperCase().trim() || null, String(raw.model || '').trim() || null,
         U.int(raw.year, null), U.int(raw.seats, null), String(raw.lic || '').trim() || null, U.int(raw.exp, null),
-        String(raw.bank || '').trim(), String(raw.branch || '').trim(), String(raw.accName || '').trim(), String(raw.accNo || '').trim()]);
+        String(raw.bank || '').trim(), String(raw.branch || '').trim(), String(raw.accName || '').trim(), String(raw.accNo || '').trim(), await auth.hashPassword(String(raw.password))]);
     const p = r.rows[0];
     for (const f of files) await db.query('INSERT INTO partner_documents(partner_id, kind, file_name, mime, data) VALUES($1,$2,$3,$4,$5)', [p.id, f.kind, f.name, f.mime, f.buffer]);
     await activity.log(db, 'partner', p.id, 'Application submitted', name);
