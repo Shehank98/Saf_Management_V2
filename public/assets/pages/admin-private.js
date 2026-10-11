@@ -20,7 +20,7 @@ async function open(code) {
   if (b.status === 'Request') main = `<button class="btn ok" id="aConfirm">Confirm &amp; email ticket</button><button class="btn" id="aDecline">Decline</button>`;
   else if (b.status === 'Started') main = `<button class="btn ok" id="aDone">Mark completed</button><button class="btn" id="aPay">Record payment</button>`;
   else if (['Confirmed', 'Deposit paid'].includes(b.status)) main = `<button class="btn" id="aTicket">Resend e-ticket</button><button class="btn" id="aPay">Record payment</button>${hrs < 0 ? '<button class="btn ok" id="aDone">Mark completed</button>' : ''}<button class="btn danger" id="aCancel">Cancel</button>`;
-  const tUrl = `${CFG.baseUrl}/t/${encodeURIComponent(b.code)}?k=${encodeURIComponentb.k}`;
+  const tUrl = `${CFG.baseUrl}/t/${encodeURIComponent(b.code)}?k=${encodeURIComponent(b.k)}`;
   openDrawer(`<div class="dh"><div><div class="mono" style="font-size:20px">${b.code}</div><div style="margin-top:4px">${badge(b.status)} <span class="small muted">booked ${shortDate(b.created)}${b.createdBy === 'ADMIN' ? ' · by office' : ''}</span></div></div><button class="x" aria-label="Close">×</button></div>
   <div class="db">
     <div class="sec-t">Guest</div><dl class="dl"><dt>Name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd><a href="tel:${(b.cc + b.phone).replace(/\s/g, '')}">${esc(b.cc)} ${esc(b.phone)}</a></dd><dt>Email</dt><dd>${esc(b.email) || '—'}</dd><dt>Notes</dt><dd>${esc(b.notes) || '—'}</dd></dl>

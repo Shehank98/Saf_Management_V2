@@ -36,7 +36,7 @@ const DEFAULT_EXTRAS = [
 ];
 
 let cache = null, cacheAt = 0;
-const TTL = 3000; // short TTL so a second instance picks up changes quickly
+const TTL = 15000; // saved changes clear this instantly on the instance that saved them
 
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 function merge(base, over) {

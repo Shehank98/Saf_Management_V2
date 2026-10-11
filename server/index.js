@@ -1,6 +1,7 @@
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
+const compression = require('compression');
 const config = require('./config');
 const { pool, query } = require('./db');
 const { migrate } = require('./migrate');
@@ -41,6 +42,7 @@ app.use(helmet({
 }));
 app.use((req, res, next) => { res.set('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=()'); next(); });
 
+app.use(compression({ threshold: 512 }));
 app.use(express.json({ limit: '300kb', verify: (req, res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use(sameOrigin);
@@ -122,7 +124,7 @@ app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), {
-  maxAge: config.isProd ? '1h' : 0,
+  maxAge: config.isProd ? '1d' : 0, // files are revalidated with ETag; the service worker refreshes them in the background
   setHeaders: (res, file) => {
     if (file.endsWith('sw.js')) res.set('Cache-Control', 'no-cache');
     if (file.endsWith('.webmanifest')) res.type('application/manifest+json');

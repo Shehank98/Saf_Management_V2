@@ -113,7 +113,9 @@ def head_for(kind, title, extra_head, page):
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="{app_title}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/{css}">
 <link rel="stylesheet" href="/assets/pwa.css">
 {extra_head}'''
@@ -159,7 +161,7 @@ def convert(page):
     scripts = [x for x in scripts if x]
     out = head_for(kind, title, extra_head, page)
     if page_style.strip(): out += f'<style>{page_style}</style>\n'
-    out += '</head>\n<body>\n' + after + '\n\n' + '\n'.join(f'<script src="{x}"></script>' for x in scripts) + '\n</body>\n</html>\n'
+    out += '</head>\n<body>\n' + after + '\n\n' + '\n'.join(f'<script defer src="{x}"></script>' for x in scripts) + '\n</body>\n</html>\n'
     dest_name = page
     os.makedirs(os.path.join(OUT, os.path.dirname(dest_name)), exist_ok=True)
     open(os.path.join(OUT, dest_name), 'w', encoding='utf-8').write(out)

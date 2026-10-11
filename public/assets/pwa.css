@@ -16,3 +16,18 @@ body{padding-bottom:env(safe-area-inset-bottom)}
 .camvideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 .cam .frame,.cam .line{z-index:2}
 .install-link[hidden]{display:none}
+
+/* ---- Speed: shorter entrance animations ---- */
+main,.content{animation-duration:.2s!important}
+.fade{animation-duration:.25s!important;animation-delay:0s!important}
+.fd1,.d1,.d2,.d3,.d4{animation-delay:0s!important}
+
+/* ---- Wide screens: use the space instead of a narrow centred column ---- */
+.wrap,.bbar .row{max-width:min(1480px,94vw)}
+@media (min-width:901px){.shell{grid-template-columns:minmax(0,1fr) minmax(300px,380px)}}
+.grid.g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+@media (min-width:1600px){body{zoom:1.12}}
+@media (min-width:1900px){body{zoom:1.25}}
+@media (min-width:2400px){body{zoom:1.5}}
+@media (min-width:1600px){.content{max-width:none}}
+body:has(.app){zoom:1!important}  /* admin and partner layouts are already fluid */

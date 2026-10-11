@@ -13,7 +13,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Yala Admin">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/admin.css">
 <link rel="stylesheet" href="/assets/pwa.css">
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css"><style>
@@ -41,10 +43,10 @@ table.t td .inp{min-height:38px;padding:7px 10px}
   <div class="savebar"><button class="btn" id="reset">Discard</button><button class="btn primary" id="save">Save changes</button></div></div></div>
 </main>
 
-<script src="/api/admin/data.js"></script>
-<script src="/assets/core.js"></script>
-<script src="/assets/admin.js"></script>
-<script src="/vendor/leaflet/leaflet.js"></script>
-<script src="/assets/pages/admin-settings.js"></script>
+<script defer src="/api/admin/data.js"></script>
+<script defer src="/assets/core.js"></script>
+<script defer src="/assets/admin.js"></script>
+<script defer src="/vendor/leaflet/leaflet.js"></script>
+<script defer src="/assets/pages/admin-settings.js"></script>
 </body>
 </html>
