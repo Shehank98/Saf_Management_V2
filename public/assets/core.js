@@ -140,3 +140,13 @@ function motes(host, n = 14) {
   };
   addEventListener('online', bar); addEventListener('offline', bar); addEventListener('DOMContentLoaded', bar);
 })();
+
+
+/* Keep a page fresh: re-runs fn every 10 s. It updates data in place (never reloads the page), and pauses while the tab is
+   hidden or offline, while someone is typing, or while a dialog / side panel is open, so nothing they entered is lost. */
+function autoRefresh(fn, ms = 10000) {
+  const idle = () => { const a = document.activeElement && document.activeElement.tagName; return !document.hidden && navigator.onLine && !/^(INPUT|TEXTAREA|SELECT)$/.test(a || '') && !document.querySelector('.modal.show,.drawer.open,.sheet.open') };
+  const run = () => { if (idle()) Promise.resolve().then(fn).catch(() => { }) };
+  setInterval(run, ms);
+  document.addEventListener('visibilitychange', run);
+}

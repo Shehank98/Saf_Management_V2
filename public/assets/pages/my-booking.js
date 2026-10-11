@@ -14,9 +14,11 @@ function lookup() {
     catch (err) { $('#le').textContent = err.message; btn.disabled = false }
   };
 }
+let lastSig = '';
 async function show() {
   let b;
   try { b = await GET(`/api/bookings/${encodeURIComponent(CODE)}?k=${encodeURIComponent(K || '')}`) } catch (e) { toastErr(e); CODE = null; return lookup() }
+  const sig = JSON.stringify(b); if (sig === lastSig) return; lastSig = sig;
   const s = SESS[b.ses], conf = ['CONFIRMED', 'STARTED', 'COMPLETED'].includes(b.rawStatus), started = ['STARTED', 'COMPLETED'].includes(b.rawStatus), cancelled = b.status === 'Cancelled';
   const steps = cancelled ? [['Booked', 'done'], ['Cancelled', 'x']] : [['Booked', 'done'], ['Confirmed', conf ? 'done' : 'now'], ['E-ticket sent', conf ? 'done' : ''], [b.rawStatus === 'STARTED' ? 'Trip started ' + b.startedAt : 'Trip started', started ? 'done' : conf ? 'now' : ''], ['Done', b.rawStatus === 'COMPLETED' ? 'done' : b.rawStatus === 'STARTED' ? 'now' : '']];
   const cls = { Confirmed: 'ok', 'Deposit paid': 'ok', Started: 'live', Completed: 'ok', Request: 'warn', Cancelled: 'bad' }[b.status];
@@ -42,3 +44,4 @@ async function show() {
 }
 $('#modal').onclick = e => { if (e.target.id === 'modal') e.target.classList.remove('show') };
 CODE && K ? show() : lookup();
+autoRefresh(() => CODE && K ? show() : null);

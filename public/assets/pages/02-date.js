@@ -44,3 +44,5 @@ $('#prev').onclick = () => { view = new Date(view.getFullYear(), view.getMonth()
 $('#nxt').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); refresh() };
 $('#next').onclick = () => go('03-group.html', { date: sel, ses });
 sesSeg(); render(); refresh();
+
+autoRefresh(async () => { Object.keys(_cal).forEach(k => delete _cal[k]); days = await loadMonth(monthKey(view), ses); selInfo = sel ? (days[sel] || await loadDay(sel, ses)) : null; render(); detail() });

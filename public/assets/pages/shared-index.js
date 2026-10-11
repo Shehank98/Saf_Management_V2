@@ -49,3 +49,4 @@ async function refresh() {
 $('#prev').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); sel = null; refresh() };
 $('#nxt').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); sel = null; refresh() };
 sesSeg(); render(); refresh();
+autoRefresh(async () => { try { days = (await GET(`/api/shared-trips?month=${monthKey(view)}&session=${ses}`)).days; render(); detail() } catch (e) { } });

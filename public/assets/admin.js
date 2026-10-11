@@ -106,7 +106,7 @@ function adminShell({ active, title, actions = '', nav = ADMIN_NAV, who = null, 
   const il = $('#instLink'); if (il && !document.documentElement.classList.contains('is-app')) { il.hidden = false; il.onclick = e => { e.preventDefault(); window.installApp && window.installApp() } }
   wireChrome();
   // Keep the data fresh while the page is open (new bookings, started trips).
-  if (sub === 'Admin') setInterval(() => { if (!document.hidden && typeof onDataChanged === 'function') reload().then(onDataChanged).catch(() => { }) }, 45000);
+  if (sub === 'Admin') autoRefresh(() => typeof onDataChanged === 'function' ? reload().then(onDataChanged) : null);
 }
 function openDrawer(html) { $('#drawer').innerHTML = html; $('#drawer').classList.add('open'); $('#scrim').classList.add('show'); const x = $('#drawer .x'); if (x) { x.onclick = closeDrawer; x.focus() } }
 function closeDrawer() { $('#drawer')?.classList.remove('open'); $('#scrim')?.classList.remove('show') }

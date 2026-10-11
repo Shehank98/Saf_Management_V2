@@ -25,10 +25,10 @@ function login(note) {
 }
 function app() {
   adminShell({ active: location.hash || '#home', title: 'Partner portal', nav: NAV, who: [PD.me.name.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase(), PD.me.name], sub: 'Partner' });
-  addEventListener('hashchange', show); setInterval(() => { if (!document.hidden && !scanner) refresh(true) }, 60000);
+  addEventListener('hashchange', show); autoRefresh(() => { if (!scanner) return refresh(true) });
   show();
 }
-async function refresh(quiet) { try { PD = await GET('/api/partner/data'); off = new Set(PD.off); if (!quiet || !$('#cf')) show() } catch (e) { if (!quiet) toastErr(e) } }
+async function refresh(quiet) { try { const d = await GET('/api/partner/data'); const same = quiet && JSON.stringify(d) === JSON.stringify(PD); PD = d; off = new Set(PD.off); if (!same && (!quiet || !$('#cf'))) show() } catch (e) { if (!quiet) toastErr(e) } }
 
 const fee = j => j.fee;
 const mapsHref = j => j.lat != null ? `https://www.google.com/maps?q=${j.lat},${j.lng}` : `https://maps.google.com/?q=${encodeURIComponent((j.hotel || '') + ', Sri Lanka')}`;

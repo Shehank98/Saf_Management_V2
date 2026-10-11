@@ -102,6 +102,7 @@ async function pickSeats() {
     }
   }
   f.provider = (CFG.providers[0] || {}).id;
+  autoRefresh(async () => { if (step !== 0) return; const t = await GET(`/api/shared/${encodeURIComponent(TID)}`); const nt = new Set(t.taken); if (nt.size === taken.size && [...nt].every(n => taken.has(n))) return; taken = nt; trip.taken = t.taken; trip.paid = t.paid; [...mine].forEach(n => { if (taken.has(n)) mine.delete(n) }); render() });
   $('#nx').onclick = async () => {
     if (step < 2) { step++; render(); scrollTo(0, 0); return }
     const b = $('#nx'); if (b.disabled) return; b.disabled = true;
