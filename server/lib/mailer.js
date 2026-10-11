@@ -1,0 +1,119 @@
+// Email outbox. Rows are written in the same transaction as the event that caused them,
+// then a worker sends them through the Google Apps Script web app (see /appscript/Code.gs).
+const config = require('../config');
+const { query, pool } = require('../db');
+const settings = require('./settings');
+
+const GROUP_TOGGLE = {
+  admin_new_private: 'admin_new_private', admin_new_request: 'admin_new_request', admin_new_shared: 'admin_new_shared',
+  admin_started: 'admin_started', admin_shared_status: 'admin_shared_status', admin_cancelled: 'admin_cancelled',
+  admin_vendor_app: 'admin_vendor_app', admin_daily: 'admin_daily',
+  cust_request: 'cust_request', cust_confirmed: 'cust_confirmed', cust_reminder: 'cust_reminder',
+  cust_started: 'cust_started', cust_thanks: 'cust_thanks', vendor_job: 'vendor_job', vendor_payout: 'vendor_payout',
+};
+
+async function eventEnabled(template, conf) {
+  const key = GROUP_TOGGLE[template];
+  if (!key) return true; // security / transactional emails are always on
+  const ev = conf.emails.events || {};
+  return ev[key] !== false;
+}
+
+/**
+ * Queue one email. `db` is a pg client (inside a transaction) or the pool.
+ * msg: { template, to, subject, html, inline?, replyTo?, entity?, entityId? }
+ */
+async function enqueue(db, msg) {
+  const conf = await settings.load();
+  if (!(await eventEnabled(msg.template, conf))) return null;
+  const recipients = Array.isArray(msg.to) ? msg.to : [msg.to];
+  const ids = [];
+  for (const to of recipients.filter(Boolean)) {
+    const r = await db.query(
+      `INSERT INTO email_log(template, to_addr, subject, html, inline_images, reply_to, entity, entity_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [msg.template, to, msg.subject, msg.html, JSON.stringify(msg.inline || []), msg.replyTo || null, msg.entity || null, msg.entityId ? String(msg.entityId) : null]);
+    ids.push(r.rows[0].id);
+  }
+  if (db.after) db.after(kick); else kick();
+  return ids;
+}
+
+let kicking = false;
+function kick() {
+  if (kicking) return;
+  kicking = true;
+  setImmediate(() => processOutbox().catch(e => console.error('[mail] worker error', e.message)).finally(() => { kicking = false; }));
+}
+
+async function sendViaAppsScript(row, conf) {
+  const res = await fetch(config.appsScriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      secret: config.appsScriptSecret, to: row.to_addr, subject: row.subject, html: row.html,
+      inline: row.inline_images, replyTo: row.reply_to || conf.business.email, fromName: conf.business.name,
+    }),
+    redirect: 'follow',
+    signal: AbortSignal.timeout(30000),
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch { /* HTML error page from Google */ }
+  if (!res.ok || !json || !json.ok) throw new Error((json && json.error) || `Apps Script replied ${res.status}: ${text.slice(0, 160)}`);
+}
+
+let warned = false;
+async function processOutbox() {
+  const conf = await settings.load();
+  for (let i = 0; i < 25; i++) {
+    const client = await pool.connect();
+    let row;
+    try {
+      await client.query('BEGIN');
+      const r = await client.query(
+        `SELECT * FROM email_log WHERE status='PENDING' AND next_attempt_at <= now()
+          ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED`);
+      row = r.rows[0];
+      if (!row) { await client.query('COMMIT'); return; }
+      if (!config.appsScriptUrl) {
+        if (!warned) { console.warn('[mail] APPS_SCRIPT_URL is not set: emails are only logged. See docs/APPS_SCRIPT.md'); warned = true; }
+        await client.query(`UPDATE email_log SET status='LOGGED', attempts=attempts+1 WHERE id=$1`, [row.id]);
+        console.log(`[mail] (not sent) to=${row.to_addr} subject="${row.subject}"`);
+      } else {
+        try {
+          await sendViaAppsScript(row, conf);
+          await client.query(`UPDATE email_log SET status='SENT', attempts=attempts+1, sent_at=now(), error=NULL WHERE id=$1`, [row.id]);
+        } catch (e) {
+          const attempts = row.attempts + 1;
+          const failed = attempts >= 6;
+          const delayMin = Math.min(60, 2 ** attempts); // 2, 4, 8, 16, 32 minutes
+          await client.query(
+            `UPDATE email_log SET attempts=$2, error=$3, status=$4, next_attempt_at = now() + ($5 || ' minutes')::interval WHERE id=$1`,
+            [row.id, attempts, String(e.message).slice(0, 400), failed ? 'FAILED' : 'PENDING', String(delayMin)]);
+          console.error(`[mail] send failed (attempt ${attempts}) to=${row.to_addr}: ${e.message}`);
+        }
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+/** Send a one-off test mail straight away (Admin → Settings → Emails). */
+async function sendTest(to) {
+  const conf = await settings.load();
+  if (!config.appsScriptUrl) throw new Error('APPS_SCRIPT_URL is not set on the server yet.');
+  await sendViaAppsScript({
+    to_addr: to, subject: 'Test email from ' + conf.business.name,
+    html: '<p style="font:15px Arial">It works! Your Google Apps Script email relay is connected.</p>', inline_images: [], reply_to: null,
+  }, conf);
+}
+
+const recipientsFor = conf => (conf.emails.recipients || []).filter(Boolean);
+
+module.exports = { enqueue, kick, processOutbox, sendTest, recipientsFor };
