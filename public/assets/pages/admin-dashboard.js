@@ -4,25 +4,30 @@ const totalFleet = () => LOCS.reduce((a, l) => a + (l.fleet || 0), 0) || CFG.fle
 const shAll = t => t.seats.filter(x => x.pay === 'Paid').length;
 let first = true;
 function render() {
-  const up = BOOKINGS.filter(b => !['Cancelled'].includes(b.status) && parseIso(b.date) >= TODAY);
-  const req = BOOKINGS.filter(b => b.status === 'Request');
+  // Only live work: nothing cancelled, declined, finished or in the past. Private items only while private safaris are on.
+  const priv = PRIVATE_ON ? BOOKINGS : [];
+  const up = priv.filter(b => !['Cancelled', 'Completed'].includes(b.status) && !b.declined && parseIso(b.date) >= TODAY);
+  const req = up.filter(b => b.status === 'Request');
   const unassigned = up.filter(b => ['Confirmed', 'Deposit paid'].includes(b.status) && !b.vendor);
-  const liveShared = SHARED.filter(t => !['Cancelled', 'Completed'].includes(t.status) && parseIso(t.date) >= TODAY);
-  const fleetUsed = up.filter(b => b.date === D(1)).reduce((a, b) => a + jeepsFor(b.guests), 0) + SHARED.filter(t => t.date === D(1) && t.status !== 'Cancelled').length;
+  const activeSeats = t => t.seats.filter(x => x.pay !== 'Refunded');
+  const pastDeadline = t => t.deadline && new Date(`${t.deadline}T${t.deadlineTime || '00:00'}:00+05:30`) <= new Date() && shAll(t) < t.minSeats;
+  // A shared jeep only needs action while it has guests and is still going to run (not cancelled, not past its auto-cancel time).
+  const liveShared = SHARED.filter(t => !['Cancelled', 'Completed'].includes(t.status) && parseIso(t.date) >= TODAY && activeSeats(t).length > 0 && !pastDeadline(t));
+  const fleetUsed = up.filter(b => b.date === D(1)).reduce((a, b) => a + jeepsFor(b.guests), 0) + SHARED.filter(t => t.date === D(1) && !['Cancelled', 'Completed'].includes(t.status) && activeSeats(t).length).length;
   const seatsUp = liveShared.reduce((a, t) => a + t.seats.length, 0);
   $('#kpis').innerHTML = [['Upcoming trips', up.length + liveShared.length, PRIVATE_ON ? 'bookings and shared trips' : 'shared jeeps with guests'], PRIVATE_ON ? ['New requests', req.length, 'waiting for you'] : ['Seats booked', seatsUp, 'upcoming shared seats'], ['Received this month', fmt(STATS.monthReceived || 0), 'deposits + full payments'], ['Jeeps tomorrow', fleetUsed + ' / ' + totalFleet(), 'fleet in use']].map(([l, v, d]) => `<div class="kpi ${first ? 'fade' : ''}"><div class="l">${l}</div><div class="v">${v}</div><div class="d muted">${d}</div></div>`).join('');
   lives();
   const A = [...req.map(b => ({ i: 'priv', c: 'var(--warn-bg)', t: `Confirm request ${b.code}`, s: `${esc(b.name)} · ${shortDate(b.date)} ${SESS[b.ses].short} · ${ppl(b.guests)} · pay at pickup`, h: `/admin/bookings?open=${b.code}`, btn: 'Review' })),
     ...unassigned.map(b => ({ i: 'priv', c: 'var(--info-bg)', t: `Assign a jeep to ${b.code}`, s: `${shortDate(b.date)} ${SESS[b.ses].short} · ${ppl(b.guests)}`, h: `/admin/bookings?open=${b.code}`, btn: 'Assign' })),
     ...liveShared.filter(t => t.guideWanted && !t.guide).map(t => ({ i: 'user', c: 'var(--warn-bg)', t: `${t.id} · guest asked for a guide`, s: `${shortDate(t.date)} ${SESS[t.ses].short}${atLoc(t)} · assign a guide partner`, h: `/admin/shared?open=${t.id}`, btn: 'Assign guide' })),
-    ...BOOKINGS.filter(b => b.guideReq && !b.guide && !['Cancelled', 'Completed'].includes(b.status)).map(b => ({ i: 'user', c: 'var(--warn-bg)', t: `${b.code} · guest asked for a guide`, s: `${shortDate(b.date)} ${SESS[b.ses].short}`, h: `/admin/bookings?open=${b.code}`, btn: 'Assign guide' })),
+    ...up.filter(b => b.guideReq && !b.guide).map(b => ({ i: 'user', c: 'var(--warn-bg)', t: `${b.code} · guest asked for a guide`, s: `${shortDate(b.date)} ${SESS[b.ses].short}`, h: `/admin/bookings?open=${b.code}`, btn: 'Assign guide' })),
     ...liveShared.filter(t => shAll(t) < t.minSeats && (parseIso(t.date) - TODAY) / 864e5 <= 3).map(t => ({ i: 'shared', c: 'var(--bad-bg)', t: `${t.id} needs ${t.minSeats - shAll(t)} more paid seats`, s: `${shortDate(t.date)} ${SESS[t.ses].short}${atLoc(t)} · auto-cancels ${t.deadline === D(0) ? 'today' : shortDate(t.deadline)} if not enough`, h: `/admin/shared?open=${t.id}`, btn: 'Share link' })),
     ...liveShared.filter(t => t.seats.length >= t.minSeats).map(t => ({ i: 'shared', c: 'var(--ok-bg)', t: `${t.id} · ${t.seats.length} seats booked, ready to go further`, s: `${shortDate(t.date)} ${SESS[t.ses].short}${atLoc(t)} · ${shAll(t)} paid · ${t.vendor ? 'jeep ' + esc(vendorName(t.vendor)) : 'no jeep assigned yet'}`, h: `/admin/shared?open=${t.id}`, btn: t.vendor ? 'Open' : 'Assign' })),
     ...APPLICATIONS.map(a => ({ i: 'vend', c: 'var(--ok-bg)', t: `Partner application: ${esc(a.name)}`, s: `${a.type} · applied ${shortDate(a.applied)}`, h: '/admin/partners', btn: 'Review' }))];
   $('#actCount').textContent = A.length + ' items';
   $('#actions').innerHTML = A.map(a => `<div class="act"><div class="i" style="background:${a.c}">${ic(a.i)}</div><div class="t"><b>${a.t}</b><span>${a.s}</span></div><a class="btn sm" href="${a.h}">${a.btn}</a></div>`).join('') || '<div class="empty">All clear 🎉</div>';
-  const items = [...BOOKINGS.filter(b => [D(0), D(1)].includes(b.date) && b.status !== 'Cancelled').map(b => ({ d: b.date, ses: b.ses, t: `<b class="mono">${b.code}</b> ${esc(b.name)} · ${ppl(b.guests)}`, v: b.vendor ? esc(vendorName(b.vendor)) + stateNote(b.vendorState) : '<span style="color:var(--bad)">No jeep yet</span>', st: b.status })),
-    ...SHARED.filter(t => [D(0), D(1)].includes(t.date) && t.status !== 'Cancelled').map(t => ({ d: t.date, ses: t.ses, t: `<b class="mono">${t.id}</b> Shared · ${t.seats.length}/${t.seatsMax} seats`, v: t.vendor ? esc(vendorName(t.vendor)) + stateNote(t.vendorState) : '<span style="color:var(--bad)">No jeep yet</span>', st: t.status }))]
+  const items = [...priv.filter(b => [D(0), D(1)].includes(b.date) && b.status !== 'Cancelled' && !b.declined).map(b => ({ d: b.date, ses: b.ses, t: `<b class="mono">${b.code}</b> ${esc(b.name)} · ${ppl(b.guests)}`, v: b.vendor ? esc(vendorName(b.vendor)) + stateNote(b.vendorState) : '<span style="color:var(--bad)">No jeep yet</span>', st: b.status })),
+    ...SHARED.filter(t => [D(0), D(1)].includes(t.date) && t.status !== 'Cancelled' && activeSeats(t).length).map(t => ({ d: t.date, ses: t.ses, t: `<b class="mono">${t.id}</b> Shared · ${t.seats.length}/${t.seatsMax} seats`, v: t.vendor ? esc(vendorName(t.vendor)) + stateNote(t.vendorState) : '<span style="color:var(--bad)">No jeep yet</span>', st: t.status }))]
     .sort((a, b) => (a.d + SESS[a.ses].start).localeCompare(b.d + SESS[b.ses].start));
   $('#sched').innerHTML = items.map(x => `<div class="slot"><div class="tm">${x.d === D(0) ? 'Today' : 'Tomorrow'}<span>${SESS[x.ses].pickup} pickup</span></div><div>${x.t}<div class="small muted">Jeep: ${x.v}</div></div>${badge(x.st)}</div>`).join('') || '<div class="empty">No trips today or tomorrow</div>';
   const vals = (STATS.daily14 || []).map(x => Math.max(0, x.v)), mx = Math.max(...vals, 1);
