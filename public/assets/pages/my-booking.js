@@ -18,6 +18,7 @@ let lastSig = '';
 async function show() {
   let b;
   try { b = await GET(`/api/bookings/${encodeURIComponent(CODE)}?k=${encodeURIComponent(K || '')}`) } catch (e) { toastErr(e); CODE = null; return lookup() }
+  if (b.cur) fmt = n => fmtCur(n, b.cur);
   const sig = JSON.stringify(b); if (sig === lastSig) return; lastSig = sig;
   const s = SESS[b.ses], conf = ['CONFIRMED', 'STARTED', 'COMPLETED'].includes(b.rawStatus), started = ['STARTED', 'COMPLETED'].includes(b.rawStatus), cancelled = b.status === 'Cancelled';
   const steps = cancelled ? [['Booked', 'done'], ['Cancelled', 'x']] : [['Booked', 'done'], ['Confirmed', conf ? 'done' : 'now'], ['E-ticket sent', conf ? 'done' : ''], [b.rawStatus === 'STARTED' ? 'Trip started ' + b.startedAt : 'Trip started', started ? 'done' : conf ? 'now' : ''], ['Done', b.rawStatus === 'COMPLETED' ? 'done' : b.rawStatus === 'STARTED' ? 'now' : '']];

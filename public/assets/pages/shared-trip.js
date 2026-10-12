@@ -28,6 +28,7 @@ async function purchase() {
 }
 async function showDone(tries = 0) {
   const p = await purchase();
+  if (p.cur) fmt = n => fmtCur(n, p.cur);
   if (p.error || p.gone) return frame(`<div class="card bad-link"><h2>We couldn't find that booking</h2><p class="muted">${esc(p.error || 'Those seats are no longer held.')}</p><a class="btn primary" href="/s/${esc(TID)}">Back to the trip</a></div>`);
   if (!p.paid && tries < 20) { frame(`<div class="card bad-link"><div class="spin" aria-hidden="true"></div><h1>Confirming your payment…</h1><p class="muted">This usually takes a few seconds.</p></div>`); return setTimeout(() => showDone(tries + 1), 2500) }
   const s = SESS[p.ses];
@@ -39,6 +40,7 @@ async function showDone(tries = 0) {
 }
 async function showPayLink() {
   const p = await purchase();
+  if (p.cur) fmt = n => fmtCur(n, p.cur);
   if (p.error || p.gone) return frame(`<div class="card bad-link"><h2>These seats are no longer held</h2><p class="muted">${esc(p.error || 'The payment time ran out and the seats were released.')} If seats are still free you can pick them again.</p><a class="btn primary" href="/s/${esc(TID)}">Choose seats</a></div>`);
   if (p.paid) return showDone();
   const s = SESS[p.ses];
@@ -56,6 +58,7 @@ async function pickSeats() {
   let trip;
   try { trip = await GET(`/api/shared/${encodeURIComponent(TID)}?token=${encodeURIComponent(TOKEN)}`) } catch (e) { return invalid() }
   if (trip.full && trip.nextId) { location.replace('/s/' + trip.nextId); return }
+  if (trip.cur) fmt = n => fmtCur(n, trip.cur); // a trip keeps the currency it was priced in
   if (!online && !trip.allowLater) return frame(`<div class="card bad-link"><h2>Booking opens soon</h2><p class="muted">Online payment is not switched on yet. Please contact us to book a seat.</p></div>`);
   const s = sesAt(trip.loc, trip.ses), park = locOf(trip.loc) || { name: trip.locName, radiusKm: CFG.radiusKm, lat: CFG.baseLat, lng: CFG.baseLng, office: CFG.office };
   let step = 0, taken = new Set(trip.taken), locked = new Set(trip.locked);

@@ -47,6 +47,9 @@ With both enabled, guests are offered the choice at checkout. More local gateway
 - **Settings → Website**: private safaris are **off** by default, so the website shows shared safaris only. Switch them on again any time; nothing is deleted.
 - **Settings → Sessions & prices → Extras**: the *Naturalist guide* price (charged once per group). Guests tick it next to meals and binoculars; the trip then shows "Guide requested" in the admin panel so you can assign a guide.
 
+## 4c-2. Currency (LKR or USD)
+Settings → Payments → *Currency guests see and pay in*. With **USD**, type guest prices (seats, meals, extras) in USD and set the **USD rate** (LKR for 1 USD). Guests see and receive emails in USD; Stripe charges USD; OnePay charges the LKR amount. The dashboard, Payments & profit and partner payments are always in LKR, using the rate saved with each booking (changing the rate later does not change past bookings). Partner fees are always typed in LKR.
+
 ## 4d. Phone notifications for partners (optional variables)
 Partners tap **Turn on notifications** in the partner portal (on iPhone, add the portal to the home screen first). Keys are created automatically. To set your own, add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_EMAIL` (generate with `npx web-push generate-vapid-keys`).
 

@@ -46,7 +46,7 @@ async function adminData(req) {
     serialize.customerPayments(db, since),
     query(`SELECT message, actor, created_at FROM activity_log ORDER BY id DESC LIMIT 25`),
     query(`SELECT to_char((created_at + ($2 || ' minutes')::interval)::date, 'YYYY-MM-DD') AS d,
-                  SUM(CASE WHEN kind='REFUND' THEN -amount ELSE amount END)::int AS n
+                  ROUND(SUM(CASE WHEN kind='REFUND' THEN -amount ELSE amount END * fx))::int AS n
              FROM payments WHERE (status='SUCCEEDED') AND created_at >= $1::date - 1 GROUP BY 1`, [U.addDays(today, -40), String(require('../config').utcOffsetMinutes)]),
     req.admin.role === 'OWNER' ? query('SELECT id, name, email, role, active FROM admin_users ORDER BY id') : { rows: [] },
   ]);
@@ -221,7 +221,10 @@ r.put('/settings/:section', owner, U.wrap(async (req, res) => {
     const seats = num(b.seats, 2, 12, 6);
     await settings.set('shared', { seats, minSeats: num(b.minSeats, 1, seats, 4), payWindowH: num(b.payWindowH, 1, 168, 24), autoCancelH: num(b.autoCancelH, 1, 168, 24), allowLater: !!b.allowLater, privateUpgrade: !!b.privateUpgrade });
   } else if (sec === 'payments') {
-    await settings.set('payments', { deposit: num(b.deposit, 0.05, 1, 0.3), allowFull: !!b.allowFull, allowLater: !!b.allowLater, currency: 'LKR' });
+    const currency = b.currency === 'USD' ? 'USD' : 'LKR';
+    const usdRate = num(b.usdRate, 1, 100000, conf.payments.usdRate || 300);
+    if (currency === 'USD' && !(+b.usdRate >= 1)) throw U.bad('Enter the USD rate (how many LKR for 1 USD).');
+    await settings.set('payments', { deposit: num(b.deposit, 0.05, 1, 0.3), allowFull: !!b.allowFull, allowLater: !!b.allowLater, currency, usdRate });
   } else if (sec === 'notify') {
     const recipients = String(b.recipients || '').split(/[,;\s]+/).filter(U.validEmail).slice(0, 10);
     if (!recipients.length) throw U.bad('Add at least one company email address.');

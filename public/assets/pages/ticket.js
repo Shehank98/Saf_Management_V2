@@ -53,6 +53,7 @@ async function load() {
     if (!lastSig) $('#root').innerHTML = `<div class="card locked"><div style="font-size:40px">🎟️</div><h2>Ticket not found</h2><p class="muted">${esc(e.message)}</p><a class="btn primary" href="${CFG.privateOn ? '/booking' : '/'}">${CFG.privateOn ? 'Find my booking' : 'Back to the website'}</a></div>`; return }
   const sig = JSON.stringify(t); if (sig === lastSig) return; lastSig = sig;
   const s = SESS[t.ses] || Object.values(SESS)[0], shared = t.kind === 'shared';
+  if (t.cur) fmt = n => fmtCur(n, t.cur);
   if (!t.ok) {
     $('#root').innerHTML = `<div class="card locked"><div style="font-size:40px">⏳</div><h2>Ticket not ready yet</h2><p class="muted">${shared ? `Your shared jeep needs ${t.minSeats} paid seats before it runs (${t.paidSeats} so far). We'll email your ticket as soon as it's confirmed.` : `Booking <b>${esc(code)}</b> is ${t.rawStatus === 'REQUEST' ? 'waiting for confirmation' : 'not active'}. We'll email your ticket as soon as it's confirmed.`}</p><a class="btn primary" href="${shared ? '/s/' + esc(t.trip) : link('my-booking.html', { code, k: K }, false)}">${shared ? 'Back to the trip' : 'View booking'}</a></div>`; return;
   }

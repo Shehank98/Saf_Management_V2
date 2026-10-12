@@ -38,6 +38,7 @@ function publicConfig(conf) {
     sharedAllowLater: conf.shared.allowLater, maxAheadMonths: conf.rules.maxAheadMonths,
     providers: providers.list(), today: U.todayStr(),
     mealOptions: pricing.MEAL_OPTIONS,
+    currency: settings.money(conf).cur, usdRate: conf.payments.usdRate || 300,
     privateOn: !!(conf.features && conf.features.private), locations: locationsForClient(conf), defaultLoc: conf.defaultLoc,
   };
 }
@@ -71,7 +72,7 @@ async function bookings(db, where = 'TRUE', params = []) {
       pay: PAY_UI[b.pay_option], paid: b.paid, total: b.total, refunded: b.refunded, jeeps: b.jeeps, status: uiStatus(b), declined: b.status === 'DECLINED',
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
       created: U.dateOf(b.created_at), notes: b.notes || '', startedAt: b.started_at ? U.hhmm(b.started_at) : '', startedBy: b.started_by || '',
-      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code), tempDriver: tempMap[b.id] || null,
+      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code), tempDriver: tempMap[b.id] || null, cur: b.currency || 'LKR', fx: +b.fx || 1,
     };
   });
 }
@@ -97,7 +98,8 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
       id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, status: STATUS[t.status], minSeats: t.min_seats, seatsMax: t.seats,
       deadline: U.dateOf(t.auto_cancel_at), deadlineTime: U.hhmm(t.auto_cancel_at),
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
-      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id, tempDriver: tempMap[t.id] || null,
+      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id, tempDriver: tempMap[t.id] || null, cur: t.currency || 'LKR',
+      fx: (seatMap[t.id] || []).length ? +(seatMap[t.id][0].fx) || 1 : 1,
       guideWanted: mine.some(s => s.has_guide && s.status !== 'REFUNDED'),
       seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline, hotel: s.hotel_name || '', pdist: s.pickup_km == null ? null : +s.pickup_km, lat: s.pickup_lat, lng: s.pickup_lng, bino: s.has_bino, guideReq: s.has_guide, amount: s.amount })),
     };
@@ -141,16 +143,16 @@ async function trips(db, sinceDate, conf = null) {
   const bs = (await db.query(`SELECT * FROM bookings WHERE status IN ('STARTED','COMPLETED') AND date >= $1`, [sinceDate])).rows;
   for (const b of bs) {
     const c = costOf(b.code);
-    const revenue = b.total - b.refunded;
+    const revenue = Math.round((b.total - b.refunded) * (+b.fx || 1)); // reports are in LKR
     out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue, paid: b.paid, mealsN: c.mealsN, cam: b.has_cam ? 1 : 0, vendor: c.vendor, guide: c.guide, name: b.lead_name, status: uiStatus(b), cost: c.cost, profit: revenue - c.cost.total });
   }
   // Cancelled bookings where we kept part of the money (cancellation fee) are income with no trip cost.
   const kept = (await db.query(`SELECT * FROM bookings WHERE status IN ('CANCELLED','DECLINED') AND paid > refunded AND date >= $1`, [sinceDate])).rows;
   for (const b of kept) {
-    const revenue = b.paid - b.refunded, zero = { jeep: 0, guide: 0, meals: 0, cam: 0, total: 0 };
+    const revenue = Math.round((b.paid - b.refunded) * (+b.fx || 1)), zero = { jeep: 0, guide: 0, meals: 0, cam: 0, total: 0 };
     out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: 0, revenue, paid: b.paid, mealsN: 0, cam: 0, vendor: '', guide: '', name: b.lead_name + ' (cancelled, fee kept)', status: 'Cancelled', bookedOn: U.dateOf(b.cancelled_at || b.created_at), cost: zero, profit: revenue });
   }
-  const ts = (await db.query(`SELECT t.*, COALESCE((SELECT SUM(amount) FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID'),0)::int AS revenue,
+  const ts = (await db.query(`SELECT t.*, COALESCE((SELECT ROUND(SUM(amount * fx)) FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID'),0)::int AS revenue,
       (SELECT COUNT(*)::int FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID') AS n FROM shared_trips t WHERE t.status IN ('STARTED','COMPLETED') AND t.date >= $1`, [sinceDate])).rows;
   for (const t of ts) {
     const c = costOf(t.id);
@@ -167,9 +169,10 @@ async function trips(db, sinceDate, conf = null) {
       FROM bookings b WHERE b.status IN ('CONFIRMED','REQUEST') AND b.created_at >= $1::date`, [sinceDate])).rows;
     for (const b of ub) {
       const cost = est(b.session_id, b.jeeps, b.has_guide || b.has_guide_partner, b.has_meals ? b.meal_n : 0, b.has_cam);
-      out.push({ code: b.code, kind: 'Private', date: b.date, bookedOn: U.dateOf(b.created_at), ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue: b.total, paid: b.paid, mealsN: b.meal_n, cam: b.has_cam ? 1 : 0, vendor: '', guide: '', name: b.lead_name, status: 'Upcoming', est: true, cost, profit: b.total - cost.total });
+      b.total = Math.round(b.total * (+b.fx || 1));
+      out.push({ code: b.code, kind: 'Private', date: b.date, bookedOn: U.dateOf(b.created_at), ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue: b.total, paid: Math.round(b.paid * (+b.fx || 1)), mealsN: b.meal_n, cam: b.has_cam ? 1 : 0, vendor: '', guide: '', name: b.lead_name, status: 'Upcoming', est: true, cost, profit: b.total - cost.total });
     }
-    const ut = (await db.query(`SELECT t.*, COALESCE(SUM(s.amount),0)::int AS revenue, COUNT(s.*)::int AS n, COUNT(*) FILTER (WHERE s.meals)::int AS meal_n, BOOL_OR(s.has_guide) AS guide,
+    const ut = (await db.query(`SELECT t.*, COALESCE(ROUND(SUM(s.amount * s.fx)),0)::int AS revenue, COUNT(s.*)::int AS n, COUNT(*) FILTER (WHERE s.meals)::int AS meal_n, BOOL_OR(s.has_guide) AS guide,
         MIN(s.created_at) AS first_paid
       FROM shared_trips t JOIN shared_seats s ON s.trip_id=t.id AND s.status='PAID'
       WHERE t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') GROUP BY t.id HAVING MIN(s.created_at) >= $1::date`, [sinceDate])).rows;
@@ -203,7 +206,8 @@ async function customerPayments(db, sinceDate) {
   return rows.map(p => ({
     id: p.id, d: U.dateOf(p.created_at), code: p.bcode || p.trip_id || '', who: p.lead_name || p.sname || '',
     kind: p.kind === 'REFUND' ? `Refund${p.status === 'PENDING' ? ' (to do by hand)' : ''}` : `${p.trip_id ? 'Shared seat' : KIND[p.kind]} (${M[p.method]})`,
-    amt: p.kind === 'REFUND' ? -p.amount : p.amount, pendingRefund: p.kind === 'REFUND' && p.status === 'PENDING',
+    // in LKR for the office; the guest's own amount and currency are kept for display
+    amt: Math.round((p.kind === 'REFUND' ? -p.amount : p.amount) * (+p.fx || 1)), orig: p.currency === 'USD' ? (p.kind === 'REFUND' ? -p.amount : p.amount) : null, cur: p.currency || 'LKR', pendingRefund: p.kind === 'REFUND' && p.status === 'PENDING',
   }));
 }
 

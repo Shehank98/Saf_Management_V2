@@ -126,7 +126,7 @@ async function applyPayment(db, pay) {
     if (wasHold && !a.closed && a.jeeps >= b.jeeps) { status = 'CONFIRMED'; revived = true; }
     else {
       const plan = await paymentsSvc.planRefund(db, { bookingId: b.id }, pay.amount);
-      await activity.log(db, 'booking', b.code, `Payment of ${U.fmtLkr(pay.amount)} arrived after the booking was cancelled: refund started`, pay.provider);
+      await activity.log(db, 'booking', b.code, `Payment of ${U.fmtMoney(pay.amount, pay.currency)} arrived after the booking was cancelled: refund started`, pay.provider);
       db.after(() => paymentsSvc.settleRefunds(plan));
       return b;
     }
@@ -138,7 +138,7 @@ async function applyPayment(db, pay) {
   if (revived) { sendTicket = true; firstConfirm = true; }
   const r = await db.query(`UPDATE bookings SET paid=$2, status=$3, hold_until=NULL, cancelled_at=NULL WHERE id=$1 RETURNING *`, [b.id, paid, status]);
   const row = r.rows[0];
-  await activity.log(db, 'booking', b.code, `${U.fmtLkr(pay.amount)} received online (${pay.provider})${sendTicket ? ' · confirmed · e-ticket emailed' : ''}`, 'Payment');
+  await activity.log(db, 'booking', b.code, `${U.fmtMoney(pay.amount, pay.currency)} received online (${pay.provider})${sendTicket ? ' · confirmed · e-ticket emailed' : ''}`, 'Payment');
   if (sendTicket) db.after(async () => { await tx(c => notify.confirmed(c, row, { newBooking: firstConfirm })); live.publish('booking', { code: b.code }); });
   return row;
 }
@@ -172,7 +172,7 @@ async function cancel(code, { by = 'Guest', refundOverride = null, staff = false
     const r = await db.query(
       `UPDATE bookings SET status='CANCELLED', cancelled_at=now(), refunded=refunded+$2 WHERE id=$1 RETURNING *`, [b.id, refund]);
     await db.query('DELETE FROM assignments WHERE booking_id=$1', [b.id]);
-    await activity.log(db, 'booking', b.code, `Cancelled by ${by}${b.paid ? ` · refund ${U.fmtLkr(refund)} (${pct}%)` : ''}`, by);
+    await activity.log(db, 'booking', b.code, `Cancelled by ${by}${b.paid ? ` · refund ${U.fmtMoney(refund, b.currency)} (${pct}%)` : ''}`, by);
     const row = r.rows[0];
     db.after(async () => { await tx(c => notify.cancelled(c, row, { refund, pct, by })); live.publish('booking', { code: b.code }); });
     return row;
@@ -220,11 +220,11 @@ async function recordPayment(code, amount, method, actor) {
     if (!b0) throw U.notFound('Booking not found');
     const b = (await db.query('SELECT * FROM bookings WHERE id=$1 FOR UPDATE', [b0.id])).rows[0];
     if (['CANCELLED', 'DECLINED'].includes(b.status)) throw U.conflict('This booking is cancelled.');
-    if (b.paid + amount > b.total) throw U.bad(`That is more than the balance (${U.fmtLkr(b.total - b.paid)}).`);
+    if (b.paid + amount > b.total) throw U.bad(`That is more than the balance (${U.fmtMoney(b.total - b.paid, b.currency)}).`);
     const m = method === 'Bank transfer' ? 'BANK' : method === 'Cash' ? 'CASH' : 'CARD';
     await db.query(`INSERT INTO payments(booking_id, provider, amount, kind, method, status, completed_at) VALUES($1,'manual',$2,'BALANCE',$3,'SUCCEEDED',now())`, [b.id, amount, m]);
     const r = await db.query('UPDATE bookings SET paid=paid+$2 WHERE id=$1 RETURNING *', [b.id, amount]);
-    await activity.log(db, 'booking', b.code, `${U.fmtLkr(amount)} received (${method || 'cash'})`, actor);
+    await activity.log(db, 'booking', b.code, `${U.fmtMoney(amount, b.currency)} received (${method || 'cash'})`, actor);
     return r.rows[0];
   });
 }

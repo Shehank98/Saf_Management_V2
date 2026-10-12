@@ -1,7 +1,7 @@
 // HTML for every email. Styles are inline because email clients ignore <style> blocks.
 // Layout: brand line, white card with a thin accent rule, serif headline, hairline details tables,
 // one clear call-to-action, quiet text links for secondary actions, and a contact footer.
-const { esc, fmtLkr, ppl, shortDate, niceDate, digits } = require('./util');
+const { esc, fmtLkr, fmtMoney, ppl, shortDate, niceDate, digits } = require('./util');
 const secrets = require('./secrets');
 
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -86,7 +86,7 @@ function bookingTable(b) {
   return table([
     row('Booking', `<span style="font-family:'Courier New',monospace;letter-spacing:.06em">${esc(b.code)}</span>`), row('Safari', 'Private jeep · ' + esc(b.session.name)), row('Date', niceDate(b.date)),
     row('Pickup', esc(b.session.pickup) + ' · ' + esc(b.pickupWhere)), row('Group', ppl(b.guests) + ` · ${b.jeeps} jeep${b.jeeps > 1 ? 's' : ''}`),
-    b.extrasText && row('Extras', esc(b.extrasText)), row('Total', fmtLkr(b.total)), row('Paid', `<span style="color:#3a6f34">${fmtLkr(b.paid)}</span>`), row('Pay on the day', `<b>${fmtLkr(b.total - b.paid)}</b>`),
+    b.extrasText && row('Extras', esc(b.extrasText)), row('Total', fmtMoney(b.total, b.cur)), row('Paid', `<span style="color:#3a6f34">${fmtMoney(b.paid, b.cur)}</span>`), row('Pay on the day', `<b>${fmtMoney(b.total - b.paid, b.cur)}</b>`),
   ]);
 }
 
@@ -120,12 +120,12 @@ function admin_new_shared({ trip, session, seats, name, phone, payText, held, pa
   };
 }
 
-function admin_started({ code, guestText, by, startedAt, collect, isShared }, c) {
+function admin_started({ code, guestText, by, startedAt, collect, isShared, cur }, c) {
   return {
     subject: `Trip started: ${code} at ${startedAt}`,
     html: layout({
       kind: 'admin', icon: '🏁', small: 'Trip started', title: `${esc(code)} is on the road`, c, foot: false,
-      body: table([row(isShared ? 'Trip' : 'Guest', esc(guestText)), row('Started by', esc(by)), row('Time', startedAt), collect != null && row('Collect at pickup', fmtLkr(collect))]) + btn(`${c.base}/admin`, '📡 Open live dashboard'),
+      body: table([row(isShared ? 'Trip' : 'Guest', esc(guestText)), row('Started by', esc(by)), row('Time', startedAt), collect != null && row('Collect at pickup', fmtMoney(collect, cur))]) + btn(`${c.base}/admin`, '📡 Open live dashboard'),
     }),
   };
 }
@@ -146,7 +146,7 @@ function admin_cancelled(b, { refund, by }, c) {
     subject: `Booking cancelled ${b.code} | ${shortDate(b.date)}, ${b.session.short}`,
     html: layout({
       kind: 'admin', icon: '❌', small: 'Booking cancelled', title: `${esc(b.code)} · ${esc(b.name)}`, c, foot: false,
-      body: table([row('Cancelled by', esc(by)), row('Safari', esc(b.session.name) + ' · ' + niceDate(b.date)), row('Group', ppl(b.guests)), row('Paid', fmtLkr(b.paid)), row('Refund', fmtLkr(refund))]) + btn(`${c.base}/admin/bookings?open=${encodeURIComponent(b.code)}`, 'Open booking'),
+      body: table([row('Cancelled by', esc(by)), row('Safari', esc(b.session.name) + ' · ' + niceDate(b.date)), row('Group', ppl(b.guests)), row('Paid', fmtMoney(b.paid, b.cur)), row('Refund', fmtMoney(refund, b.cur))]) + btn(`${c.base}/admin/bookings?open=${encodeURIComponent(b.code)}`, 'Open booking'),
     }),
   };
 }
@@ -201,7 +201,7 @@ function cust_confirmed(b, c) {
         + h3('Your booking') + bookingTable(b) + (b.mealsText ? table([row('Meal choices', esc(b.mealsText))]) : '')
         + pills([{ href: calHref(b), label: '📅 Add to calendar' }, office && { href: mapHref(c.conf.business.office), label: '📍 Directions' }, { href: b.manageUrl, label: '⚙️ Manage booking' }])
         + h3('Good to bring') + steps(['A hat, sunscreen and water', 'A light jacket for the early morning', 'Your camera and this e-ticket'])
-        + callout(`💳 Pay the remaining <b>${fmtLkr(b.total - b.paid)}</b> on the safari day (cash or card).`, 'info'),
+        + callout(`💳 Pay the remaining <b>${fmtMoney(b.total - b.paid, b.cur)}</b> on the safari day (cash or card).`, 'info'),
     }),
   };
 }
@@ -213,7 +213,7 @@ function cust_reminder(b, d, c) {
     html: layout({
       icon: '⏰', small: 'See you tomorrow', title: `Pickup at ${esc(b.session.pickup)}`, c, preheader: 'Your safari is tomorrow.',
       body: p('Here is everything for tomorrow. Please be ready 10 minutes early.')
-        + table([d.driver && row('Your driver', esc(d.driver)), d.plate && row('Jeep', esc(d.plate)), d.tracker && row('Your tracker', esc(d.tracker)), row('Pickup from', esc(b.pickupWhere)), row('Pay on the day', fmtLkr(b.total - b.paid))])
+        + table([d.driver && row('Your driver', esc(d.driver)), d.plate && row('Jeep', esc(d.plate)), d.tracker && row('Your tracker', esc(d.tracker)), row('Pickup from', esc(b.pickupWhere)), row('Pay on the day', fmtMoney(b.total - b.paid, b.cur))])
         + btn(b.ticketUrl, '🎟️ Open my e-ticket') + qrBlock(b.code)
         + pills([d.driverPhone && { href: telHref(d.driverPhone), label: '📞 Call your driver' }, { href: calHref(b), label: '📅 Add to calendar' }, { href: b.manageUrl, label: '⚙️ Manage booking' }]),
     }),
@@ -261,7 +261,7 @@ function cust_cancelled(b, { refund, pct }, c) {
     html: layout({
       icon: '🧾', small: 'Booking cancelled', title: `Booking ${esc(b.code)} is cancelled`, c,
       body: p(`Your ${esc(b.session.name.toLowerCase())} on ${niceDate(b.date)} is cancelled.`)
-        + (b.paid ? (refund ? callout(`💸 A refund of <b>${fmtLkr(refund)}</b> (${pct}%) is on its way back to you. Cards usually take 5 to 10 days.`, 'ok') : callout('Under our cancellation policy this booking is not refundable.', 'warn')) : '')
+        + (b.paid ? (refund ? callout(`💸 A refund of <b>${fmtMoney(refund, b.cur)}</b> (${pct}%) is on its way back to you. Cards usually take 5 to 10 days.`, 'ok') : callout('Under our cancellation policy this booking is not refundable.', 'warn')) : '')
         + btn(c.base + '/book/session', '🚙 Book another safari'),
     }),
   };
@@ -285,9 +285,9 @@ function cust_shared_pay({ trip, session, seats, amount, payUrl, payWindowH, nam
   return {
     subject: `Pay within ${payWindowH} hours to keep your seat`,
     html: layout({
-      icon: '💳', small: `Shared jeep · ${esc(trip.id)}`, title: 'Your jeep is going ahead', c, preheader: `Pay ${fmtLkr(amount)} to keep your seat.`,
+      icon: '💳', small: `Shared jeep · ${esc(trip.id)}`, title: 'Your jeep is going ahead', c, preheader: `Pay ${fmtMoney(amount, trip.currency)} to keep your seat.`,
       body: p(`Hi ${esc(name.split(' ')[0])}, enough guests have booked the ${esc(session.name.toLowerCase())} on <b>${niceDate(trip.date)}</b>. Pay within <b>${payWindowH} hours</b> to keep your seat, otherwise it is released to someone else.`)
-        + table([row('Seat', seats.join(', ')), row('Amount', `<b>${fmtLkr(amount)}</b>`)]) + btn(payUrl, `💳 Pay ${fmtLkr(amount)} now`, 'success')
+        + table([row('Seat', seats.join(', ')), row('Amount', `<b>${fmtMoney(amount, trip.currency)}</b>`)]) + btn(payUrl, `💳 Pay ${fmtMoney(amount, trip.currency)} now`, 'success')
         + muted('If the jeep does not go ahead, you get a full refund.'),
     }),
   };
@@ -312,7 +312,7 @@ function cust_shared_cancel({ trip, session, refund, name, privateUpgrade }, c) 
     html: layout({
       icon: '😔', small: `Shared jeep · ${esc(trip.id)}`, title: 'Your shared safari is cancelled', c,
       body: p(`Hi ${esc(name.split(' ')[0])}, the shared jeep on ${niceDate(trip.date)} did not reach enough paid seats, so it is cancelled.`)
-        + (refund ? callout(`💸 We have refunded <b>${fmtLkr(refund)}</b> to your card (5 to 10 days).`, 'ok') : '')
+        + (refund ? callout(`💸 We have refunded <b>${fmtMoney(refund, trip.currency)}</b> to your card (5 to 10 days).`, 'ok') : '')
         + (privateUpgrade ? p('Still want to go? Upgrade to your own private jeep:') + btn(`${c.base}/book/date?date=${trip.date}&ses=${trip.session_id}`, '🚙 Book a private jeep') : ''),
     }),
   };
@@ -349,7 +349,7 @@ function vendor_job(j, c) {
     html: layout({
       kind: 'vendor', icon: '🚙', small: 'New job offer', title: `${shortDate(j.date)} · ${esc(j.session.name)}`, c, foot: false, preheader: `Your fee ${fmtLkr(j.fee)}. Tap Accept to take it.`,
       body: p(`You have been offered a job as <b>${esc(j.roleLabel)}</b>. Tap a button to answer. It takes one tap.`)
-        + table([row('Pickup', esc(j.session.pickup) + ' · ' + esc(j.pickupWhere)), row('Guests', ppl(j.guests) + (j.leadName ? ` (lead: ${esc(j.leadName)})` : '')), j.mealsText && row('Meal packs', esc(j.mealsText)), j.collect != null && row('Collect at pickup', fmtLkr(j.collect)), row('Your fee', `<b style="color:#3a6f34">${fmtLkr(j.fee)}</b>`)])
+        + table([row('Pickup', esc(j.session.pickup) + ' · ' + esc(j.pickupWhere)), row('Guests', ppl(j.guests) + (j.leadName ? ` (lead: ${esc(j.leadName)})` : '')), j.mealsText && row('Meal packs', esc(j.mealsText)), j.collect != null && row('Collect at pickup', fmtMoney(j.collect, j.cur)), row('Your fee', `<b style="color:#3a6f34">${fmtLkr(j.fee)}</b>`)])
         + (j.aid ? btn(jobHref(c, j.aid, 'accept'), '✅ Accept this job', 'success') + btn(jobHref(c, j.aid, 'decline'), 'Decline', 'danger') : btn(portal, 'Open my jobs'))
         + pills([{ href: portal, label: '📋 Open partner portal' }, j.phone && { href: telHref(j.phone), label: '📞 Call guest' }, { href: telHref(c.conf.business.phone), label: '📞 Call the office' }]),
     }),

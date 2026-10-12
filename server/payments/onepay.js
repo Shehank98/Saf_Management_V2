@@ -23,7 +23,7 @@ async function call(path, body) {
 async function status(transactionId) {
   const j = await call('/v3/transaction/status/', { app_id: config.onepayAppId, onepay_transaction_id: transactionId });
   const d = j.data || {};
-  return { paid: d.status === true || d.status === 1 || d.status === '1', amount: d.amount != null ? parseFloat(d.amount) : null };
+  return { paid: d.status === true || d.status === 1 || d.status === '1', amount: d.amount != null ? parseFloat(d.amount) : null, amountCurrency: 'LKR' };
 }
 
 module.exports = {
@@ -32,7 +32,9 @@ module.exports = {
   configured: () => !!(config.onepayAppId && config.onepayAppToken && config.onepayHashSalt),
 
   async createCheckout({ payment, successUrl, customer = {}, customerEmail }) {
-    const amount = Number(payment.amount).toFixed(2), currency = 'LKR';
+    // OnePay charges Sri Lankan rupees: USD bookings are converted with the rate saved on the booking.
+    const lkr = payment.currency === 'USD' ? Math.round(payment.amount * (+payment.fx || 1)) : payment.amount;
+    const amount = Number(lkr).toFixed(2), currency = 'LKR';
     const [first, ...rest] = String(customer.name || 'Guest').trim().split(/\s+/);
     const j = await call('/v3/checkout/link/', {
       currency, app_id: config.onepayAppId,
@@ -59,7 +61,7 @@ module.exports = {
     const id = String(b.transaction_id || b.onepay_transaction_id || '');
     if (!id) throw new Error('OnePay callback without transaction_id');
     const s = await status(id);
-    if (s.paid) return { type: 'succeeded', providerRef: id, amount: s.amount, meta: { onepay: id } };
+    if (s.paid) return { type: 'succeeded', providerRef: id, amount: s.amount, amountCurrency: 'LKR', meta: { onepay: id } };
     if (String(b.status) === '0' || b.status === false) return { type: 'failed', providerRef: id };
     return null;
   },

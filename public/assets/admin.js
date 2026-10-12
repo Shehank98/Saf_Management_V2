@@ -1,5 +1,8 @@
 /* Admin and partner-portal shell (needs core.js). Admin pages load window.ADMIN_DATA from the server first. */
 const DATA = window.ADMIN_DATA || null;
+fmt = n => fmtCur(n, 'LKR'); // office and partners work in LKR
+/** A guest amount in its own currency, with the LKR value when it was USD. */
+const gm = (n, rec) => rec && rec.cur === 'USD' ? `${fmtCur(n, 'USD')} <span class="muted">(${fmtCur(n * (rec.fx || 1), 'LKR')})</span>` : fmtCur(n, 'LKR');
 const ME = DATA ? DATA.me : null;
 const BOOKINGS = DATA ? DATA.bookings : [];
 const SHARED = DATA ? DATA.shared : [];

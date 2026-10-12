@@ -18,7 +18,7 @@ function list() {
   $('#trips').innerHTML = rows.map(t => {
     const p = paidOf(t), st = status(t), byN = {}; t.seats.forEach(x => byN[x.n] = x);
     return `<button class="trip fade" data-id="${t.id}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="mono small muted">${t.id}</span>${badge(st)}</div>
-    <div class="dt">${shortDate(t.date)}</div><div class="small muted">${esc(locName(t.loc))} · ${esc(SESS[t.ses].name)} · ${fmt(t.price)}/seat</div>${t.guideWanted ? `<div style="margin-top:4px"><span class="tag ${t.guide ? 'ok' : 'warn'}">🧭 Guide requested${t.guide ? ' · assigned' : ''}</span></div>` : ''}
+    <div class="dt">${shortDate(t.date)}</div><div class="small muted">${esc(locName(t.loc))} · ${esc(SESS[t.ses].name)} · ${gm(t.price, t)}/seat</div>${t.guideWanted ? `<div style="margin-top:4px"><span class="tag ${t.guide ? 'ok' : 'warn'}">🧭 Guide requested${t.guide ? ' · assigned' : ''}</span></div>` : ''}
     <div class="mini-seats">${Array.from({ length: t.seatsMax }, (_, i) => i + 1).map(n => `<i class="${byN[n] ? (byN[n].pay === 'Paid' ? 'p' : 'r') : ''}" title="Seat ${n}"></i>`).join('')}</div>
     <div class="small"><b>${p}</b> paid · ${t.seats.length - p} reserved · ${t.seatsMax - t.seats.length} free ${p < t.minSeats && st !== 'Cancelled' ? `<span style="color:var(--warn)">· needs ${t.minSeats - p}</span>` : ''}</div>
     <div class="small muted" style="margin-top:6px">Jeep: ${t.vendor ? esc(vendorName(t.vendor)) + stateNote(t.vendorState) : '<span style="color:var(--bad)">not assigned</span>'}</div></button>`;
@@ -28,7 +28,7 @@ function list() {
 function open(id) {
   const t = SHARED.find(x => x.id === id); if (!t) return; openId = id;
   const s = SESS[t.ses], p = paidOf(t), st = status(t), byN = {}; t.seats.forEach(x => byN[x.n] = x);
-  const msg = `Hi! Here's the link to book a seat on our shared ${s.name.toLowerCase()} on ${nice(t.date)} (${fmt(t.price)}/seat): ${tripLink(t)}`;
+  const msg = `Hi! Here's the link to book a seat on our shared ${s.name.toLowerCase()} on ${nice(t.date)} (${fmtCur(t.price, t.cur)}/seat): ${tripLink(t)}`;
   const locked = ['Cancelled', 'Completed'].includes(st);
   openDrawer(`<div class="dh"><div><div class="mono" style="font-size:20px">${t.id}</div><div style="margin-top:4px">${badge(st)} <span class="small muted">${nice(t.date)} · ${esc(s.short)} · ${esc(locName(t.loc))}</span></div></div><button class="x" aria-label="Close">×</button></div>
   <div class="db">
@@ -43,7 +43,7 @@ function open(id) {
     <div class="sec-t">Assign</div>
     <div class="field"><label for="vJ">Jeep + driver${stateNote(t.vendorState)}</label><select class="inp" id="vJ" ${locked ? 'disabled' : ''}>${vendorOpts('jeep', t.vendor)}</select></div>${handoverButton({ ...t, status: st }, t.id)}
     <div class="field"><label for="vG">Tracker / guide${stateNote(t.guideState)}</label><select class="inp" id="vG" ${locked ? 'disabled' : ''}>${vendorOpts('guide', t.guide)}</select></div>
-    <div class="sec-t">Rules for this trip</div><dl class="dl"><dt>Price</dt><dd>${fmt(t.price)} per seat</dd><dt>Min. to run</dt><dd>${t.minSeats} paid seats</dd><dt>Auto-cancel</dt><dd>${shortDate(t.deadline)}, ${t.deadlineTime} if under ${t.minSeats} paid</dd></dl>
+    <div class="sec-t">Rules for this trip</div><dl class="dl"><dt>Price</dt><dd>${gm(t.price, t)} per seat</dd><dt>Min. to run</dt><dd>${t.minSeats} paid seats</dd><dt>Auto-cancel</dt><dd>${shortDate(t.deadline)}, ${t.deadlineTime} if under ${t.minSeats} paid</dd></dl>
     <div class="sec-t">Activity</div><ul class="log" id="log"><li class="muted">Loading…</li></ul>
   </div>
   <div class="df">${!locked && st !== 'Started' && t.seats.some(x => x.pay === 'Paid') ? `<button class="btn" id="runBtn">Pickup run</button>` : ''}${!locked && st !== 'Started' ? `<button class="btn" id="remind" ${t.seats.some(x => x.pay !== 'Paid') ? '' : 'disabled'}>Send payment reminders</button><button class="btn danger" id="cx">Cancel trip</button>` : ''}</div>`);
@@ -55,7 +55,7 @@ function open(id) {
   const rb = $('#runBtn'); if (rb) rb.onclick = () => openRun(id);
   const r = $('#remind'); if (r) r.onclick = () => act(async () => POST(`/api/admin/shared/${id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, r);
   const c = $('#cx');
-  if (c) c.onclick = () => { openModal(`<h3>Cancel ${t.id}?</h3><p class="muted" style="margin-top:8px">All ${t.seats.length} guests are emailed and the ${p} paid seat${p === 1 ? '' : 's'} (${fmt(p * t.price)}) are refunded in full.</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" data-close>Back</button><button class="btn" id="cOk" style="background:var(--bad);border-color:var(--bad);color:#fff">Cancel trip</button></div>`);
+  if (c) c.onclick = () => { openModal(`<h3>Cancel ${t.id}?</h3><p class="muted" style="margin-top:8px">All ${t.seats.length} guests are emailed and the ${p} paid seat${p === 1 ? '' : 's'} (${gm(p * t.price, t)}) are refunded in full.</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" data-close>Back</button><button class="btn" id="cOk" style="background:var(--bad);border-color:var(--bad);color:#fff">Cancel trip</button></div>`);
     $('#cOk').onclick = async e => { if (await act(() => POST(`/api/admin/shared/${id}/cancel`), 'Trip cancelled · guests emailed · refunds started', e.target)) { closeModal(); list(); open(id) } } };
 }
 async function openRun(id) {
@@ -68,7 +68,7 @@ async function openRun(id) {
 function seat(t, n) {
   const x = t.seats.find(y => y.n === n), id = t.id;
   if (x) {
-    openModal(`<h3>Seat ${n} · ${esc(x.name)}</h3><dl class="dl" style="margin-top:10px"><dt>Mobile</dt><dd>${esc(x.cc)} ${esc(x.phone)}</dd><dt>Email</dt><dd>${esc(x.email) || '-'}</dd>${x.meal ? `<dt>Meal</dt><dd>${esc(x.meal)}</dd>` : ''}<dt>Pickup</dt><dd>${x.hotel ? esc(x.hotel) + (x.pdist != null ? ` (${x.pdist} km)` : '') : 'Office'}</dd>${x.bino || x.guideReq ? `<dt>Extras</dt><dd>${[x.bino && 'Binoculars', x.guideReq && 'Naturalist guide'].filter(Boolean).join(', ')}</dd>` : ''}<dt>Amount</dt><dd>${fmt(x.amount || 0)}</dd><dt>Payment</dt><dd><span class="tag ${x.pay === 'Paid' ? 'ok' : 'warn'}">${x.pay}</span></dd></dl>
+    openModal(`<h3>Seat ${n} · ${esc(x.name)}</h3><dl class="dl" style="margin-top:10px"><dt>Mobile</dt><dd>${esc(x.cc)} ${esc(x.phone)}</dd><dt>Email</dt><dd>${esc(x.email) || '-'}</dd>${x.meal ? `<dt>Meal</dt><dd>${esc(x.meal)}</dd>` : ''}<dt>Pickup</dt><dd>${x.hotel ? esc(x.hotel) + (x.pdist != null ? ` (${x.pdist} km)` : '') : 'Office'}</dd>${x.bino || x.guideReq ? `<dt>Extras</dt><dd>${[x.bino && 'Binoculars', x.guideReq && 'Naturalist guide'].filter(Boolean).join(', ')}</dd>` : ''}<dt>Amount</dt><dd>${gm(x.amount || 0, t)}</dd><dt>Payment</dt><dd><span class="tag ${x.pay === 'Paid' ? 'ok' : 'warn'}">${x.pay}</span></dd></dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${x.pay === 'Pending' ? '<button class="btn ok" id="mp">Mark as paid (cash)</button>' : ''}<button class="btn danger" id="rm">Remove guest</button><button class="btn" data-close>Close</button></div>`);
     const mp = $('#mp'); if (mp) mp.onclick = async e => { if (await act(() => POST(`/api/admin/shared/${id}/seats/${n}/paid`), 'Marked paid · e-tickets go out once the trip has enough paid seats', e.target)) { closeModal(); list(); open(id) } };
     $('#rm').onclick = async e => { if (await act(() => DEL(`/api/admin/shared/${id}/seats/${n}`), 'Guest removed · seat is free again', e.target)) { closeModal(); list(); open(id) } };
@@ -80,11 +80,11 @@ function seat(t, n) {
 function create() {
   openModal(`<h3>Create a shared trip</h3><p class="small muted">You'll get a private link to send to guests. It takes one of your jeeps for that session.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label for="cd">Date</label><input class="inp" id="cd" type="date" min="${D(1)}" value="${D(7)}"></div>${LOCS.length > 1 ? `<div class="field" style="grid-column:1/-1"><label for="cl">Park</label><select class="inp" id="cl">${LOCS.map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('')}</select></div>` : ''}<div class="field"><label for="cs">Session</label><select class="inp" id="cs">${Object.entries(SESS).map(([k, s]) => `<option value="${k}">${esc(s.short)}</option>`).join('')}</select></div>
-  <div class="field"><label for="cp2">Price per seat (LKR)</label><input class="inp" id="cp2" type="number" step="500"></div><div class="field"><label for="cj">Jeep (optional)</label><select class="inp" id="cj">${vendorOpts('jeep', '')}</select></div></div>
+  <div class="field"><label for="cp2">Price per seat (${CFG.currency || 'LKR'})</label><input class="inp" id="cp2" type="number" step="500"></div><div class="field"><label for="cj">Jeep (optional)</label><select class="inp" id="cj">${vendorOpts('jeep', '')}</select></div></div>
   <div class="newtrip-prev small" id="prev"></div><div id="cerr" class="errmsg"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" data-close>Cancel</button><button class="btn primary" id="cOk">Create &amp; get link</button></div>`);
   const locSel = () => ($('#cl') ? $('#cl').value : (LOCS[0] || {}).id);
-  const pv = () => { const l = LOCS.find(x => x.id === locSel()), s = { ...SESS[$('#cs').value], ...((l && l.sessions[$('#cs').value]) || {}) }; if (!$('#cp2').dataset.touched) $('#cp2').value = s.seat; const d = $('#cd').value; $('#prev').innerHTML = `<b>${esc(s.name)}, ${d ? nice(d) : ''}</b><br>${CFG.sharedSeats} seats · runs at ${CFG.minSeats} paid · auto-cancels ${CONF.shared.autoCancelH}h before ${s.start} if not · max income ${fmt(CFG.sharedSeats * (+$('#cp2').value || 0))}` };
+  const pv = () => { const l = LOCS.find(x => x.id === locSel()), s = { ...SESS[$('#cs').value], ...((l && l.sessions[$('#cs').value]) || {}) }; if (!$('#cp2').dataset.touched) $('#cp2').value = s.seat; const d = $('#cd').value; $('#prev').innerHTML = `<b>${esc(s.name)}, ${d ? nice(d) : ''}</b><br>${CFG.sharedSeats} seats · runs at ${CFG.minSeats} paid · auto-cancels ${CONF.shared.autoCancelH}h before ${s.start} if not · max income ${fmtCur(CFG.sharedSeats * (+$('#cp2').value || 0), CFG.currency)}` };
   $('#cs').onchange = pv; if ($('#cl')) $('#cl').onchange = pv; $('#cd').oninput = pv; $('#cp2').oninput = () => { $('#cp2').dataset.touched = 1; pv() }; pv();
   $('#cOk').onclick = async e => {
     e.target.disabled = true; $('#cerr').textContent = '';

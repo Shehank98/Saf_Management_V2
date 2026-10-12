@@ -17,7 +17,7 @@ module.exports = {
 
   /** Fields for the auto-submitted form page (see routes/pay.js). */
   formFields({ payment, description, successUrl, cancelUrl, base, customer }) {
-    const amount = payment.amount.toFixed(2), currency = 'LKR', orderId = 'PH' + payment.id;
+    const amount = Number(payment.amount).toFixed(2), currency = payment.currency === 'USD' ? 'USD' : 'LKR', orderId = 'PH' + payment.id;
     const [first, ...rest] = String(customer.name || 'Guest').split(' ');
     return {
       action: host() + '/pay/checkout',

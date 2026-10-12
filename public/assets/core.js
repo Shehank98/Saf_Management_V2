@@ -3,7 +3,9 @@
    Settings and data come from the server (window.APP_CONFIG / window.ADMIN_DATA).
    ========================================================= */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const fmt = n => 'LKR ' + Math.round(n).toLocaleString('en-US');
+/* Money. Guests see the currency chosen in Settings (LKR or USD); the admin panel and partner portal always show LKR. */
+const fmtCur = (n, cur) => (cur === 'USD' ? 'USD ' : 'LKR ') + Math.round(n).toLocaleString('en-US');
+let fmt = n => fmtCur(n, (window.APP_CONFIG && window.APP_CONFIG.currency) || 'LKR');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = new URLSearchParams(location.search);
 const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

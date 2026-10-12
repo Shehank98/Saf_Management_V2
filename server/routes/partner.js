@@ -45,7 +45,7 @@ async function jobsFor(p, conf) {
     jobs.push({
       aid: a.aid, role: a.role, roleLabel: ROLE_LABEL[a.role], fee: a.fee, state: a.astatus, kind: 'Private', code: b.code, date: b.date, ses: b.ses, status: b.status,
       guests: b.guests, jeeps: b.jeeps, pmode: b.pmode, hotel: b.hotel, lat: b.lat, lng: b.lng, name: b.name, cc: accepted ? b.cc : '', phone: accepted ? b.phone : '',
-      plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: b.loc, guideReq: !!b.guideReq, tempDriver: b.tempDriver,
+      plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: b.loc, guideReq: !!b.guideReq, tempDriver: b.tempDriver, cur: b.cur,
       notes: accepted ? b.notes : '', balance: Math.max(0, b.total - b.paid), meals: b.meals ? c : {}, allergy: b.allergy, startedAt: b.startedAt,
     });
   }

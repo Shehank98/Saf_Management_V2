@@ -17,7 +17,8 @@ const DEFAULTS = {
   rules: { fleet: 4, maxPerJeep: 6, minLead: 'daybefore20', maxAheadMonths: 4 },
   policy: [[48, 100], [24, 50], [0, 0]],
   shared: { seats: 6, minSeats: 4, payWindowH: 24, autoCancelH: 24, allowLater: true, privateUpgrade: true },
-  payments: { deposit: 0.3, allowFull: true, allowLater: true, currency: 'LKR' },
+  // currency = what guests see and pay in (LKR or USD); usdRate = LKR per 1 USD, used to report everything in LKR.
+  payments: { deposit: 0.3, allowFull: true, allowLater: true, currency: 'LKR', usdRate: 300 },
   costs: { jeepFee: { morning: 12000, evening: 12000, full: 22000 }, guideFee: { morning: 4000, evening: 4000, full: 7000 }, mealCost: 900, camCost: 1500 },
   pickup: { radiusKm: 7, baseLat: 6.2833, baseLng: 81.2886 },
   emails: { recipients: ['bookings@yalawildsafaris.lk'], events: EVENTS },
@@ -146,4 +147,7 @@ function baseUrl(conf) {
   return d ? (/^https?:/.test(d) ? d : 'https://' + d).replace(/\/$/, '') : 'http://localhost:' + config.port;
 }
 
-module.exports = { load, set, invalidate, seedDefaults, baseUrl, DEFAULTS, EVENTS, todayStr, sessionAt, locOf, fleetOf, locationOf };
+/** The guest currency now and its LKR rate (fx). */
+const money = conf => { const cur = conf.payments.currency === 'USD' ? 'USD' : 'LKR'; return { cur, fx: cur === 'USD' ? (+conf.payments.usdRate || 1) : 1 }; };
+
+module.exports = { money, load, set, invalidate, seedDefaults, baseUrl, DEFAULTS, EVENTS, todayStr, sessionAt, locOf, fleetOf, locationOf };

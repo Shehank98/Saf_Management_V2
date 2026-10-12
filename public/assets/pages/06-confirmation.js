@@ -8,6 +8,7 @@ async function load() {
   let b;
   try { b = await GET(`/api/bookings/${encodeURIComponent(code)}?k=${encodeURIComponent(K)}`) }
   catch (e) { $('#hero').innerHTML = `<div class="hour">🔎</div><h1>We couldn't find that booking</h1><p class="muted">${esc(e.message)}</p><a class="btn primary" href="/booking" style="margin-top:12px">Find my booking</a>`; $('.card.fade').remove(); return }
+  if (b && b.cur) fmt = n => fmtCur(n, b.cur);
   paint(b);
   if (b.rawStatus === 'PENDING_PAYMENT' && !P.get('cancelled') && polls++ < 50) setTimeout(load, 2500);
 }

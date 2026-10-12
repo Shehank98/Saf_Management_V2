@@ -31,6 +31,8 @@ const fmt12 = t => { const [h, m] = String(t).split(':').map(Number); return `${
 
 // ---------- Money / text ----------
 const fmtLkr = n => 'LKR ' + Math.round(n).toLocaleString('en-US');
+/** Money in its own currency (guest prices can be LKR or USD). */
+const fmtMoney = (n, cur = 'LKR') => (cur === 'USD' ? 'USD ' : 'LKR ') + Math.round(n).toLocaleString('en-US');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ppl = n => n + (+n === 1 ? ' person' : ' people');
 const shortDate = s => new Date(s + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -57,7 +59,7 @@ const int = (v, d = 0) => { const n = parseInt(v, 10); return Number.isFinite(n)
 module.exports = {
   HttpError, bad, unauthorized, forbidden, notFound, conflict,
   todayStr, addDays, addMonths, localDate, hhmm, dateOf, isDate, fmt12, offsetStr,
-  fmtLkr, esc, ppl, shortDate, niceDate,
+  fmtLkr, fmtMoney, esc, ppl, shortDate, niceDate,
   bookingCode, seatCode, tripId, randomToken, sha256, normCode, digits, validEmail,
   wrap, clamp, int,
 };

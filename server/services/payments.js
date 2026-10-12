@@ -28,7 +28,7 @@ async function launch(payment, { description, successUrl, cancelUrl, customer })
 }
 
 /** Idempotent: mark a pending payment as paid and apply it to its booking or shared seats. */
-async function complete(paymentId, { amount = null, meta = {} } = {}) {
+async function complete(paymentId, { amount = null, amountCurrency = null, meta = {} } = {}) {
   const bookings = require('./bookings');
   const shared = require('./shared');
   return tx(async db => {
@@ -37,7 +37,9 @@ async function complete(paymentId, { amount = null, meta = {} } = {}) {
     if (!pay) throw notFound('Payment not found');
     // A success that arrives late (after we gave up on the attempt) is still real money, so it is applied too.
     if (pay.status === 'SUCCEEDED') return { already: true, payment: pay };
-    if (amount != null && Math.abs(amount - pay.amount) > 0.5) {
+    // A gateway may report the amount in LKR for a USD booking (OnePay): compare like with like.
+    const expected = amountCurrency && amountCurrency !== pay.currency ? Math.round(pay.amount * (+pay.fx || 1)) : pay.amount;
+    if (amount != null && Math.abs(amount - expected) > Math.max(0.5, expected * 0.001)) {
       await db.query(`UPDATE payments SET status='FAILED', meta = meta || $2::jsonb WHERE id=$1`, [paymentId, JSON.stringify({ mismatch: amount })]);
       if (pay.booking_id) await activity.log(db, 'booking', pay.booking_id, `Payment amount mismatch (expected ${pay.amount}, gateway said ${amount}) - not applied`, pay.provider);
       throw conflict('Payment amount does not match');
@@ -62,7 +64,7 @@ async function reconcile(payment) {
   if (!prov || !prov.fetchStatus || payment.status !== 'PENDING' || !payment.provider_ref) return;
   try {
     const s = await prov.fetchStatus(payment);
-    if (s.paid) await complete(payment.id, { amount: s.amount, meta: s.meta });
+    if (s.paid) await complete(payment.id, { amount: s.amount, amountCurrency: s.amountCurrency, meta: s.meta });
   } catch (e) { console.error('[payments] reconcile failed', e.message); }
 }
 

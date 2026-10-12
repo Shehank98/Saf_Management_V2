@@ -17,7 +17,7 @@ r.post('/api/payments/webhook/:provider', U.wrap(async (req, res) => {
   if (!ev) return res.json({ ok: true, ignored: true });
   const pay = (await query('SELECT * FROM payments WHERE provider=$1 AND provider_ref=$2', [prov.id, ev.providerRef])).rows[0];
   if (!pay) { console.warn('[webhook] unknown payment', ev.providerRef); return res.json({ ok: true, unknown: true }); }
-  if (ev.type === 'succeeded') await paymentsSvc.complete(pay.id, { amount: ev.amount, meta: ev.meta });
+  if (ev.type === 'succeeded') await paymentsSvc.complete(pay.id, { amount: ev.amount, amountCurrency: ev.amountCurrency, meta: ev.meta });
   else await paymentsSvc.fail(pay.id);
   res.json({ ok: true });
 }));
@@ -34,7 +34,7 @@ r.get('/pay/mock/:id', U.wrap(async (req, res) => {
   const p = (await query(`SELECT * FROM payments WHERE id=$1 AND provider='mock'`, [+req.params.id])).rows[0];
   if (!p || p.status !== 'PENDING') return res.status(404).send(page('Payment', '<h1>Nothing to pay</h1><p class="m">This payment was already completed or has expired.</p>'));
   res.send(page('Test payment', `<div class="t">Test mode: no real money moves. Set up Stripe or PayHere for real payments.</div>
-<h1>Pay ${U.esc(U.fmtLkr(p.amount))}</h1><p class="m">${U.esc((p.meta && p.meta.description) || 'Safari booking')}</p><div class="amt">${U.esc(U.fmtLkr(p.amount))}</div>
+<h1>Pay ${U.esc(U.fmtMoney(p.amount, p.currency))}</h1><p class="m">${U.esc((p.meta && p.meta.description) || 'Safari booking')}</p><div class="amt">${U.esc(U.fmtMoney(p.amount, p.currency))}</div>
 <button class="p" id="ok">Pay now (test)</button><button id="no">Cancel</button>
 <script>const go=o=>fetch('/api/payments/mock/${p.id}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({outcome:o})}).then(r=>r.json()).then(j=>location.href=j.redirect||'/');
 ok.onclick=()=>go('success');no.onclick=()=>go('cancel');</script>`));

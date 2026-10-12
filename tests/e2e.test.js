@@ -583,3 +583,34 @@ test('shared pickup run: scan boards a guest, driver picks the next one (guest s
   assert.equal((await query('SELECT status FROM shared_trips WHERE id=$1', [tid])).rows[0].status, 'STARTED');
   assert.equal((await query(`SELECT COUNT(*)::int n FROM payout_lines WHERE trip_code=$1 AND role='JEEP' AND partner_id=$2`, [tid, dId])).rows[0].n, 1);
 });
+
+test('currency: USD for guests, LKR for the office (rate locked per booking)', async () => {
+  assert.equal((await admin('PUT', '/api/admin/settings/payments', { deposit: 0.3, currency: 'USD', usdRate: 300 })).status, 200);
+  try {
+    assert.match(await (await fetch(base + '/api/config.js')).text(), /"currency":"USD"/);
+    await query(`UPDATE sessions SET shared_seat_price=25 WHERE id='morning'`); require('../server/lib/settings').invalidate();
+    const date = U.addDays(U.todayStr(), 14);
+    const id = (await api('POST', '/api/shared-trips/open', { date, ses: 'morning' })).json.id;
+    const v = (await api('GET', `/api/shared/${id}`)).json;
+    assert.equal(v.cur, 'USD'); assert.equal(v.price, 25);
+    const r = await api('POST', `/api/shared/${id}/seats`, { seats: [1, 2], name: 'Tom USD', phone: '771234567', email: 'tom@usd.com', pay: 'card', provider: 'mock', token: 'tokenUSDUSDUSDUSDUSDUSD1' });
+    assert.equal(r.status, 201); assert.equal(r.json.total, 50);
+    const seat = (await query(`SELECT currency, fx FROM shared_seats WHERE trip_id=$1 LIMIT 1`, [id])).rows[0];
+    assert.equal(seat.currency, 'USD'); assert.equal(+seat.fx, 300);
+    const pay = (await query(`SELECT * FROM payments WHERE seat_code=$1`, [r.json.code])).rows[0];
+    assert.equal(pay.currency, 'USD'); assert.equal(pay.amount, 50);
+    // a gateway that reports LKR (OnePay) is compared with the converted amount
+    await require('../server/services/payments').complete(pay.id, { amount: 15000, amountCurrency: 'LKR' });
+    assert.equal((await query(`SELECT status FROM payments WHERE id=$1`, [pay.id])).rows[0].status, 'SUCCEEDED');
+    // the rate changing later does not change what was booked
+    await admin('PUT', '/api/admin/settings/payments', { deposit: 0.3, currency: 'USD', usdRate: 320 });
+    const data = (await admin('GET', '/api/admin/data')).json;
+    const row = data.customerPayments.find(p => p.code === id);
+    assert.equal(row.amt, 15000); assert.equal(row.orig, 50); assert.equal(row.cur, 'USD');
+    const up = data.trips.find(t => t.code === id);
+    assert.equal(up.revenue, 15000, 'profit report in LKR');
+  } finally {
+    await admin('PUT', '/api/admin/settings/payments', { deposit: 0.3, currency: 'LKR', usdRate: 300 });
+    await query(`UPDATE sessions SET shared_seat_price=7500 WHERE id='morning'`); require('../server/lib/settings').invalidate();
+  }
+});

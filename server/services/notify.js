@@ -22,7 +22,7 @@ async function bookingView(db, b, c) {
   const extras = [b.has_meals ? 'Meal pack (' + prefs.filter(x => x !== 'No meal').length + ')' : '', b.has_bino ? 'Binoculars' : '', b.has_cam ? 'Camera' : ''].filter(Boolean).join(', ');
   const asg = await db.query('SELECT 1 FROM assignments WHERE booking_id=$1 AND role=\'JEEP\' AND status<>\'DECLINED\' LIMIT 1', [b.id]);
   return {
-    id: b.id, code: b.code, name: b.lead_name, firstName: (b.lead_name || '').split(' ')[0], email: b.email,
+    id: b.id, cur: b.currency || 'LKR', code: b.code, name: b.lead_name, firstName: (b.lead_name || '').split(' ')[0], email: b.email,
     phone: `${b.phone_cc} ${b.phone}`.trim(), session: { ...session, end12: fmt12(session.end) },
     date: b.date, guests: b.guests, jeeps: b.jeeps, status: b.status, total: b.total, paid: b.paid,
     pickupWhere: b.pickup_mode === 'HOTEL' ? (b.hotel_name || 'your hotel') : 'our office',
@@ -84,7 +84,7 @@ async function started(db, b, { startedAt, by }) {
       WHERE a.booking_id=$1 AND a.status<>'DECLINED'`, [b.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
   await send(db, 'cust_started', T.cust_started(v, { startedAt, driver: jeep && jeep.name, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c), { to: v.email, entity: 'booking', entityId: v.code });
-  await send(db, 'admin_started', T.admin_started({ code: v.code, guestText: `${v.name} · ${v.guests} guests`, by, startedAt, collect: v.total - v.paid }, c), { to: await toCompany(), entity: 'booking', entityId: v.code });
+  await send(db, 'admin_started', T.admin_started({ code: v.code, guestText: `${v.name} · ${v.guests} guests`, by, startedAt, collect: v.total - v.paid, cur: v.cur }, c), { to: await toCompany(), entity: 'booking', entityId: v.code });
 }
 
 async function thanks(db, b) {
@@ -98,7 +98,7 @@ async function jobOffer(db, partner, { role, fee, booking, trip, aid }) {
   let j;
   if (booking) {
     const v = await bookingView(db, booking, c);
-    j = { code: v.code, date: v.date, session: v.session, roleLabel, pickupWhere: v.pickupWhere, guests: v.guests, leadName: v.name, phone: v.phone, mealsText: v.mealsText, collect: v.total - v.paid, fee, aid };
+    j = { code: v.code, date: v.date, session: v.session, roleLabel, pickupWhere: v.pickupWhere, guests: v.guests, leadName: v.name, phone: v.phone, mealsText: v.mealsText, collect: v.total - v.paid, cur: v.cur, fee, aid };
   } else {
     const session = require("../lib/settings").sessionAt(c.conf, trip.location_id, trip.session_id);
     j = { code: trip.id, date: trip.date, session, roleLabel, pickupWhere: 'several hotels (shared jeep)', guests: trip.heldCount || 0, fee, aid };

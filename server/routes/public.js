@@ -287,7 +287,7 @@ r.get('/shared/:id/purchase', limits.poll, U.wrap(async (req, res) => {
   const fresh = await shared.payLinkInfo(req.params.id, code, String(req.query.k || '')).catch(() => info);
   const conf = await settings.load();
   res.set('Cache-Control', 'no-store').json({
-    code, name: fresh.name, seats: fresh.seats.map(s => s.n), amount: fresh.amount, paid: fresh.alreadyPaid, deadline: fresh.deadline,
+    code, name: fresh.name, seats: fresh.seats.map(s => s.n), amount: fresh.amount, cur: fresh.cur, paid: fresh.alreadyPaid, deadline: fresh.deadline,
     ses: fresh.trip.session_id, date: fresh.trip.date, tripStatus: fresh.trip.status, ticketReady: fresh.alreadyPaid && ['CONFIRMED', 'FULL', 'STARTED'].includes(fresh.trip.status),
     k: secrets.sign(code), mealPrice: conf.extras.meals ? conf.extras.meals.price : 0,
   });
@@ -326,7 +326,7 @@ r.get('/drive/:token', limits.poll, U.wrap(async (req, res) => {
     guests = [...by.values()].map(g => ({ ...g, people: g.seats.length }));
   }
   res.set('Cache-Control', 'no-store').json({
-    driver: d.temp.name, plate: d.temp.plate, code: t.code, kind: t.kind, date: t.date, status: t.status,
+    driver: d.temp.name, plate: d.temp.plate, code: t.code, kind: t.kind, cur: t.row.currency || 'LKR', date: t.date, status: t.status,
     session: { name: s.name, short: s.short, time: s.time, pickup: s.pickup }, park: L ? L.name : '', office: L ? L.office : '', guests,
   });
 }));

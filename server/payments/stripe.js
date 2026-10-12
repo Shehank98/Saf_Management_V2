@@ -5,8 +5,10 @@ const config = require('../config');
 const API = 'https://api.stripe.com/v1';
 // Stripe amounts are in the smallest currency unit. LKR has 2 decimals; set STRIPE_CURRENCY to change currency.
 const ZERO_DECIMAL = new Set(['jpy', 'krw', 'vnd', 'clp', 'pyg', 'ugx', 'xof', 'xaf']);
-const minor = (amount) => ZERO_DECIMAL.has(config.stripeCurrency) ? Math.round(amount) : Math.round(amount * 100);
-const major = (n) => ZERO_DECIMAL.has(config.stripeCurrency) ? n : n / 100;
+// USD bookings are charged in USD; LKR bookings in STRIPE_CURRENCY (default lkr).
+const curOf = payment => payment && payment.currency === 'USD' ? 'usd' : config.stripeCurrency;
+const minor = (amount, cur = config.stripeCurrency) => ZERO_DECIMAL.has(cur) ? Math.round(amount) : Math.round(amount * 100);
+const major = (n, cur = config.stripeCurrency) => ZERO_DECIMAL.has(cur) ? n : n / 100;
 
 async function call(method, path, params) {
   const body = params ? new URLSearchParams(params).toString() : undefined;
@@ -28,8 +30,8 @@ module.exports = {
   async createCheckout({ payment, description, successUrl, cancelUrl, customerEmail }) {
     const p = {
       mode: 'payment', success_url: successUrl, cancel_url: cancelUrl,
-      'line_items[0][price_data][currency]': config.stripeCurrency,
-      'line_items[0][price_data][unit_amount]': String(minor(payment.amount)),
+      'line_items[0][price_data][currency]': curOf(payment),
+      'line_items[0][price_data][unit_amount]': String(minor(payment.amount, curOf(payment))),
       'line_items[0][price_data][product_data][name]': description,
       'line_items[0][quantity]': '1',
       client_reference_id: String(payment.id),
@@ -45,14 +47,14 @@ module.exports = {
   /** Ask Stripe directly (used when the guest returns before the webhook arrives). */
   async fetchStatus(payment) {
     const s = await call('GET', '/checkout/sessions/' + encodeURIComponent(payment.provider_ref));
-    return { paid: s.payment_status === 'paid', amount: major(s.amount_total || 0), meta: { payment_intent: s.payment_intent } };
+    return { paid: s.payment_status === 'paid', amount: major(s.amount_total || 0, s.currency || curOf(payment)), meta: { payment_intent: s.payment_intent } };
   },
 
   async refund(payment, amount) {
     let pi = payment.meta && payment.meta.payment_intent;
     if (!pi) pi = (await this.fetchStatus(payment)).meta.payment_intent;
     if (!pi) throw new Error('No Stripe payment_intent for this payment');
-    const r = await call('POST', '/refunds', { payment_intent: pi, amount: String(minor(amount)) });
+    const r = await call('POST', '/refunds', { payment_intent: pi, amount: String(minor(amount, curOf(payment))) });
     return { ok: true, ref: r.id };
   },
 
@@ -70,7 +72,7 @@ module.exports = {
     if (!o) return null;
     if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
       if (o.payment_status !== 'paid') return null;
-      return { type: 'succeeded', providerRef: o.id, amount: major(o.amount_total || 0), meta: { payment_intent: o.payment_intent } };
+      return { type: 'succeeded', providerRef: o.id, amount: major(o.amount_total || 0, o.currency || config.stripeCurrency), meta: { payment_intent: o.payment_intent } };
     }
     if (ev.type === 'checkout.session.expired' || ev.type === 'checkout.session.async_payment_failed') {
       return { type: 'failed', providerRef: o.id };

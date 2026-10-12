@@ -114,7 +114,7 @@ async function publicView(tripId, token = '') {
   const holds = await liveHolds({ query }, t.id);
   const L = settings.locOf(conf, t.location_id);
   return {
-    jeepNo: sib.indexOf(t.id) + 1, nextId, loc: t.location_id, locName: L ? L.name : '',
+    jeepNo: sib.indexOf(t.id) + 1, nextId, loc: t.location_id, locName: L ? L.name : '', cur: t.currency || 'LKR',
     id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, seatsMax: t.seats, minSeats: t.min_seats, payWindowH: t.pay_window_h,
     time: s.time, pickup: s.pickup,
     taken: seats.map(x => x.seat_no), paid: seats.filter(x => x.status === 'PAID').length, held: seats.length, allowLater: conf.shared.allowLater,
@@ -308,14 +308,14 @@ async function applySeatPayment(db, pay) {
   }
   if (!toPay.length || ['CANCELLED', 'COMPLETED'].includes(t.status)) {
     const plan = await paymentsSvc.planRefund(db, { seatCode: pay.seat_code }, pay.amount);
-    await activity.log(db, 'trip', t.id, `Payment ${U.fmtLkr(pay.amount)} for ${pay.seat_code} arrived but the seats are gone: refund started`, pay.provider);
+    await activity.log(db, 'trip', t.id, `Payment ${U.fmtMoney(pay.amount, pay.currency)} for ${pay.seat_code} arrived but the seats are gone: refund started`, pay.provider);
     db.after(() => paymentsSvc.settleRefunds(plan));
     return;
   }
   await db.query(`UPDATE shared_seats SET status='PAID', pay_deadline=NULL WHERE id = ANY($1)`, [toPay.map(s => s.id)]);
   const session = sesOf(conf, t);
   const first = seats[0];
-  await activity.log(db, 'trip', t.id, `${first.name} paid ${U.fmtLkr(pay.amount)} for seat${toPay.length > 1 ? 's' : ''} ${toPay.map(s => s.seat_no).join(', ')}`, pay.provider);
+  await activity.log(db, 'trip', t.id, `${first.name} paid ${U.fmtMoney(pay.amount, pay.currency)} for seat${toPay.length > 1 ? 's' : ''} ${toPay.map(s => s.seat_no).join(', ')}`, pay.provider);
   const after = await evaluate(db, t.id);
   const ticketNow = ['CONFIRMED', 'FULL'].includes(after.status);
   if (first.email) {
@@ -330,7 +330,7 @@ async function payLinkInfo(tripId, code, k) {
   if (!seats.length) throw U.notFound('Those seats are no longer held. Please pick seats again.');
   const t = (await query('SELECT * FROM shared_trips WHERE id=$1', [U.normCode(tripId)])).rows[0];
   return {
-    trip: t, seats: seats.map(s => ({ n: s.seat_no, meal: s.meal, status: s.status })), name: seats[0].name, email: seats[0].email || '', phone: seats[0].phone_cc + seats[0].phone,
+    trip: t, cur: t.currency || 'LKR', seats: seats.map(s => ({ n: s.seat_no, meal: s.meal, status: s.status })), name: seats[0].name, email: seats[0].email || '', phone: seats[0].phone_cc + seats[0].phone,
     amount: seats.filter(s => s.status !== 'PAID').reduce((a, s) => a + s.amount, 0), alreadyPaid: seats.every(s => s.status === 'PAID'),
     deadline: seats[0].pay_deadline,
   };

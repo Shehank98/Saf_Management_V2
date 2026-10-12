@@ -378,3 +378,68 @@ ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS next_at timestamptz;
 ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_lat double precision;
 ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_lng double precision;
 ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_at timestamptz;
+
+-- Currency: guests can be priced in LKR or USD (Settings > Payments). Every money row keeps its currency and the
+-- LKR rate at that moment (fx = LKR per 1 unit), so reports and partner payments are always in LKR.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'LKR';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS fx numeric(12,4) NOT NULL DEFAULT 1;
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'LKR';
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'LKR';
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS fx numeric(12,4) NOT NULL DEFAULT 1;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'LKR';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS fx numeric(12,4) NOT NULL DEFAULT 1;
+
+-- New trips and private bookings take the guest currency from Settings; seats follow their trip;
+-- payments and refunds follow their booking / seat. fx is locked in when the row is created.
+CREATE OR REPLACE FUNCTION yws_site_money(OUT cur text, OUT rate numeric) AS $$
+  SELECT CASE WHEN value->>'currency' = 'USD' THEN 'USD' ELSE 'LKR' END,
+         CASE WHEN value->>'currency' = 'USD' THEN GREATEST(COALESCE(NULLIF(value->>'usdRate','')::numeric, 1), 1) ELSE 1 END
+    FROM settings WHERE key = 'payments'
+  UNION ALL SELECT 'LKR', 1 LIMIT 1;
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION yws_money_trip() RETURNS trigger AS $$
+DECLARE m record;
+BEGIN
+  SELECT * INTO m FROM yws_site_money();
+  NEW.currency := m.cur;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS shared_trips_money ON shared_trips;
+CREATE TRIGGER shared_trips_money BEFORE INSERT ON shared_trips FOR EACH ROW EXECUTE FUNCTION yws_money_trip();
+
+CREATE OR REPLACE FUNCTION yws_money_booking() RETURNS trigger AS $$
+DECLARE m record;
+BEGIN
+  SELECT * INTO m FROM yws_site_money();
+  NEW.currency := m.cur; NEW.fx := m.rate;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS bookings_money ON bookings;
+CREATE TRIGGER bookings_money BEFORE INSERT ON bookings FOR EACH ROW EXECUTE FUNCTION yws_money_booking();
+
+CREATE OR REPLACE FUNCTION yws_money_seat() RETURNS trigger AS $$
+DECLARE c text; m record;
+BEGIN
+  SELECT currency INTO c FROM shared_trips WHERE id = NEW.trip_id;
+  SELECT * INTO m FROM yws_site_money();
+  NEW.currency := COALESCE(c, 'LKR');
+  NEW.fx := CASE WHEN NEW.currency = 'USD' THEN (CASE WHEN m.cur = 'USD' THEN m.rate ELSE GREATEST(COALESCE((SELECT NULLIF(value->>'usdRate','')::numeric FROM settings WHERE key='payments'), 1), 1) END) ELSE 1 END;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS shared_seats_money ON shared_seats;
+CREATE TRIGGER shared_seats_money BEFORE INSERT ON shared_seats FOR EACH ROW EXECUTE FUNCTION yws_money_seat();
+
+CREATE OR REPLACE FUNCTION yws_money_payment() RETURNS trigger AS $$
+DECLARE c text; f numeric;
+BEGIN
+  IF NEW.booking_id IS NOT NULL THEN
+    SELECT currency, fx INTO c, f FROM bookings WHERE id = NEW.booking_id;
+  ELSIF NEW.seat_code IS NOT NULL THEN
+    SELECT currency, fx INTO c, f FROM shared_seats WHERE code = NEW.seat_code ORDER BY id LIMIT 1;
+  END IF;
+  NEW.currency := COALESCE(c, 'LKR'); NEW.fx := COALESCE(f, 1);
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS payments_money ON payments;
+CREATE TRIGGER payments_money BEFORE INSERT ON payments FOR EACH ROW EXECUTE FUNCTION yws_money_payment();

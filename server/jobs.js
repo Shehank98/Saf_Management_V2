@@ -40,7 +40,7 @@ async function dailySummary() {
   const tomorrowB = (await query(`SELECT code, lead_name, guests, session_id, (SELECT COUNT(*) FROM assignments a WHERE a.booking_id=bookings.id AND a.role='JEEP' AND a.status<>'DECLINED')::int AS jeep FROM bookings WHERE date=$1 AND status IN ('REQUEST','CONFIRMED')`, [tmr])).rows;
   const tomorrowS = (await query(`SELECT id, session_id FROM shared_trips WHERE date=$1 AND status <> 'CANCELLED'`, [tmr])).rows;
   const created = (await query(`SELECT COUNT(*)::int n FROM bookings WHERE created_at >= ($1::date - ($2 || ' minutes')::interval) AND status <> 'PENDING_PAYMENT'`, [today, String(config.utcOffsetMinutes)])).rows[0].n;
-  const received = (await query(`SELECT COALESCE(SUM(CASE WHEN kind='REFUND' THEN -amount ELSE amount END),0)::int n FROM payments WHERE status='SUCCEEDED' AND created_at >= ($1::date - ($2 || ' minutes')::interval)`, [today, String(config.utcOffsetMinutes)])).rows[0].n;
+  const received = (await query(`SELECT COALESCE(ROUND(SUM(CASE WHEN kind='REFUND' THEN -amount ELSE amount END * fx)),0)::int n FROM payments WHERE status='SUCCEEDED' AND created_at >= ($1::date - ($2 || ' minutes')::interval)`, [today, String(config.utcOffsetMinutes)])).rows[0].n;
   const owed = (await query(`SELECT COALESCE(SUM(amount),0)::int n FROM payout_lines WHERE status='UNPAID'`)).rows[0].n;
   const sName = id => (conf.sessions[id] || {}).short || id;
   const c = await notify.ctx();
