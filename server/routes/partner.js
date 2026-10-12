@@ -124,6 +124,18 @@ r.post('/temp-driver/:id/revoke', auth.requirePartner, U.wrap(async (req, res) =
   await require('../services/tempDrivers').revoke(x.id, { name: req.partner.name }); res.json({ ok: true });
 }));
 
+/* Pickup run of a shared jeep (driver holding the job) */
+const actorOf = req => ({ kind: 'PARTNER', id: req.partner.id, name: req.partner.name, type: req.partner.type });
+r.get('/trips/:id/run', auth.requirePartner, U.wrap(async (req, res) => {
+  const id = U.normCode(req.params.id);
+  const mine = await query(`SELECT 1 FROM assignments WHERE shared_trip_id=$1 AND partner_id=$2 AND status<>'DECLINED'`, [id, req.partner.id]);
+  if (!mine.rowCount) throw U.forbidden('This is not your trip.');
+  res.set('Cache-Control', 'no-store').json(await trips.pickupRun({ query }, id));
+}));
+r.post('/trips/:id/next', auth.requirePartner, U.wrap(async (req, res) => res.json(await trips.setNext(req.params.id, req.body.code, actorOf(req)))));
+r.post('/trips/:id/location', auth.requirePartner, U.wrap(async (req, res) => res.json(await trips.driverLocation(req.params.id, req.body, actorOf(req)))));
+r.post('/trips/:id/start', auth.requirePartner, U.wrap(async (req, res) => res.json(await trips.startShared(req.params.id, actorOf(req), { force: !!req.body.force }))));
+
 /* Phone notifications */
 r.get('/push/key', auth.requirePartner, U.wrap(async (req, res) => res.json({ key: await push.publicKey() })));
 r.post('/push/subscribe', auth.requirePartner, U.wrap(async (req, res) => { await push.subscribe(req.partner.id, req.body); res.json({ ok: true }); }));

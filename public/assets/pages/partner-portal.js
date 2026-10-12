@@ -40,7 +40,7 @@ function jobCard(j, full) {
   <div class="kv"><div>Pickup<b>${s.pickup} · ${sh ? 'several hotels' : j.pmode === 'hotel' ? esc(j.hotel || 'hotel') : 'Office'}</b></div><div>Guests<b>${ppl(j.guests)}${sh ? '' : ` · ${j.jeeps} jeep${j.jeeps > 1 ? 's' : ''}`}</b></div><div>Collect from guest<b style="color:${j.balance ? 'var(--bad)' : 'inherit'}">${j.balance ? fmt(j.balance) : 'Nothing'}</b></div><div>Your fee<b>${fmt(fee(j))}</b></div></div>
   ${Object.keys(mc).length ? `<div class="small"><b>Meal packs</b><div class="meals">${Object.entries(mc).map(([k, v]) => `<span>${v}× ${esc(k)}</span>`).join('')}${j.allergy ? `<span style="background:var(--bad-bg);color:var(--bad)">⚠ ${esc(j.allergy)}</span>` : ''}</div></div>` : ''}
   ${full && !isNew ? (sh ? `<ul class="pax">${j.seats.map(x => `<li><span>Seat ${x.n} · ${esc(x.name)}${x.meal ? ' · ' + esc(x.meal) : ''}${x.pay !== 'Paid' ? ' · <b style="color:var(--bad)">not paid</b>' : ''}</span><a href="tel:${(x.cc + x.phone).replace(/\s/g, '')}">Call</a></li>`).join('') || '<li><span class="muted">No guests yet</span></li>'}</ul>` : `<ul class="pax"><li><span>Lead guest · ${esc(j.name)}</span><a href="tel:${(j.cc + j.phone).replace(/\s/g, '')}">Call</a></li>${j.notes ? `<li><span>Note: ${esc(j.notes)}</span></li>` : ''}</ul>`) : ''}
-  <div class="acts" style="margin-top:10px">${isNew ? `<button class="btn sm ok" data-acc="${j.aid}">Accept job</button><button class="btn sm" data-dec="${j.aid}">Decline</button>` : live ? `<span class="small" style="color:var(--info);font-weight:700">Trip in progress since ${j.startedAt}</span><button class="btn sm" data-done="${esc(j.code)}">Trip finished</button>` : `<a class="btn sm ${today ? 'primary' : ''}" href="#checkin">Scan ticket to start trip</a>${!sh && j.pmode === 'hotel' ? `<a class="btn sm" target="_blank" rel="noopener" href="${mapsHref(j)}">Directions</a>` : ''}<a class="btn sm" target="_blank" rel="noopener" href="${gcal(j)}">📅 Add to calendar</a>${['JEEP', 'GUIDE'].includes(j.role) ? `<button class="btn sm" data-ho="${j.aid}">Hand over / vehicle</button>` : ''}`}</div>
+  <div class="acts" style="margin-top:10px">${isNew ? `<button class="btn sm ok" data-acc="${j.aid}">Accept job</button><button class="btn sm" data-dec="${j.aid}">Decline</button>` : live ? `<span class="small" style="color:var(--info);font-weight:700">Trip in progress since ${j.startedAt}</span><button class="btn sm" data-done="${esc(j.code)}">Trip finished</button>` : `<a class="btn sm ${today ? 'primary' : ''}" href="#checkin">${sh ? 'Scan tickets' : 'Scan ticket to start trip'}</a>${!sh && j.pmode === 'hotel' ? `<a class="btn sm" target="_blank" rel="noopener" href="${mapsHref(j)}">Directions</a>` : ''}<a class="btn sm" target="_blank" rel="noopener" href="${gcal(j)}">📅 Add to calendar</a>${sh && j.role === 'JEEP' && j.state === 'ACCEPTED' ? `<a class="btn sm ${today ? 'primary' : ''}" href="#run-${esc(j.code)}">Pickup run</a>` : ''}${['JEEP', 'GUIDE'].includes(j.role) ? `<button class="btn sm" data-ho="${j.aid}">Hand over / vehicle</button>` : ''}`}</div>
   ${!isNew && (j.plate || j.handedFrom) ? `<div class="tiny muted" style="margin-top:8px">${j.role === 'JEEP' && j.plate ? 'Vehicle <b>' + esc(j.plate) + '</b>' : ''}${j.handedFrom ? ' · handed to you by ' + esc(j.handedFrom) : ''}</div>` : ''}${j.tempDriver ? `<div class="note warn small" style="margin-top:8px">Temporary driver <b>${esc(j.tempDriver.name)}</b> (${esc(j.tempDriver.plate)}) has the driving link for this trip.</div>` : ''}</div>`;
 }
 const gcal = j => { const s = SESS[j.ses] || {}, c = (d, t) => d.replace(/-/g, '') + 'T' + (t || '00:00').replace(':', '') + '00'; return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${j.roleLabel}: ${j.code}`)}&dates=${c(j.date, s.pickupRaw || s.start)}/${c(j.date, s.end)}&ctz=Asia%2FColombo&details=${encodeURIComponent(`${s.name || ''} · ${ppl(j.guests)} · pickup ${s.pickup || ''}`)}` };
@@ -94,8 +94,19 @@ function wirePush() {
 const upcoming = () => PD.jobs.filter(j => (parseIso(j.date) >= TODAY || j.status === 'Started') && !['Completed', 'Cancelled'].includes(j.status)).sort((a, b) => a.date.localeCompare(b.date));
 
 function stopScanner() { if (scanner) { scanner.stop(); scanner = null } }
+async function renderRun(id) {
+  $('.ahead h1').textContent = 'Pickup run'; $$('.side a.nv').forEach(a => a.classList.remove('on'));
+  const c = $('#content');
+  let run; try { run = await GET(`/api/partner/trips/${encodeURIComponent(id)}/run`) } catch (e) { c.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; return }
+  if (!location.hash.startsWith('#run-')) return;
+  c.innerHTML = `<a href="#jobs" class="small">← My jobs</a><div style="margin-top:10px">${pickupRunHTML(run)}</div>`;
+  const base = `/api/partner/trips/${encodeURIComponent(id)}`;
+  wirePickupRun(run, { next: code => POST(base + '/next', { code }), start: force => POST(base + '/start', { force }), location: (lat, lng) => POST(base + '/location', { lat, lng }), scan: () => { location.hash = '#checkin' }, refresh: () => renderRun(id) });
+}
 function show() {
   stopScanner();
+  if ((location.hash || '').startsWith('#run-')) { renderRun(decodeURIComponent(location.hash.slice(5))); return }
+  stopGeo();
   const tab = (location.hash || '#home').slice(1); $$('.side a.nv').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + tab)); $('#side').classList.remove('open');
   const t = NAV.find(n => n[0] === '#' + tab); $('.ahead h1').textContent = t ? t[1] : 'Partner portal';
   const up = upcoming(), L = PD.lines, owed = L.filter(l => !l.paid).reduce((a, l) => a + l.amount, 0); let h = '';

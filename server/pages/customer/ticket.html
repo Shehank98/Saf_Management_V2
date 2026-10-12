@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/assets/pwa.css">
 <style>
 main.wrap{padding:24px 16px 60px;max-width:460px}
@@ -44,6 +45,9 @@ main.wrap{padding:24px 16px 60px;max-width:460px}
 .onway{display:flex;gap:12px;align-items:center;background:var(--info-bg);color:var(--ink);padding:12px 20px;animation:fade .5s .3s both}
 .onway .paw{font-size:24px;animation:pawstep 1.2s ease-in-out infinite}
 @keyframes pawstep{50%{transform:translateY(-4px) rotate(-10deg)}}
+.pk{margin:12px 16px 0;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.pk.nx{border:2px solid var(--info);background:var(--info-bg)}.pk.ok{background:var(--ok-bg);border-color:transparent}
+.pkmap{height:220px;border-radius:12px;overflow:hidden;margin-top:10px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -53,6 +57,8 @@ main.wrap{padding:24px 16px 60px;max-width:460px}
 <script defer src="/assets/core.js"></script>
 <script defer src="/assets/customer.js"></script>
 <script defer src="/assets/qr.js"></script>
+<script defer src="/vendor/leaflet/leaflet.js"></script>
+<script defer src="/assets/map.js"></script>
 <script defer src="/assets/pages/ticket.js"></script>
 </body>
 </html>

@@ -371,3 +371,10 @@ CREATE TABLE IF NOT EXISTS temp_drivers (
   CHECK ((booking_id IS NOT NULL) <> (shared_trip_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS temp_drivers_trip ON temp_drivers (booking_id, shared_trip_id);
+
+-- Pickup run of a shared jeep: who the driver is collecting next and where the driver is.
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS next_code text;
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS next_at timestamptz;
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_lat double precision;
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_lng double precision;
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS drv_at timestamptz;

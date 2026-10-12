@@ -178,8 +178,9 @@ function scanResultHTML(r) {
     return `<div class="scanres ok"><div class="big">Ticket found</div><p style="font-size:17px;margin:4px 0 8px"><b>${esc(i.name)}</b> · ${ppl(i.guests)} · ${esc(i.sessionName)}${i.seats ? ' · seat ' + i.seats.join(', ') : ''}</p>
     <p class="small" style="margin:0 0 6px">Code <b class="mono">${esc(i.code)}</b>${i.mealsText ? ' · <b>Meals:</b> ' + esc(i.mealsText) : ''}${i.driver ? ` · <b>Driver:</b> ${esc(i.driver)}${i.plate ? ' (' + esc(i.plate) + ')' : ''}` : ''}</p>
     <p style="margin:6px 0 12px">Collect from guest: <b style="color:${i.balance ? 'var(--bad)' : 'var(--ok)'}">${i.balance ? fmt(i.balance) : 'nothing, fully paid'}</b></p>
-    <button class="btn primary block" id="startTrip" style="font-size:17px;padding:14px">▶ Start the trip</button></div>`;
+    <button class="btn primary block" id="startTrip" style="font-size:17px;padding:14px">${r.action === 'board' ? '✓ Mark as on board' : '▶ Start the trip'}</button></div>`;
   }
+  if (r.kind === 'ok' && r.boarded) { const i = r.info; return `<div class="scanres ok"><div class="big">✓ ${esc(r.title)}</div><p style="font-size:17px;margin:4px 0 8px"><b>${esc(i.name)}</b> · ${ppl(i.guests)}${i.seats ? ' · seat ' + i.seats.join(', ') : ''}</p><p class="small" style="margin:0">${i.running ? 'The safari is already running.' : i.left ? 'Pick up the next guests, then tap <b>Start the safari</b> in the pickup run.' : 'Everyone is on board. Tap <b>Start the safari</b> in the pickup run.'}</p>${i.tripId ? `<button class="btn primary block" id="toRun" data-trip="${esc(i.tripId)}" style="margin-top:12px">Open pickup run</button>` : ''}</div>` }
   if (r.kind !== 'ok') return `<div class="scanres ${r.kind}"><div class="big">${esc(r.title)}</div><p>${esc(r.msg || '')}</p>${r.canForce ? '<button class="btn sm" id="force">Start anyway</button>' : ''}${r.info && r.kind === 'warn' ? `<p class="small" style="margin:6px 0 0">${esc(r.info.name)} · ${esc(r.info.sessionName)}</p>` : ''}</div>`;
   const i = r.info;
   return `<div class="scanres ok"><div class="startanim" aria-hidden="true"><div class="road2"></div><div class="flag">🏁</div><div class="car2">${JEEP('#3f5a2e', 64, 40)}</div></div>
@@ -190,9 +191,53 @@ function scanResultHTML(r) {
 }
 function wireScanResult(r, rerun) {
   const f = $('#force'); if (f) f.onclick = () => rerun(true);
+  const tr = $('#toRun'); if (tr) tr.onclick = () => { if (typeof openRun === 'function') openRun(tr.dataset.trip); else location.hash = '#run-' + tr.dataset.trip };
   const st = $('#startTrip'); if (st) st.onclick = () => { st.disabled = true; st.textContent = 'Starting…'; rerun(false, true) };
-  if (r.kind === 'ok') toast(`Trip started · email sent to ${esc((r.info.name || '').split(' ')[0])}`);
+  if (r.kind === 'ok') toast(r.boarded ? `${esc((r.info.name || '').split(' ')[0])} is on board` : `Trip started · email sent to ${esc((r.info.name || '').split(' ')[0])}`);
 }
+
+/* ===== Pickup run for a shared jeep (driver app, temporary link, office) ===== */
+let _geo = null, _geoLast = 0;
+function pickupRunHTML(run, { canAct = true } = {}) {
+  const done = run.groups.filter(g => g.boarded).length, n = run.groups.length;
+  const chip = g => g.boarded ? '<span class="tag ok">✓ On board</span>' : g.next ? '<span class="tag info">On the way</span>' : '<span class="tag">Waiting</span>';
+  return `<div class="panel run"><div class="ph"><h3>Pickup run · ${run.id}</h3><span class="small muted">${done} of ${n} group${n === 1 ? '' : 's'} on board</span></div><div class="pb">
+    ${run.started ? `<div class="note ok" style="margin-bottom:10px">The safari started at ${esc(run.startedAt || '')}.</div>` : ''}
+    <div class="runmap" id="runMap"></div>
+    <div class="runlist">${run.groups.map((g, i) => `<div class="rg ${g.boarded ? 'on' : ''} ${g.next ? 'nx' : ''}"><span class="no">${i + 1}</span><div class="rt"><b>${esc(g.name)}</b> · ${ppl(g.people)} · seat ${g.seats.join(', ')}<div class="tiny muted">${g.hotel ? esc(g.hotel) + (g.km != null ? ` · ${g.km} km from base` : '') : 'Meets at the office'}</div><div style="margin-top:6px">${chip(g)}</div></div>
+      <div class="ra">${!g.boarded && !run.started && canAct && !g.next ? `<button class="btn sm primary" data-next="${esc(g.code)}">Pick up next</button>` : ''}${g.lat != null ? `<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g.lat},${g.lng}">Directions</a>` : ''}<a class="btn sm" href="tel:${esc(g.phone.replace(/\s/g, ''))}">Call</a></div></div>`).join('') || '<div class="empty">No paid guests yet</div>'}</div>
+    ${run.next && !run.started ? `<p class="tiny muted" id="geoNote" style="margin:10px 0 0">📍 Your location is shared with the guest you are driving to, so they can see you coming.</p>` : ''}
+    ${!run.started && canAct ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" id="runScan">Scan a ticket</button><button class="btn primary" id="runStart" style="flex:1" ${done ? '' : 'disabled'}>▶ Start the safari${done && done < n ? ` (${done}/${n} on board)` : ''}</button></div>` : ''}
+  </div></div>`;
+}
+function wirePickupRun(run, api) {
+  $$('[data-next]').forEach(b => b.onclick = () => busy(b, async () => { await api.next(b.dataset.next); toast('Guest told you are on the way'); api.refresh() }));
+  const sc = $('#runScan'); if (sc) sc.onclick = () => api.scan();
+  const st = $('#runStart'); if (st) st.onclick = () => busy(st, async () => {
+    try { await api.start(false) } catch (e) { if (e.data && e.data.canForce && confirm(e.message)) await api.start(true); else throw e }
+    toast('The safari has started · guests emailed'); stopGeo(); api.refresh();
+  });
+  // map
+  const el = $('#runMap');
+  const pts = run.groups.filter(g => g.lat != null);
+  if (el && typeof L !== 'undefined' && (pts.length || run.base)) {
+    const map = slMap(el, { center: run.base ? [run.base.lat, run.base.lng] : [pts[0].lat, pts[0].lng], zoom: 12 });
+    const all = [];
+    if (run.base) { L.circleMarker([run.base.lat, run.base.lng], { radius: 8, color: '#2b2118', fillColor: '#2b2118', fillOpacity: 1 }).addTo(map).bindTooltip('Office / base'); all.push([run.base.lat, run.base.lng]) }
+    run.groups.forEach((g, i) => { if (g.lat == null) return; const c = g.boarded ? '#3a6f34' : g.next ? '#2f6a8a' : '#c0682a';
+      L.marker([g.lat, g.lng], { icon: L.divIcon({ className: '', html: `<div style="width:28px;height:28px;border-radius:50%;background:${c};color:#fff;font:700 13px/28px system-ui;text-align:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">${g.boarded ? '✓' : i + 1}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(map).bindTooltip(`${g.name}${g.hotel ? ' · ' + g.hotel : ''}`); all.push([g.lat, g.lng]) });
+    if (all.length > 1) map.fitBounds(L.latLngBounds(all).pad(0.25));
+    setTimeout(() => map.invalidateSize(), 200);
+  } else if (el) el.remove();
+  // share the driver's position while driving to the next guest
+  if (run.next && !run.started && api.location) startGeo(api.location); else stopGeo();
+}
+function startGeo(send) {
+  if (_geo != null || !navigator.geolocation) return;
+  _geo = navigator.geolocation.watchPosition(p => { if (Date.now() - _geoLast < 15000) return; _geoLast = Date.now(); send(p.coords.latitude, p.coords.longitude).catch(() => { }) },
+    () => { const n = $('#geoNote'); if (n) n.textContent = '⚠ Location is off, so the guest cannot see you coming. They still got a message that you are on the way.' }, { enableHighAccuracy: true, maximumAge: 10000 });
+}
+function stopGeo() { if (_geo != null && navigator.geolocation) navigator.geolocation.clearWatch(_geo); _geo = null }
 
 /* ===== Camera QR scanner (works on phones; uses jsQR, so no special browser support needed) ===== */
 function startScanner(host, onCode) {

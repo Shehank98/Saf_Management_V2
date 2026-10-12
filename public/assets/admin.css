@@ -269,3 +269,12 @@ table.t tbody tr:hover{background:var(--sand)}
 .seg{display:inline-flex;background:var(--sand);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex-wrap:wrap;max-width:100%}
 .seg button{border:0;background:transparent;padding:8px 12px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+
+/* pickup run */
+.runmap{height:260px;border-radius:12px;border:1px solid var(--line);overflow:hidden;margin-bottom:12px}
+.runlist{display:grid;gap:8px}
+.rg{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.rg .no{width:26px;height:26px;border-radius:50%;background:var(--sand);display:grid;place-items:center;font-weight:800;font-size:13px}
+.rg.on{opacity:.75}.rg.on .no{background:var(--ok-bg);color:var(--ok)}
+.rg.nx{border:2px solid var(--info);box-shadow:0 0 0 3px color-mix(in srgb,var(--info) 15%,transparent)}.rg.nx .no{background:var(--info);color:#fff}
+.rg .ra{grid-column:2;display:flex;gap:6px;flex-wrap:wrap}

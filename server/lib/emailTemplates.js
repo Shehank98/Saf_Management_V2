@@ -318,6 +318,18 @@ function cust_shared_cancel({ trip, session, refund, name, privateUpgrade }, c) 
   };
 }
 
+function cust_driver_next({ name, driver, plate, trackUrl, session, hotel }, c) {
+  return {
+    subject: 'Your driver is on the way to pick you up',
+    html: layout({
+      kind: 'customer', small: 'Pickup', title: 'Your driver is on the way', c, preheader: 'You are the next pickup. Please be ready at the entrance.',
+      body: p(`Hello ${esc(name.split(' ')[0])}, you are the <b>next pickup</b> for your ${esc(session.name.toLowerCase())}. Please be ready${hotel ? ` at the entrance of <b>${esc(hotel)}</b>` : ''} with your QR ticket.`)
+        + table([driver && row('Driver', esc(driver)), plate && row('Vehicle', esc(plate))])
+        + btn(trackUrl, 'See where the driver is') + muted('The map on your ticket shows the jeep while the driver is on the way.'),
+    }),
+  };
+}
+
 function cust_shared_released({ trip, session, seats, name }, c) {
   return {
     subject: 'Your reserved seat was released',
@@ -417,7 +429,7 @@ function vendor_login({ link }, c) {
 const TEMPLATES = {
   admin_new_private, admin_new_shared, admin_started, admin_vendor_app, admin_cancelled, admin_shared_status, admin_daily,
   cust_request, cust_confirmed, cust_reminder, cust_started, cust_thanks, cust_declined, cust_cancelled,
-  vendor_handover, cust_shared_seat, cust_shared_pay, cust_shared_ticket, cust_shared_cancel, cust_shared_released,
+  vendor_handover, cust_driver_next, cust_shared_seat, cust_shared_pay, cust_shared_ticket, cust_shared_cancel, cust_shared_released,
   temp_driver, vendor_job, vendor_approved, vendor_rejected, vendor_payout, vendor_login,
 };
 

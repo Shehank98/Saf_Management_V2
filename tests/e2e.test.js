@@ -544,3 +544,42 @@ test('temporary driver link: one trip only, blocks the regular driver, can be st
   assert.equal((await query('SELECT status FROM bookings WHERE code=$1', [code])).rows[0].status, 'COMPLETED');
   assert.equal((await api('GET', '/api/drive/not-a-real-token-at-all-xx')).status, 404);
 });
+
+test('shared pickup run: scan boards a guest, driver picks the next one (guest sees it), safari starts on demand', async () => {
+  const hash = await require('../server/lib/auth').hashPassword('drive-pass-99');
+  const dId = (await query(`INSERT INTO partners(type,name,email,status,password_hash,vehicle_plate) VALUES('JEEP_DRIVER','Ajith','ajith@t.lk','ACTIVE',$1,'CAB-5555') RETURNING id`, [hash])).rows[0].id;
+  const oId = (await query(`INSERT INTO partners(type,name,email,status,password_hash) VALUES('JEEP_DRIVER','Other2','other2@t.lk','ACTIVE',$1) RETURNING id`, [hash])).rows[0].id; void oId;
+  const ck = async e => (await api('POST', '/api/partner/login', { email: e, password: 'drive-pass-99' })).headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const pc = await ck('ajith@t.lk'), oc = await ck('other2@t.lk');
+  const tid = 'SH-RUN1';
+  await query(`INSERT INTO shared_trips(id, session_id, date, seat_price, seats, min_seats, status, auto_cancel_at) VALUES($1,'evening',$2,7500,6,2,'CONFIRMED',now() + interval '1 day')`, [tid, U.todayStr()]);
+  const groups = [['GA', 'Anna', 6.25, 81.3], ['GB', 'Ben', 6.28, 81.29], ['GC', 'Cara', null, null]];
+  let n = 1;
+  for (const [code, name, lat, lng] of groups) await query(`INSERT INTO shared_seats(trip_id, seat_no, code, name, phone, email, pay_option, amount, status, pickup_lat, pickup_lng, pickup_km, hotel_name) VALUES($1,$2,$3,$4,'0771234567',$5,'NOW',7500,'PAID',$6,$7,$8,$9)`,
+    [tid, n++, 'YWS-' + code + '00X', name, name.toLowerCase() + '@x.lk', lat, lng, lat ? 2.5 : null, lat ? name + ' Hotel' : null]);
+  await query(`INSERT INTO assignments(shared_trip_id, partner_id, role, fee, status) VALUES($1,$2,'JEEP',12000,'ACCEPTED')`, [tid, dId]);
+  const pv = await api('POST', '/api/checkin', { code: 'YWS-GA00X', preview: true }, pc);
+  assert.equal(pv.json.kind, 'ready'); assert.equal(pv.json.action, 'board');
+  const b1 = await api('POST', '/api/checkin', { code: 'YWS-GA00X' }, pc);
+  assert.equal(b1.json.kind, 'ok'); assert.equal(b1.json.boarded, true); assert.equal(b1.json.info.left, 2);
+  assert.equal((await query('SELECT status FROM shared_trips WHERE id=$1', [tid])).rows[0].status, 'CONFIRMED', 'boarding does not start the safari');
+  assert.equal((await api('POST', `/api/partner/trips/${tid}/next`, { code: 'YWS-GB00X' }, oc)).status, 403, 'other drivers cannot run it');
+  const nx = await api('POST', `/api/partner/trips/${tid}/next`, { code: 'YWS-GB00X' }, pc);
+  assert.equal(nx.status, 200); assert.equal(nx.json.next, 'YWS-GB00X');
+  assert.ok((await emails('cust_driver_next')).some(e => e.to_addr === 'ben@x.lk'));
+  assert.equal((await api('POST', `/api/partner/trips/${tid}/location`, { lat: 6.27, lng: 81.295 }, pc)).status, 200);
+  const k = require('../server/lib/secrets').sign('YWS-GB00X');
+  const tk = (await api('GET', `/api/ticket/YWS-GB00X?k=${k}`)).json;
+  assert.equal(tk.pickup.next, true); assert.equal(tk.pickup.driver.name, 'Ajith'); assert.equal(tk.pickup.pos.lat, 6.27);
+  const tkA = (await api('GET', `/api/ticket/YWS-GA00X?k=${require('../server/lib/secrets').sign('YWS-GA00X')}`)).json;
+  assert.equal(tkA.pickup.onBoard, true); assert.equal(tkA.pickup.pos, null, 'only the next guest sees the driver');
+  await api('POST', '/api/checkin', { code: 'YWS-GB00X' }, pc);
+  const run = (await api('GET', `/api/partner/trips/${tid}/run`, null, pc)).json;
+  assert.equal(run.groups.filter(g => g.boarded).length, 2); assert.equal(run.next, null);
+  const s1 = await api('POST', `/api/partner/trips/${tid}/start`, {}, pc);
+  assert.equal(s1.status, 409); assert.equal(s1.json.canForce, true); assert.match(s1.json.error, /Cara/);
+  const s2 = await api('POST', `/api/partner/trips/${tid}/start`, { force: true }, pc);
+  assert.equal(s2.status, 200);
+  assert.equal((await query('SELECT status FROM shared_trips WHERE id=$1', [tid])).rows[0].status, 'STARTED');
+  assert.equal((await query(`SELECT COUNT(*)::int n FROM payout_lines WHERE trip_code=$1 AND role='JEEP' AND partner_id=$2`, [tid, dId])).rows[0].n, 1);
+});

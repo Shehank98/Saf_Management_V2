@@ -23,8 +23,8 @@ $('#quick').onsubmit = e => {
   location.href = '/shared?' + q;
 };
 
-/* Parks: list + Sri Lanka map */
-let map = null, rings = {};
+/* Parks */
+
 function parks() {
   $('#parks').innerHTML = LOCS.map((l, i) => `<button type="button" class="card park fade ${l.id === loc ? 'on' : ''}" style="animation-delay:${i * .06}s" data-l="${esc(l.id)}">
     <span class="pin">${PIN}</span><span><b>${esc(l.name)}</b><div class="small muted">${esc(l.tagline || '')}</div><div class="tiny muted" style="margin-top:3px">Free pickup within ${l.radiusKm} km · ${sessAt(l).map(([, s]) => esc(s.short)).join(' · ')}</div></span>
@@ -40,28 +40,6 @@ function sessCards() {
 }
 function pick(id, fly) {
   loc = id; $('#qLoc').value = id; fillSessions(); parks(); sessCards();
-  if (map && fly && rings[id]) map.flyToBounds(rings[id].getBounds().pad(0.6), { duration: .8 });
-  Object.entries(rings).forEach(([k, r]) => r.setStyle({ color: k === id ? '#c0682a' : '#6b7b45', fillOpacity: k === id ? .14 : .06, weight: k === id ? 3 : 1.5 }));
 }
-function drawMap() {
-  const el = $('#pmap');
-  if (typeof L === 'undefined' || !LOCS.length) { el.innerHTML = '<p class="small muted" style="padding:14px">Map unavailable.</p>'; return }
-  map = slMap(el);
-  const all = [];
-  LOCS.forEach(l => {
-    const c = L.circle([l.lat, l.lng], { radius: l.radiusKm * 1000, color: '#6b7b45', weight: 1.5, fillOpacity: .06 }).addTo(map);
-    const m = L.marker([l.lat, l.lng], { title: l.name }).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br>${esc(l.tagline || '')}<br>From ${fmt(fromPrice(l))} per seat`);
-    m.on('click', () => pick(l.id, false)); c.on('click', () => pick(l.id, false));
-    rings[l.id] = c; all.push([l.lat, l.lng]);
-  });
-  if (all.length > 1) map.fitBounds(L.latLngBounds(all).pad(0.4)); else if (all.length) map.fitBounds(rings[LOCS[0].id].getBounds().pad(2));
-  pick(loc, false);
-  setTimeout(() => map.invalidateSize(), 250);
-}
-
-/* Extras */
-const EX = [['meals', '🍱', 'Meal pack', 'per seat · choose veg, vegan, halal and more'], ['bino', '🔭', 'Binoculars', 'per group · see the leopard up close'], ['guide', '🧭', 'Naturalist guide', 'per group · an expert explains what you see']];
-$('#extras').innerHTML = EX.filter(([k]) => EXTRAS[k]).map(([k, icon, name, sub]) => `<div class="card"><div class="ic">${icon}</div><b>${esc(EXTRAS[k].name || name)}</b><p class="small muted" style="margin:0">${fmt(EXTRAS[k].price)} ${sub}</p></div>`).join('') || '<p class="muted">No extras right now.</p>';
 
 parks(); fillSessions(); sessCards();
-addEventListener('load', drawMap);

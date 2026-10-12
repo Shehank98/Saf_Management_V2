@@ -18,7 +18,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="/assets/customer.css">
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/assets/pwa.css">
 <style>
 
@@ -130,8 +129,8 @@ footer{padding:50px 0 120px;color:var(--muted);font-size:13px;text-align:center}
   </div>
 </div>
 <main class="wrap">
-<section><h2>Choose your park</h2><p class="muted">Every park has its own pickup area. Pickup is free within the ring on the map.</p>
-  <div class="parks"><div class="pmap" id="pmap" role="img" aria-label="Map of Sri Lanka with our safari parks"></div><div class="plist" id="parks"></div></div></section>
+<section><h2>Choose your park</h2><p class="muted">Free hotel pickup near each park. You drop a pin on your hotel when you book.</p>
+  <div class="plist" id="parks" style="margin-top:14px;max-width:760px"></div></section>
 <section><h2>Sessions</h2><p class="muted" id="sessNote">Price is per seat. A shared jeep takes up to <span data-cfg="sharedSeats">6</span> guests.</p><div class="grid g3 sess" id="sessCards" style="margin-top:14px"></div></section>
 <section><h2>How shared safaris work</h2>
   <div class="steps4">
@@ -140,7 +139,6 @@ footer{padding:50px 0 120px;color:var(--muted);font-size:13px;text-align:center}
     <div class="card"><b>Pay securely</b><p class="small muted">Pay by card on a secure page, or reserve now and pay when the jeep fills up.</p></div>
     <div class="card"><b>Get your e-ticket</b><p class="small muted">Once <span data-cfg="minSeats">4</span> seats are paid the safari is on and your QR ticket is emailed. Not enough people? Full refund.</p></div>
   </div></section>
-<section><h2>Add to your safari</h2><div class="extras3" id="extras"></div></section>
 <section><h2>Good to know</h2><div style="margin-top:14px">
   <details><summary>When is the shared jeep confirmed?</summary><p>As soon as <span data-cfg="minSeats">4</span> seats are paid. Everyone on the jeep gets their QR e-ticket by email at that moment.</p></details>
   <details><summary>What if not enough people book?</summary><p>If a jeep doesn't reach <span data-cfg="minSeats">4</span> paid seats before the deadline, it is cancelled and every payment is refunded in full.</p></details>
@@ -154,8 +152,6 @@ footer{padding:50px 0 120px;color:var(--muted);font-size:13px;text-align:center}
 <script defer src="/api/config.js"></script>
 <script defer src="/assets/core.js"></script>
 <script defer src="/assets/customer.js"></script>
-<script defer src="/vendor/leaflet/leaflet.js"></script>
-<script defer src="/assets/map.js"></script>
 <script defer src="/assets/pages/landing.js"></script>
 </body>
 </html>

@@ -164,13 +164,102 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
   const blocked = startBlock(actor, drv0);
   if (blocked) return blocked;
   if (t0.date !== today && !force) return warn('! Different day', `This ticket is for ${U.niceDate(t0.date)} (${session.short}).`, { canForce: true });
-  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(t0.started_at ? U.hhmm(t0.started_at) : null), mealsText: '', driver: drv0 ? drv0.name : '', plate: drv0 ? drv0.plate || '' : '' }, tripRunning: t0.status === 'STARTED' };
+  if (preview) return { kind: 'ready', action: 'board', title: 'Ready to board', info: { ...info(t0.started_at ? U.hhmm(t0.started_at) : null), mealsText: '', driver: drv0 ? drv0.name : '', plate: drv0 ? drv0.plate || '' : '' }, tripRunning: t0.status === 'STARTED' };
 
-  const res = await tx(async db => {
+  // Shared jeeps pick up several groups: scanning a ticket marks that group ON BOARD.
+  // The safari itself starts when the driver taps "Start the safari" (startShared).
+  const boarded = await tx(async db => {
     const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1 FOR UPDATE', [t0.id])).rows[0];
+    if (startBlock(actor, await currentDriver('shared_trip_id', t.id))) throw U.forbidden('Only the assigned driver can board guests on this trip.');
+    await adoptRole(db, actor, 'shared_trip_id', t.id, null, conf, t.session_id, 1);
+    await db.query(`UPDATE shared_seats SET checked_in_at=now() WHERE trip_id=$1 AND code=$2 AND checked_in_at IS NULL`, [t.id, s0.code]);
+    if (t.next_code === s0.code) await db.query(`UPDATE shared_trips SET next_code=NULL, next_at=NULL WHERE id=$1`, [t.id]);
+    await activity.log(db, 'trip', t.id, `${s0.name} on board (seat ${seats.map(s => s.seat_no).join(', ')})${t.status === 'STARTED' ? '' : ' · pickup run'}`, actor.name);
+    db.after(() => live.publish('shared', { id: t.id }));
+    return (await pickupRun(db, t.id));
+  });
+  const left = boarded.groups.filter(g => !g.boarded).length;
+  const running = t0.status === 'STARTED';
+  return { kind: 'ok', boarded: true, title: running ? 'On board' : `On board · ${left ? left + ' more to pick up' : 'everyone is on board'}`,
+    info: { ...info(running ? U.hhmm(t0.started_at) : null, U.hhmm(new Date())), left, running, tripId: t0.id } };
+}
+
+/** Everything the driver needs for the pickup run of a shared jeep: groups, pins, who is on board, who is next. */
+async function pickupRun(db, tripId) {
+  const conf = await settings.load();
+  const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1', [tripId])).rows[0];
+  if (!t) throw U.notFound('Trip not found');
+  const L = settings.locOf(conf, t.location_id), s = settings.sessionAt(conf, t.location_id, t.session_id);
+  const seats = (await db.query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND status='PAID' ORDER BY seat_no`, [tripId])).rows;
+  const by = new Map();
+  for (const x of seats) {
+    if (!by.has(x.code)) by.set(x.code, { code: x.code, name: x.name, phone: `${x.phone_cc} ${x.phone}`.trim(), seats: [], hotel: x.hotel_name || '', lat: x.pickup_lat, lng: x.pickup_lng, km: x.pickup_km == null ? null : +x.pickup_km, boarded: true });
+    const g = by.get(x.code); g.seats.push(x.seat_no); if (!x.checked_in_at) g.boarded = false;
+  }
+  const groups = [...by.values()].map(g => ({ ...g, people: g.seats.length, next: t.next_code === g.code }));
+  // Suggested order: nearest to the base first is not always best, so we just sort far → near from the base (finish close to the park).
+  groups.sort((a, b) => (b.km ?? -1) - (a.km ?? -1));
+  return { id: t.id, status: t.status, date: t.date, session: { name: s.name, short: s.short, pickup: s.pickup, time: s.time },
+    base: L ? { lat: L.lat, lng: L.lng, name: L.name, office: L.office } : null, groups, next: t.next_code,
+    started: t.status === 'STARTED', startedAt: t.started_at ? U.hhmm(t.started_at) : null };
+}
+
+/** Driver authority for a shared trip (assigned driver, temporary link holder, or the office). */
+async function runAuth(tripId, actor) {
+  const conf = await settings.load();
+  const t = (await query('SELECT * FROM shared_trips WHERE id=$1', [U.normCode(tripId)])).rows[0];
+  if (!t) throw U.notFound('Trip not found');
+  if (actor.kind === 'TEMP' && actor.tempTrip !== t.id) throw U.forbidden('This is not your trip.');
+  const blocked = startBlock(actor, await currentDriver('shared_trip_id', t.id));
+  if (blocked) throw U.forbidden(blocked.msg);
+  return { t, conf };
+}
+
+/** Driver picks who to collect next: that guest is told the driver is on the way. */
+async function setNext(tripId, code, actor) {
+  const { t, conf } = await runAuth(tripId, actor);
+  if (['STARTED', 'COMPLETED', 'CANCELLED'].includes(t.status)) throw U.conflict('The pickup run is over for this trip.');
+  const g = (await query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND code=$2 AND status='PAID' ORDER BY seat_no`, [t.id, U.normCode(code)])).rows;
+  if (!g.length) throw U.notFound('Guest not found on this trip');
+  if (g.every(x => x.checked_in_at)) throw U.conflict(`${g[0].name} is already on board.`);
+  await tx(async db => {
+    await db.query(`UPDATE shared_trips SET next_code=$2, next_at=now() WHERE id=$1`, [t.id, g[0].code]);
+    await activity.log(db, 'trip', t.id, `Driver on the way to ${g[0].name}${g[0].hotel_name ? ' (' + g[0].hotel_name + ')' : ''}`, actor.name);
+    if (g[0].email) {
+      const drv = await currentDriver('shared_trip_id', t.id);
+      const base = settings.baseUrl(conf), session = settings.sessionAt(conf, t.location_id, t.session_id);
+      await notify.send(db, 'cust_driver_next', T.cust_driver_next({ name: g[0].name, driver: drv ? drv.name : '', plate: drv ? drv.plate : '', trackUrl: require('../lib/qr').ticketLink(base, g[0].code), session, hotel: g[0].hotel_name }, { conf, base }), { to: g[0].email, entity: 'trip', entityId: t.id });
+    }
+    db.after(() => live.publish('shared', { id: t.id }));
+  });
+  return pickupRun({ query }, t.id);
+}
+
+/** The driver's phone shares its position while it is on the way to the next guest. */
+async function driverLocation(tripId, { lat, lng }, actor) {
+  const { t } = await runAuth(tripId, actor);
+  lat = +lat; lng = +lng;
+  if (!isFinite(lat) || !isFinite(lng) || !U.inSriLanka(lat, lng)) throw U.bad('Location outside Sri Lanka');
+  if (['COMPLETED', 'CANCELLED'].includes(t.status)) return { ok: false };
+  await query(`UPDATE shared_trips SET drv_lat=$2, drv_lng=$3, drv_at=now() WHERE id=$1`, [t.id, lat, lng]);
+  return { ok: true };
+}
+
+/** "Start the safari": everyone (or everyone the driver could find) is on board. */
+async function startShared(tripId, actor, { force = false } = {}) {
+  const { conf } = await runAuth(tripId, actor);
+  const run0 = await pickupRun({ query }, U.normCode(tripId));
+  const onBoard = run0.groups.filter(g => g.boarded);
+  if (!onBoard.length) throw U.conflict('Scan at least one guest on board first.');
+  const missing = run0.groups.filter(g => !g.boarded);
+  if (missing.length && !force) throw U.conflict(`${missing.map(g => g.name).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not on board yet. Start anyway?`, { missing: missing.map(g => g.name), canForce: true });
+  const res = await tx(async db => {
+    const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1 FOR UPDATE', [run0.id])).rows[0];
+    if (t.status === 'STARTED') return t;
+    if (['COMPLETED', 'CANCELLED'].includes(t.status)) throw U.conflict('This trip is closed.');
+    const s0 = { name: onBoard[0].name };
     let startedNow = false;
-    if (startBlock(actor, await currentDriver('shared_trip_id', t.id))) throw U.forbidden('Only the assigned driver can start this trip.');
-    if (!['STARTED'].includes(t.status)) {
+    {
       await adoptRole(db, actor, 'shared_trip_id', t.id, null, conf, t.session_id, 1);
       const jeep = await partnerFor(db, 'shared_trip_id', t.id, 'JEEP');
       const guide = await partnerFor(db, 'shared_trip_id', t.id, 'GUIDE');
@@ -182,10 +271,9 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
       if (mealN) lines.push({ partner: mealPartner ? mealPartner.partner_id : await defaultMealSupplier(db), role: 'MEALS', qty: mealN, amount: mealN * c.mealCost });
       await insertLines(db, lines, { tripId: t.id, code: t.id, date: t.date, sessionId: t.session_id });
       await db.query(`UPDATE shared_trips SET status='STARTED', started_at=now(), started_by=$2 WHERE id=$1`, [t.id, actor.name]);
-      await activity.log(db, 'trip', t.id, `Trip started (first ticket scanned: ${s0.name}) · guests emailed`, actor.name);
+      await activity.log(db, 'trip', t.id, `Safari started (${onBoard.length} group${onBoard.length > 1 ? 's' : ''} on board${missing.length ? ', ' + missing.length + ' not picked up' : ''}) · guests emailed`, actor.name);
       startedNow = true;
     }
-    await db.query(`UPDATE shared_seats SET checked_in_at=now() WHERE trip_id=$1 AND code=$2 AND checked_in_at IS NULL`, [t.id, s0.code]);
     const cur = (await db.query('SELECT * FROM shared_trips WHERE id=$1', [t.id])).rows[0];
     db.after(async () => {
       if (startedNow) {
@@ -195,9 +283,10 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
       }
       live.publish('started', { code: t.id, name: s0.name, at: U.hhmm(cur.started_at), by: actor.name, shared: true });
     });
+    await db.query(`UPDATE shared_trips SET next_code=NULL, next_at=NULL WHERE id=$1`, [t.id]);
     return cur;
   });
-  return { kind: 'ok', title: 'Trip started', info: info(U.hhmm(res.started_at), U.hhmm(new Date())) };
+  return { ok: true, startedAt: res.started_at ? U.hhmm(res.started_at) : null };
 }
 
 /** Partner (or office) taps "Trip finished". */
@@ -248,4 +337,4 @@ async function autoComplete() {
   return n;
 }
 
-module.exports = { checkin, finish, autoComplete, completeShared };
+module.exports = { checkin, finish, autoComplete, completeShared, pickupRun, setNext, driverLocation, startShared };

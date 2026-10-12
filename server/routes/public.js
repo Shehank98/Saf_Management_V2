@@ -167,8 +167,26 @@ r.get('/ticket/:code', limits.lookup, U.wrap(async (req, res) => {
     kind: 'shared', code, trip: t.id, date: t.date, ses: t.session_id, name: seats[0].name, seats: seats.map(s => s.seat_no), ok,
     started: ['STARTED', 'COMPLETED'].includes(t.status), startedAt: t.started_at ? U.hhmm(t.started_at) : '', done: t.status === 'COMPLETED', staff,
     rawStatus: t.status, paidSeats: seats.filter(s => s.status === 'PAID').length, minSeats: t.min_seats,
+    pickup: await pickupFor(t, seats),
   });
 }));
+
+/** What a shared-trip guest sees about their pickup: on board, next, and where the driver is (only while they are next). */
+async function pickupFor(t, seats) {
+  if (t.status !== 'CONFIRMED' && t.status !== 'FULL' && t.status !== 'LINKS_SENT' && t.status !== 'OPEN') return null;
+  const onBoard = seats.every(x => x.checked_in_at);
+  const next = !onBoard && t.next_code === seats[0].code;
+  const fresh = t.drv_at && Date.now() - new Date(t.drv_at).getTime() < 10 * 60e3;
+  let driver = null;
+  if (next) {
+    const d = (await query(`SELECT p.name, COALESCE(a.vehicle_plate, p.vehicle_plate) AS plate FROM assignments a JOIN partners p ON p.id=a.partner_id WHERE a.shared_trip_id=$1 AND a.role='JEEP' AND a.status<>'DECLINED' ORDER BY a.id DESC LIMIT 1`, [t.id])).rows[0];
+    const td = (await query(`SELECT name, plate FROM temp_drivers WHERE shared_trip_id=$1 AND revoked_at IS NULL AND expires_at > now() ORDER BY id DESC LIMIT 1`, [t.id])).rows[0];
+    driver = td || d || null;
+  }
+  const s0 = seats[0];
+  return { onBoard, next, driver, me: s0.pickup_lat != null ? { lat: s0.pickup_lat, lng: s0.pickup_lng, hotel: s0.hotel_name } : null,
+    pos: next && fresh ? { lat: t.drv_lat, lng: t.drv_lng, at: U.hhmm(t.drv_at) } : null };
+}
 
 /* ---------------- Shared trips (link only) ---------------- */
 /**
@@ -320,6 +338,21 @@ r.post('/drive/:token/checkin', limits.api, U.wrap(async (req, res) => {
   const out = await require('../services/trips').checkin({ code, sig, force: !!req.body.force, preview: !!req.body.preview, actor: require('../services/tempDrivers').actorFor(d.temp) });
   if (out.kind === 'ok') await query('UPDATE temp_drivers SET used_at=COALESCE(used_at, now()) WHERE id=$1', [d.temp.id]);
   res.set('Cache-Control', 'no-store').json(out);
+}));
+const tripsSvc = () => require('../services/trips');
+const tempActor = d => require('../services/tempDrivers').actorFor(d.temp);
+r.get('/drive/:token/run', limits.lookup, U.wrap(async (req, res) => {
+  const d = await driveLink(req);
+  if (d.trip.kind !== 'shared') return res.json(null);
+  res.set('Cache-Control', 'no-store').json(await tripsSvc().pickupRun({ query }, d.trip.code));
+}));
+r.post('/drive/:token/next', limits.api, U.wrap(async (req, res) => { const d = await driveLink(req); res.json(await tripsSvc().setNext(d.trip.code, req.body.code, tempActor(d))); }));
+r.post('/drive/:token/location', limits.api, U.wrap(async (req, res) => { const d = await driveLink(req); res.json(await tripsSvc().driverLocation(d.trip.code, req.body, tempActor(d))); }));
+r.post('/drive/:token/start', limits.api, U.wrap(async (req, res) => {
+  const d = await driveLink(req);
+  const out = await tripsSvc().startShared(d.trip.code, tempActor(d), { force: !!req.body.force });
+  await query('UPDATE temp_drivers SET used_at=COALESCE(used_at, now()) WHERE id=$1', [d.temp.id]);
+  res.json(out);
 }));
 r.post('/drive/:token/finish', limits.api, U.wrap(async (req, res) => {
   const d = await driveLink(req);

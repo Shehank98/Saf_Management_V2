@@ -46,16 +46,24 @@ function open(id) {
     <div class="sec-t">Rules for this trip</div><dl class="dl"><dt>Price</dt><dd>${fmt(t.price)} per seat</dd><dt>Min. to run</dt><dd>${t.minSeats} paid seats</dd><dt>Auto-cancel</dt><dd>${shortDate(t.deadline)}, ${t.deadlineTime} if under ${t.minSeats} paid</dd></dl>
     <div class="sec-t">Activity</div><ul class="log" id="log"><li class="muted">Loading…</li></ul>
   </div>
-  <div class="df">${!locked && st !== 'Started' ? `<button class="btn" id="remind" ${t.seats.some(x => x.pay !== 'Paid') ? '' : 'disabled'}>Send payment reminders</button><button class="btn danger" id="cx">Cancel trip</button>` : ''}</div>`);
+  <div class="df">${!locked && st !== 'Started' && t.seats.some(x => x.pay === 'Paid') ? `<button class="btn" id="runBtn">Pickup run</button>` : ''}${!locked && st !== 'Started' ? `<button class="btn" id="remind" ${t.seats.some(x => x.pay !== 'Paid') ? '' : 'disabled'}>Send payment reminders</button><button class="btn danger" id="cx">Cancel trip</button>` : ''}</div>`);
   GET(`/api/admin/activity?entity=trip&id=${encodeURIComponent(id)}`).then(rows => { const l = $('#log'); if (l && openId === id) l.innerHTML = rows.map(r => `<li>${esc(r.msg)}<span>${shortDate(r.d)} ${r.t}</span></li>`).join('') || '<li class="muted">No activity yet</li>' }).catch(() => { });
   $('#cp').onclick = () => { navigator.clipboard?.writeText(tripLink(t)).catch(() => { }); toast('Link copied') };
   const sv = async () => { await act(() => POST(`/api/admin/shared/${id}/assign`, { jeep: $('#vJ').value, guide: $('#vG').value }), 'Saved · partner notified by email'); list(); open(id) };
   $('#vJ').onchange = sv; $('#vG').onchange = sv; wireHandover(t, { trip: id }, () => { list(); open(id) });
   $$('.st').forEach(b => b.onclick = () => seat(t, +b.dataset.n));
+  const rb = $('#runBtn'); if (rb) rb.onclick = () => openRun(id);
   const r = $('#remind'); if (r) r.onclick = () => act(async () => POST(`/api/admin/shared/${id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, r);
   const c = $('#cx');
   if (c) c.onclick = () => { openModal(`<h3>Cancel ${t.id}?</h3><p class="muted" style="margin-top:8px">All ${t.seats.length} guests are emailed and the ${p} paid seat${p === 1 ? '' : 's'} (${fmt(p * t.price)}) are refunded in full.</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" data-close>Back</button><button class="btn" id="cOk" style="background:var(--bad);border-color:var(--bad);color:#fff">Cancel trip</button></div>`);
     $('#cOk').onclick = async e => { if (await act(() => POST(`/api/admin/shared/${id}/cancel`), 'Trip cancelled · guests emailed · refunds started', e.target)) { closeModal(); list(); open(id) } } };
+}
+async function openRun(id) {
+  let run; try { run = await GET(`/api/admin/shared/${encodeURIComponent(id)}/run`) } catch (e) { return toastErr(e) }
+  openModal(`<div style="display:flex;justify-content:space-between;align-items:center"><span class="small muted">The driver normally runs this from their phone.</span><button class="btn sm" data-close>Close</button></div>${pickupRunHTML(run)}`);
+  const base = `/api/admin/shared/${encodeURIComponent(id)}`;
+  wirePickupRun(run, { next: () => Promise.reject(new Error('Only the driver can do this from their phone.')), start: force => POST(base + '/start', { force }), scan: () => { location.href = '/admin/check-in' }, refresh: async () => { await reload(); list(); openRun(id) } });
+  $$('#modalBody [data-next]').forEach(b => b.remove());
 }
 function seat(t, n) {
   const x = t.seats.find(y => y.n === n), id = t.id;
