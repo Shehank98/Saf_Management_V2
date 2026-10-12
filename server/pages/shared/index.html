@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Shared safari trips</title>
+<title>Choose your safari date</title>
 <meta name="theme-color" content="#c0682a">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
@@ -39,20 +39,22 @@
 .seg{display:inline-flex;background:var(--sand);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex-wrap:wrap}
 .seg button{border:0;background:transparent;padding:8px 12px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.pickrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}.pickrow .lbl{display:block;margin-bottom:4px;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.jrow{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
 </style>
 </head>
 <body>
 <main class="wrap">
   <div style="max-width:860px;margin:0 auto;padding:64px 0 60px">
-    <div class="head fade"><h1>Shared safari trips</h1><p>Join a shared jeep and split the cost. Pick any open date and session. A shared jeep goes ahead once <span data-cfg="minSeats">4</span> seats are paid; if it doesn't, you get a full refund.</p></div>
-    <div class="fade" style="margin:14px 0 12px"><span class="small muted" style="margin-right:8px">Session:</span><div class="seg" id="sesSeg"></div></div>
+    <div class="head fade"><h1>Choose your date</h1><p>Join a shared jeep and split the cost. A shared jeep goes ahead once <span data-cfg="minSeats">4</span> seats are paid; if it doesn't, you get a full refund.</p></div>
+    <div class="pickrow fade" style="margin:14px 0 12px"><div id="locWrap"><span class="small muted lbl">Park</span><div class="seg" id="locSeg"></div></div><div><span class="small muted lbl">Session</span><div class="seg" id="sesSeg"></div></div></div>
     <div class="card fade">
       <div class="calhead"><h3 id="mon"></h3><div class="nav"><button id="prev" aria-label="Previous month">‹</button><button id="nxt" aria-label="Next month">›</button></div></div>
       <div class="cal" id="cal"></div>
       <p class="tiny muted" style="margin:12px 0 0">Every open date shows how many seats are free. <span style="color:var(--ok);font-weight:700">Going</span> = 4 or more seats are booked on a jeep. Hatched days are closed or not open yet.</p>
     </div>
     <div id="detail" style="margin-top:14px"></div>
-    <p class="small muted" style="margin-top:18px">Want your own jeep instead? <a href="/book/session"><b>Book a private safari</b></a>.</p>
+    <p class="small muted" style="margin-top:18px" id="privLink" hidden>Want your own jeep instead? <a href="/book/session"><b>Book a private safari</b></a>.</p>
   </div>
 </main>
 

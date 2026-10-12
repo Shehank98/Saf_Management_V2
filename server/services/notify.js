@@ -70,7 +70,7 @@ async function cancelled(db, b, { refund, pct, by }) {
 async function reminder(db, b) {
   const c = await ctx(), v = await bookingView(db, b, c);
   const a = await db.query(
-    `SELECT a.role, p.name, p.phone, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
+    `SELECT a.role, p.name, p.phone, COALESCE(a.vehicle_plate, p.vehicle_plate) AS vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
       WHERE a.booking_id=$1 AND a.status<>'DECLINED'`, [b.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
   await send(db, 'cust_reminder', T.cust_reminder(v, { driver: jeep && jeep.name, driverPhone: jeep && jeep.phone, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c),
@@ -80,7 +80,7 @@ async function reminder(db, b) {
 async function started(db, b, { startedAt, by }) {
   const c = await ctx(), v = await bookingView(db, b, c);
   const a = await db.query(
-    `SELECT a.role, p.name, p.phone, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
+    `SELECT a.role, p.name, p.phone, COALESCE(a.vehicle_plate, p.vehicle_plate) AS vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id
       WHERE a.booking_id=$1 AND a.status<>'DECLINED'`, [b.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
   await send(db, 'cust_started', T.cust_started(v, { startedAt, driver: jeep && jeep.name, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c), { to: v.email, entity: 'booking', entityId: v.code });
@@ -100,17 +100,26 @@ async function jobOffer(db, partner, { role, fee, booking, trip, aid }) {
     const v = await bookingView(db, booking, c);
     j = { code: v.code, date: v.date, session: v.session, roleLabel, pickupWhere: v.pickupWhere, guests: v.guests, leadName: v.name, phone: v.phone, mealsText: v.mealsText, collect: v.total - v.paid, fee, aid };
   } else {
-    const session = c.conf.sessions[trip.session_id];
+    const session = require("../lib/settings").sessionAt(c.conf, trip.location_id, trip.session_id);
     j = { code: trip.id, date: trip.date, session, roleLabel, pickupWhere: 'several hotels (shared jeep)', guests: trip.heldCount || 0, fee, aid };
   }
   await send(db, 'vendor_job', T.vendor_job(j, c), { to: partner.email, entity: 'partner', entityId: partner.id });
+  require('../lib/push').toPartner(partner.id, { title: `New job · ${j.session.short} ${j.date}`, body: `${roleLabel} · ${j.code} · fee LKR ${Number(fee || 0).toLocaleString('en-US')}. Tap to accept.`, tag: 'job-' + j.code });
 }
 
-module.exports = { ctx, bookingView, send, toCompany, newRequest, confirmed, declined, cancelled, reminder, started, thanks, jobOffer, qrInline };
+/** A job (and its vehicle) was handed to another partner: they hold it now and can start the trip. */
+async function handover(db, partner, { role, fee, code, date, session, from, plate }) {
+  const c = await ctx();
+  const roleLabel = { JEEP: 'Jeep + driver', GUIDE: 'Tracker / guide', MEALS: 'Meal supplier' }[role];
+  await send(db, 'vendor_job', T.vendor_handover({ code, date, session, roleLabel, fee, from, plate }, c), { to: partner.email, entity: 'partner', entityId: partner.id });
+  require('../lib/push').toPartner(partner.id, { title: `Job handed to you · ${session.short} ${date}`, body: `${from} gave you ${code}${plate ? ' (vehicle ' + plate + ')' : ''}. You can start the trip.`, tag: 'job-' + code });
+}
+
+module.exports = { ctx, bookingView, send, toCompany, newRequest, confirmed, declined, cancelled, reminder, started, thanks, jobOffer, handover, qrInline };
 
 /* ---- Shared trips: started / thanks go to every paid guest ---- */
 async function sharedGuests(db, trip, c) {
-  const session = c.conf.sessions[trip.session_id];
+  const session = require("../lib/settings").sessionAt(c.conf, trip.location_id, trip.session_id);
   const seats = (await db.query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND status='PAID' AND email IS NOT NULL ORDER BY seat_no`, [trip.id])).rows;
   const groups = new Map();
   seats.forEach(s => { if (!groups.has(s.code)) groups.set(s.code, s); });
@@ -121,7 +130,7 @@ async function sharedGuests(db, trip, c) {
 }
 async function sharedStarted(db, trip, { startedAt }) {
   const c = await ctx();
-  const a = await db.query(`SELECT a.role, p.name, p.vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id WHERE a.shared_trip_id=$1 AND a.status<>'DECLINED'`, [trip.id]);
+  const a = await db.query(`SELECT a.role, p.name, COALESCE(a.vehicle_plate, p.vehicle_plate) AS vehicle_plate FROM assignments a JOIN partners p ON p.id=a.partner_id WHERE a.shared_trip_id=$1 AND a.status<>'DECLINED'`, [trip.id]);
   const jeep = a.rows.find(x => x.role === 'JEEP'), guide = a.rows.find(x => x.role === 'GUIDE');
   for (const g of await sharedGuests(db, trip, c))
     await send(db, 'cust_started', T.cust_started(g, { startedAt, driver: jeep && jeep.name, plate: jeep && jeep.vehicle_plate, tracker: guide && guide.name }, c), { to: g.email, entity: 'trip', entityId: trip.id });

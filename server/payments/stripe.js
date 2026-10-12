@@ -22,7 +22,7 @@ async function call(method, path, params) {
 
 module.exports = {
   id: 'stripe',
-  label: 'Credit / debit card (Stripe)',
+  label: 'International cards (Stripe)',
   configured: () => !!config.stripeSecretKey,
 
   async createCheckout({ payment, description, successUrl, cancelUrl, customerEmail }) {

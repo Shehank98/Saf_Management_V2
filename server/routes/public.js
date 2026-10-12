@@ -70,6 +70,7 @@ async function authorizedBooking(req) {
 
 r.post('/bookings', limits.booking, U.wrap(async (req, res) => {
   const body = { ...(req.body || {}) };
+  if (!(await settings.load()).features.private) throw U.conflict('Private safaris are not taken online right now. Please book a shared safari.');
   const enabled = providers.enabled();
   // Every private safari needs the deposit online. Only while no payment gateway is connected yet does it fall back to a request.
   body.pay = enabled.length ? 'deposit' : 'later';
@@ -179,18 +180,21 @@ r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
   if (!/^\d{4}-\d{2}$/.test(month)) throw U.bad('Bad month');
   const ses = String(req.query.session || '');
   const conf = await settings.load();
-  const s = conf.sessions[ses];
-  if (!s || !s.active) throw U.bad('Unknown session');
+  const loc = conf.locations[String(req.query.loc || '')] ? String(req.query.loc) : conf.defaultLoc;
+  const L = conf.locations[loc];
+  const s = settings.sessionAt(conf, loc, ses);
+  if (!L || !L.active) throw U.bad('Unknown park');
+  if (!s || !s.active) throw U.bad('That session is not running at this park.');
   const first = month + '-01', last = U.addDays(U.addMonths(first, 1), -1);
   const db = { query };
-  const usage = await avail.usageRange(db, first, last);
+  const usage = await avail.usageRange(db, first, last, loc);
   const rows = (await query(
     `SELECT t.id, t.date, t.seat_price, t.seats, t.min_seats,
             COUNT(x.*) FILTER (WHERE x.status IN ('RESERVED','PAYMENT_PENDING','PAID'))::int AS held,
             COUNT(x.*) FILTER (WHERE x.status = 'PAID')::int AS paid
        FROM shared_trips t LEFT JOIN shared_seats x ON x.trip_id=t.id
-      WHERE t.date BETWEEN $1 AND $2 AND t.session_id=$3 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL')
-      GROUP BY t.id ORDER BY t.date, t.created_at, t.id`, [first, last, ses])).rows;
+      WHERE t.date BETWEEN $1 AND $2 AND t.session_id=$3 AND t.location_id=$4 AND t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL')
+      GROUP BY t.id ORDER BY t.date, t.created_at, t.id`, [first, last, ses, loc])).rows;
   const byDate = {};
   rows.forEach(t => (byDate[t.date] = byDate[t.date] || []).push(t));
   const days = {};
@@ -198,27 +202,32 @@ r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
   for (let d = first; d <= last; d = U.addDays(d, 1)) {
     if (avail.dateBlocked(d, s, conf, now) && !(byDate[d] || []).length) continue;
     const trips = (byDate[d] || []).map((t, i) => ({ id: t.id, jeepNo: i + 1, free: t.seats - t.held, held: t.held, paid: t.paid, seatsMax: t.seats, minSeats: t.min_seats, ready: t.held >= t.min_seats, confirmed: t.paid >= t.min_seats, full: t.held >= t.seats }));
-    const canOpenNew = U.localDate(d, s.start).getTime() - now >= cutoff && avail.jeepsFree(usage, d, ses, conf.rules.fleet) >= 1;
+    const canOpenNew = U.localDate(d, s.start).getTime() - now >= cutoff && avail.jeepsFree(usage, d, ses, L.fleet) >= 1;
     const openTrip = trips.find(t => !t.full);
     if (!openTrip && !canOpenNew) { if (trips.length) days[d] = { state: 'full', trips }; continue; }
     days[d] = { canOpenNew, state: trips.some(t => t.ready) ? 'ready' : 'available', price: s.seat, seatsMax: conf.shared.seats, minSeats: conf.shared.minSeats, free: openTrip ? openTrip.free : conf.shared.seats, trips };
   }
-  res.set('Cache-Control', 'no-store').json({ days, price: s.seat });
+  res.set('Cache-Control', 'no-store').json({ days, price: s.seat, loc });
 }));
 
 /** The guest tapped "Choose seats": find (or open) the jeep to book on. */
 r.post('/shared-trips/open', limits.booking, U.wrap(async (req, res) => {
   const date = String(req.body.date || ''), ses = String(req.body.ses || '');
   if (!U.isDate(date)) throw U.bad('Pick a date.');
-  const t = await shared.openJeep(date, ses, { fresh: !!req.body.fresh });
+  const t = await shared.openJeep(date, ses, { fresh: !!req.body.fresh, loc: String(req.body.loc || '') });
   if (!t) throw U.conflict('Sorry, every shared jeep for that session is full or closed.');
   res.json({ id: t.id });
 }));
 
 r.get('/shared/:id', limits.lookup, U.wrap(async (req, res) => {
-  const v = await shared.publicView(req.params.id);
+  const v = await shared.publicView(req.params.id, String(req.query.token || ''));
   if (!v) return res.status(404).json({ invalid: true, error: "This link isn't valid" });
   res.set('Cache-Control', 'no-store').json(v);
+}));
+
+/** Lock / unlock one seat for 15 minutes while this browser is choosing (so two people can't pick the same seat). */
+r.post('/shared/:id/hold', limits.api, U.wrap(async (req, res) => {
+  res.json(await shared.holdSeat(req.params.id, req.body.seat, req.body.token, req.body.on !== false));
 }));
 
 r.post('/shared/:id/seats', limits.booking, U.wrap(async (req, res) => {
@@ -274,7 +283,7 @@ r.post('/shared/:id/pay', limits.booking, U.wrap(async (req, res) => {
   const base = await siteUrl(), code = U.normCode(req.body.code), k = secrets.sign(code);
   const url = await paymentsSvc.launch(payment, {
     description: `Shared safari ${info.trip.id}`, successUrl: `${base}/s/${info.trip.id}?done=${code}&k=${k}`, cancelUrl: `${base}/s/${info.trip.id}?pay=${code}&k=${k}`,
-    customer: { name: info.name, email: '', phone: '' },
+    customer: { name: info.name, email: info.email, phone: info.phone },
   });
   res.json({ checkoutUrl: url });
 }));

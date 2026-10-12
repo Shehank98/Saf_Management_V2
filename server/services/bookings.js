@@ -36,7 +36,7 @@ function cleanInput(raw, conf, { admin = false } = {}) {
     lat: raw.lat != null && raw.lat !== '' ? +raw.lat : null, lng: raw.lng != null && raw.lng !== '' ? +raw.lng : null,
     meals: raw.meals === 1 || raw.meals === '1' || raw.meals === true, mealPrefs: Array.isArray(raw.mealPrefs) ? raw.mealPrefs : [],
     allergy: String(raw.allergy || '').trim().slice(0, 300),
-    bino: raw.bino === 1 || raw.bino === '1' || raw.bino === true, cam: raw.cam === 1 || raw.cam === '1' || raw.cam === true,
+    bino: raw.bino === 1 || raw.bino === '1' || raw.bino === true, guide: raw.guide === 1 || raw.guide === '1' || raw.guide === true, cam: raw.cam === 1 || raw.cam === '1' || raw.cam === true,
     notes: String(raw.notes || '').trim().slice(0, 600),
     pay: ['deposit', 'card', 'later'].includes(raw.pay) ? raw.pay : 'deposit',
   };
@@ -67,10 +67,10 @@ async function create(raw, { admin = null, providerId = null } = {}) {
     let a;
     if (admin && !admin.enforceLead) {
       a = { closed: d.date < U.todayStr(), reason: 'Past' };
-      if (!a.closed) { const u = await avail.usageRange(db, d.date, d.date); a = { closed: false, jeeps: avail.jeepsFree(u, d.date, d.sessionId, conf.rules.fleet) }; }
+      if (!a.closed) { const u = await avail.usageRange(db, d.date, d.date, conf.defaultLoc); a = { closed: false, jeeps: avail.jeepsFree(u, d.date, d.sessionId, settings.fleetOf(conf, conf.defaultLoc)) }; }
     } else a = await avail.dayAvailability(db, d.date, d.sessionId, conf);
     if (a.closed) throw U.conflict('That date is no longer available.' + (a.reason ? ` (${a.reason})` : ''));
-    const calc = pricing.calcBooking({ session: d.ses, guests: d.guests, meals: d.meals, mealPrefs: d.mealPrefs, bino: d.bino, cam: d.cam }, conf);
+    const calc = pricing.calcBooking({ session: d.ses, guests: d.guests, meals: d.meals, mealPrefs: d.mealPrefs, bino: d.bino, cam: d.cam, guide: d.guide }, conf);
     if (calc.jeeps > a.jeeps) throw U.conflict(a.jeeps === 0 ? 'Sorry, that session just sold out.' : `Only ${a.jeeps} jeep${a.jeeps > 1 ? 's' : ''} left for that session (up to ${a.jeeps * conf.rules.maxPerJeep} people).`);
 
     let status, holdUntil = null;
@@ -84,11 +84,11 @@ async function create(raw, { admin = null, providerId = null } = {}) {
       try {
         const r = await db.query(
           `INSERT INTO bookings(code, session_id, date, guests, children, jeeps, pickup_mode, hotel_name, pickup_lat, pickup_lng, pickup_km,
-             lead_name, phone_cc, phone, email, notes, allergy_note, has_meals, has_bino, has_cam, pay_option, total, status, hold_until, created_by)
-           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING *`,
+             lead_name, phone_cc, phone, email, notes, allergy_note, has_meals, has_bino, has_cam, pay_option, total, status, hold_until, created_by, has_guide, location_id)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING *`,
           [code, d.sessionId, d.date, d.guests, d.children, calc.jeeps, d.pmode, d.pmode === 'HOTEL' ? d.hotel : null, d.lat, d.lng, pickupKm,
             d.name, d.cc, d.phone, d.email, d.notes || null, d.allergy || null, d.meals, calc.bino > 0, calc.cam > 0, PAY_OPTION[pay], calc.total, status, holdUntil,
-            admin ? 'ADMIN' : 'WEB']);
+            admin ? 'ADMIN' : 'WEB', calc.guide > 0, conf.defaultLoc]);
         row = r.rows[0]; break;
       } catch (e) { if (e.code !== '23505') throw e; }
     }
@@ -99,6 +99,7 @@ async function create(raw, { admin = null, providerId = null } = {}) {
     if (calc.mealN) await db.query(`INSERT INTO booking_extras(booking_id, extra_id, qty, price) VALUES($1,'meals',$2,$3)`, [row.id, calc.mealN, calc.meals]);
     if (calc.bino) await db.query(`INSERT INTO booking_extras(booking_id, extra_id, qty, price) VALUES($1,'bino',1,$2)`, [row.id, calc.bino]);
     if (calc.cam) await db.query(`INSERT INTO booking_extras(booking_id, extra_id, qty, price) VALUES($1,'cam',1,$2)`, [row.id, calc.cam]);
+    if (calc.guide) await db.query(`INSERT INTO booking_extras(booking_id, extra_id, qty, price) VALUES($1,'guide',1,$2)`, [row.id, calc.guide]);
 
     const due = admin ? 0 : pricing.dueNow(calc.total, PAY_OPTION[pay], conf);
     let payment = null;

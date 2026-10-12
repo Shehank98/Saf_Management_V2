@@ -2,13 +2,15 @@ const config = require('../config');
 const mock = require('./mock');
 const stripe = require('./stripe');
 const payhere = require('./payhere');
+const onepay = require('./onepay');
 
-const ALL = { mock, stripe, payhere };
+const ALL = { mock, onepay, stripe, payhere };
 
 /** Providers the guest may use, in display order. */
 function enabled() {
   let ids = [...config.paymentProviders];
   if (!ids.length) {
+    if (onepay.configured()) ids.push('onepay');
     if (stripe.configured()) ids.push('stripe');
     if (payhere.configured()) ids.push('payhere');
     if (!ids.length && !config.isProd) ids.push('mock');

@@ -35,3 +35,10 @@ function slSearchBox(input, list, onPick) {
   });
   document.addEventListener('click', e => { if (!list.contains(e.target) && e.target !== input) hide() });
 }
+
+/** Straight-line distance in km (the server checks it again). */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371, r = x => x * Math.PI / 180, dLat = r(lat2 - lat1), dLng = r(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}

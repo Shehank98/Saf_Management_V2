@@ -1,10 +1,21 @@
 mount();
-let ses = SESS[P.get('ses')] ? P.get('ses') : Object.keys(SESS)[0], sel = null, days = {};
-let view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+const LOCS = CFG.locations || [];
+let loc = (LOCS.find(l => l.id === P.get('loc')) || LOCS[0] || {}).id;
+const LOC = () => LOCS.find(l => l.id === loc) || LOCS[0] || { sessions: SESS, name: '' };
+const SES = () => Object.fromEntries(Object.entries(SESS).filter(([k]) => LOC().sessions[k]).map(([k, s]) => [k, { ...s, ...LOC().sessions[k] }]));
+let ses = SES()[P.get('ses')] ? P.get('ses') : Object.keys(SES())[0], sel = P.get('date') || null, days = {};
+let view = sel ? new Date(parseIso(sel).getFullYear(), parseIso(sel).getMonth(), 1) : new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+if (CFG.privateOn) $('#privLink').hidden = false;
+const keepUrl = () => { const q = new URLSearchParams({ loc, ses }); if (sel) q.set('date', sel); history.replaceState(null, '', '/shared?' + q) };
+function locSeg() {
+  $('#locWrap').hidden = LOCS.length < 2;
+  $('#locSeg').innerHTML = LOCS.map(l => `<button data-l="${esc(l.id)}" class="${l.id === loc ? 'on' : ''}">${esc(l.name)}</button>`).join('');
+  $$('#locSeg button').forEach(b => b.onclick = () => { loc = b.dataset.l; if (!SES()[ses]) ses = Object.keys(SES())[0]; sel = null; locSeg(); sesSeg(); keepUrl(); refresh() });
+}
 const maxMonth = new Date(TODAY.getFullYear(), TODAY.getMonth() + (CFG.maxAheadMonths || 4) + 1, 1);
 function sesSeg() {
-  $('#sesSeg').innerHTML = Object.entries(SESS).map(([k, s]) => `<button data-k="${k}" class="${k === ses ? 'on' : ''}">${esc(s.short)}</button>`).join('');
-  $$('#sesSeg button').forEach(b => b.onclick = () => { ses = b.dataset.k; sel = null; sesSeg(); refresh() });
+  $('#sesSeg').innerHTML = Object.entries(SES()).map(([k, s]) => `<button data-k="${k}" class="${k === ses ? 'on' : ''}">${esc(s.short)}</button>`).join('');
+  $$('#sesSeg button').forEach(b => b.onclick = () => { ses = b.dataset.k; sel = null; sesSeg(); keepUrl(); refresh() });
 }
 function render() {
   $('#mon').textContent = view.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -23,10 +34,10 @@ function render() {
   $('#cal').innerHTML = h;
   $('#prev').disabled = view <= new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
   $('#nxt').disabled = new Date(view.getFullYear(), view.getMonth() + 1, 1) >= maxMonth;
-  $$('.day:not(:disabled)').forEach(b => b.onclick = () => { sel = b.dataset.d; render(); detail() });
+  $$('.day:not(:disabled)').forEach(b => b.onclick = () => { sel = b.dataset.d; keepUrl(); render(); detail(); $('#detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }) });
 }
 function detail() {
-  const el = $('#detail'), s = SESS[ses];
+  const el = $('#detail'), s = SES()[ses];
   if (!sel) { el.innerHTML = `<div class="card muted">${Object.keys(days).length ? 'Tap a date to join a shared jeep.' : 'No dates are open in this month for this session. Try another month or session.'}</div>`; return }
   const a = days[sel]; if (!a) { el.innerHTML = ''; return }
   const rows = a.trips.filter(t => !t.full).map(t => {
@@ -36,17 +47,17 @@ function detail() {
   });
   const hasFresh = a.trips.some(t => !t.full && !t.ready);
   if (a.canOpenNew && (!a.trips.length || !hasFresh)) rows.push(`<div class="jrow"><div><b>${a.trips.length ? 'Jeep ' + (a.trips.length + 1) + ' · new' : 'Jeep 1'}</b><div class="small muted">${a.seatsMax} seats free · goes ahead once ${a.minSeats} are paid</div></div><div style="text-align:right"><button class="btn sm primary" id="fresh">${a.trips.length ? 'Start this jeep' : 'Choose seats'}</button></div></div>`);
-  el.innerHTML = `<div class="card fade"><div><b style="font-size:17px">${nice(sel)}</b><div class="small muted">${esc(s.name)} · ${s.time} · pickup ${s.pickup}</div><div style="margin-top:6px"><span class="price">${fmt(a.price)}</span> <span class="small muted">per seat</span></div></div>
+  el.innerHTML = `<div class="card fade"><div><b style="font-size:17px">${nice(sel)}</b><div class="small muted">${esc(LOC().name)} · ${esc(s.name)} · ${s.time} · pickup ${s.pickup}</div><div style="margin-top:6px"><span class="price">${fmt(a.price)}</span> <span class="small muted">per seat</span></div></div>
     <div style="margin-top:12px;display:grid;gap:8px">${rows.join('') || '<span class="tag bad">All jeeps are full</span>'}</div>
     <p class="tiny muted" style="margin:10px 0 0">A jeep goes ahead once ${a.minSeats} seats are booked and paid; the others can still join the free seats, and a new jeep opens for anyone else. If a jeep doesn't go ahead you get a full refund.</p></div>`;
-  const f = $('#fresh'); if (f) f.onclick = () => busy(f, async () => { const r = await POST('/api/shared-trips/open', { date: sel, ses, fresh: true }); location.href = '/s/' + r.id });
+  const f = $('#fresh'); if (f) f.onclick = () => busy(f, async () => { const r = await POST('/api/shared-trips/open', { date: sel, ses, loc, fresh: true }); location.href = '/s/' + r.id });
 }
 async function refresh() {
   $('#cal').style.opacity = .5;
-  try { days = (await GET(`/api/shared-trips?month=${monthKey(view)}&session=${ses}`)).days } catch (e) { days = {}; toastErr(e) }
+  try { days = (await GET(`/api/shared-trips?month=${monthKey(view)}&session=${ses}&loc=${encodeURIComponent(loc)}`)).days } catch (e) { days = {}; toastErr(e) }
   $('#cal').style.opacity = 1; render(); detail();
 }
 $('#prev').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); sel = null; refresh() };
 $('#nxt').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); sel = null; refresh() };
-sesSeg(); render(); refresh();
-autoRefresh(async () => { try { days = (await GET(`/api/shared-trips?month=${monthKey(view)}&session=${ses}`)).days; render(); detail() } catch (e) { } });
+locSeg(); sesSeg(); render(); refresh();
+autoRefresh(async () => { try { days = (await GET(`/api/shared-trips?month=${monthKey(view)}&session=${ses}&loc=${encodeURIComponent(loc)}`)).days; render(); detail() } catch (e) { } });

@@ -53,7 +53,7 @@ $('#next').onclick = async () => {
   try {
     const r = await POST('/api/bookings', {
       ses: st.ses, date: st.date, guests: +st.guests, kids: +(P.get('kids') || 0), pmode: V('pmode'), hotel: P.get('hotel') || '', lat: P.get('lat'), lng: P.get('lng'),
-      meals: +st.meals, mealPrefs: st.mealPrefs, allergy: st.allergy, bino: +st.bino, cam: +st.cam, notes: P.get('notes') || '',
+      meals: +st.meals, mealPrefs: st.mealPrefs, allergy: st.allergy, bino: +st.bino, cam: +st.cam, guide: +st.guide, notes: P.get('notes') || '',
       name: $('#name').value.trim(), cc: $('#cc').value, phone: $('#phone').value.replace(/\D/g, ''), email: $('#email').value.trim(), pay, provider: due ? provider : undefined,
     });
     try { sessionStorage.removeItem('yws-contact') } catch (e) { }

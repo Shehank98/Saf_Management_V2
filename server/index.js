@@ -89,15 +89,26 @@ const adminPage = file => U.wrap(async (req, res) => {
   page(file)(req, res);
 });
 
+// With private safaris switched off (Settings), the home page is the shared-safari landing page and /book/* goes home.
+const privateOn = async () => !!(await settings.load()).features.private;
+app.get('/', U.wrap(async (req, res) => page((await privateOn()) ? 'customer/index.html' : 'shared/landing.html')(req, res)));
+app.get('/safari', page('shared/landing.html'));
+app.get(['/book/*', '/booking'], U.wrap(async (req, res, next) => {
+  if (await privateOn()) return next();
+  if (req.path === '/booking' && req.query.code) return next(); // old private booking links keep working
+  res.redirect(302, '/');
+}));
+
 const site = {
-  '/': 'customer/index.html', '/book/session': 'customer/01-session.html', '/book/date': 'customer/02-date.html', '/book/group': 'customer/03-group.html',
+  '/book/session': 'customer/01-session.html', '/book/date': 'customer/02-date.html', '/book/group': 'customer/03-group.html',
   '/book/pickup': 'customer/04-pickup-extras.html', '/book/checkout': 'customer/05-checkout.html', '/book/done/:code': 'customer/06-confirmation.html',
   '/t/:code': 'customer/ticket.html', '/booking': 'customer/my-booking.html', '/s/:id': 'shared/trip.html', '/partners/apply': 'vendor/register.html', '/shared': 'shared/index.html',
 };
-for (const [route, file] of Object.entries(site)) app.get(route, (req, res, next) => { if (route.startsWith('/t/') || route.startsWith('/s/') || route === '/shared') res.set('X-Robots-Tag', 'noindex'); next(); }, page(file));
+for (const [route, file] of Object.entries(site)) app.get(route, (req, res, next) => { if (route.startsWith('/t/') || route.startsWith('/s/')) res.set('X-Robots-Tag', 'noindex'); next(); }, page(file));
 
 app.get('/admin/login', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('admin/login.html')(req, res); });
 const admin = { '/admin': 'dashboard', '/admin/bookings': 'private', '/admin/shared': 'shared', '/admin/payments': 'payments', '/admin/partners': 'vendors', '/admin/check-in': 'checkin', '/admin/settings': 'settings' };
+app.get('/admin/bookings', U.wrap(async (req, res, next) => (await privateOn()) ? next() : res.redirect('/admin/shared')));
 for (const [route, f] of Object.entries(admin)) app.get(route, adminPage(`admin/${f}.html`));
 
 app.get('/partner/magic', U.wrap(async (req, res) => {
@@ -129,16 +140,17 @@ app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 
 
 // Web app manifests (home-screen install). Generated so the app name follows the business name in Settings.
 const manifest = (kind) => U.wrap(async (req, res) => {
-  const brand = (await settings.load()).business.name;
+  const conf = await settings.load();
+  const brand = conf.business.name, priv = !!conf.features.private;
   const icons = [
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     { src: '/icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ];
   const defs = {
-    site: { name: brand, short_name: brand.split(' ').slice(0, 2).join(' ').slice(0, 14), description: 'Book private jeep safaris', start_url: '/?source=pwa', scope: '/', id: '/', theme_color: '#c0682a', background_color: '#fbf6ea',
-      shortcuts: [{ name: 'Book a safari', url: '/book/session' }, { name: 'My booking', url: '/booking' }] },
+    site: { name: brand, short_name: brand.split(' ').slice(0, 2).join(' ').slice(0, 14), description: priv ? 'Book private jeep safaris' : 'Book a seat on a shared jeep safari', start_url: '/?source=pwa', scope: '/', id: '/', theme_color: '#c0682a', background_color: '#fbf6ea',
+      shortcuts: priv ? [{ name: 'Book a safari', url: '/book/session' }, { name: 'My booking', url: '/booking' }] : [{ name: 'Book a seat', url: '/shared' }] },
     admin: { name: brand + ' Admin', short_name: 'Safari Admin', description: 'Bookings, trips and partners', start_url: '/admin?source=pwa', scope: '/admin', id: '/admin', theme_color: '#2b2118', background_color: '#2b2118',
-      shortcuts: [{ name: 'Ticket check-in', url: '/admin/check-in' }, { name: 'Private bookings', url: '/admin/bookings' }, { name: 'Shared trips', url: '/admin/shared' }] },
+      shortcuts: [{ name: 'Ticket check-in', url: '/admin/check-in' }, { name: 'Shared trips', url: '/admin/shared' }, ...(priv ? [{ name: 'Private bookings', url: '/admin/bookings' }] : [])] },
     partner: { name: brand + ' Partner', short_name: 'Partner', description: 'Jobs, ticket scanning and payments for partners', start_url: '/partner?source=pwa', scope: '/partner', id: '/partner', theme_color: '#3f5a2e', background_color: '#fbf6ea',
       shortcuts: [{ name: 'Scan tickets', url: '/partner#checkin' }, { name: 'My jobs', url: '/partner#jobs' }, { name: 'Payments', url: '/partner#payments' }] },
   };
@@ -148,7 +160,7 @@ app.get('/manifest.webmanifest', manifest('site'));
 app.get('/admin.webmanifest', manifest('admin'));
 app.get('/partner.webmanifest', manifest('partner'));
 
-app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /shared\nDisallow: /api/\nDisallow: /pay/\n'));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\n'));
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), {

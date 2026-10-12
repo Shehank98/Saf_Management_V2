@@ -15,6 +15,8 @@ const FEED = DATA ? DATA.feed : [];
 const TEAM = DATA ? DATA.team : [];
 const IS_OWNER = !!(ME && ME.role === 'OWNER');
 if (CONF) SETTINGS.costs = CONF.costs;
+// Old trips can use a session that was switched off later: keep its name and times available for display.
+if (CONF && CONF.sessions) for (const [k, v] of Object.entries(CONF.sessions)) if (!SESS[k]) SESS[k] = { ...v, off: true };
 const ACTIVE_STATUSES = ['Confirmed', 'Deposit paid', 'Started', 'Completed'];
 const vendorName = id => (VENDORS.find(v => v.id === String(id)) || {}).name || '';
 const jeepsFor = n => Math.max(1, Math.ceil(n / (CFG.maxPerJeep || 6)));
@@ -68,7 +70,10 @@ const ic = (k, sz = 18) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24
 
 const openRequests = () => BOOKINGS.filter(b => b.status === 'Request').length;
 const unpaidPartners = () => new Set(PAYOUT_LINES.filter(l => !l.paid).map(l => l.vendor)).size;
-const ADMIN_NAV = [['dashboard.html', 'Dashboard', 'dash'], ['private.html', 'Private bookings', 'priv', openRequests], ['shared.html', 'Shared trips', 'shared'], ['payments.html', 'Payments &amp; profit', 'money', unpaidPartners], ['vendors.html', 'Vendors', 'vend', () => APPLICATIONS.length], ['checkin.html', 'Ticket check-in', 'scan'], ['settings.html', 'Settings', 'set']];
+const ADMIN_NAV = [['dashboard.html', 'Dashboard', 'dash'], ['private.html', 'Private bookings', 'priv', openRequests], ['shared.html', 'Shared trips', 'shared'], ['payments.html', 'Payments &amp; profit', 'money', unpaidPartners], ['vendors.html', 'Vendors', 'vend', () => APPLICATIONS.length], ['checkin.html', 'Ticket check-in', 'scan'], ['settings.html', 'Settings', 'set']].filter(n => CFG.privateOn || n[0] !== 'private.html');
+const PRIVATE_ON = !!CFG.privateOn;
+const LOCS = CFG.locations || [];
+const locName = id => (LOCS.find(l => l.id === id) || (CONF && CONF.locations || []).find(l => l.id === id) || {}).name || id || '';
 let _nav = null;
 function refreshNavCounts() {
   if (!_nav) return;
@@ -117,6 +122,23 @@ const badge = s => `<span class="tag ${STATUS_CLS[s] ?? ''}">${esc(s)}</span>`;
 const vendorOpts = (type, sel) => `<option value="">- Not assigned -</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
 const stateNote = st => st === 'OFFERED' ? ' <span class="tiny muted">(waiting for them to accept)</span>' : st === 'ACCEPTED' ? ' <span class="tiny" style="color:var(--ok)">✓ accepted</span>' : '';
 
+/* ===== Change the vehicle, or hand the job to another driver right away ===== */
+function handoverButton(rec, key) {
+  if (!rec.vendor || ['Cancelled', 'Completed', 'Started'].includes(rec.status)) return '';
+  return `<div class="small" style="margin:-4px 0 10px">Vehicle: <b>${esc(rec.jeepPlate || (VENDORS.find(v => v.id === rec.vendor) || {}).plate || 'driver\'s own jeep')}</b> · <a href="#" id="hoBtn" data-key="${esc(key)}">Change vehicle or hand over</a></div>`;
+}
+function wireHandover(rec, body, done) {
+  const b = $('#hoBtn'); if (!b) return;
+  b.onclick = e => {
+    e.preventDefault();
+    openModal(`<h3>Change vehicle or driver</h3><p class="small muted">The new driver gets the job straight away (no need to accept) and is the only one who can start the trip by scanning the QR. They get an email and a phone notification.</p>
+    <div class="field"><label for="hoTo">Driver</label><select class="inp" id="hoTo"><option value="">Keep ${esc(vendorName(rec.vendor))}</option>${VENDORS.filter(v => v.status === 'Active' && v.type === 'Jeep + driver' && v.id !== rec.vendor).map(v => `<option value="${v.id}">${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('')}</select></div>
+    <div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" placeholder="e.g. CAB-1234 (empty = the driver's own jeep)" value="${esc(rec.jeepPlate || '')}" style="text-transform:uppercase"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">Save</button></div>`);
+    $('#hoOk').onclick = async ev => { if (await act(() => POST('/api/admin/jobs/handover', { ...body, role: 'JEEP', to: $('#hoTo').value || undefined, plate: $('#hoPlate').value }), r => r.handed ? 'Job handed over · new driver notified' : 'Vehicle updated', ev.target)) { closeModal(); done() } };
+  };
+}
+
 /* ===== Ticket scan = trip start (Admin → Check-in and the partner app) ===== */
 async function scanTicket(text, { force = false, preview = false } = {}) {
   try { return await POST('/api/checkin', { text, force, preview }) }
@@ -126,7 +148,7 @@ function scanResultHTML(r) {
   if (r.kind === 'ready') {
     const i = r.info;
     return `<div class="scanres ok"><div class="big">Ticket found</div><p style="font-size:17px;margin:4px 0 8px"><b>${esc(i.name)}</b> · ${ppl(i.guests)} · ${esc(i.sessionName)}${i.seats ? ' · seat ' + i.seats.join(', ') : ''}</p>
-    <p class="small" style="margin:0 0 6px">Code <b class="mono">${esc(i.code)}</b>${i.mealsText ? ' · <b>Meals:</b> ' + esc(i.mealsText) : ''}</p>
+    <p class="small" style="margin:0 0 6px">Code <b class="mono">${esc(i.code)}</b>${i.mealsText ? ' · <b>Meals:</b> ' + esc(i.mealsText) : ''}${i.driver ? ` · <b>Driver:</b> ${esc(i.driver)}${i.plate ? ' (' + esc(i.plate) + ')' : ''}` : ''}</p>
     <p style="margin:6px 0 12px">Collect from guest: <b style="color:${i.balance ? 'var(--bad)' : 'var(--ok)'}">${i.balance ? fmt(i.balance) : 'nothing, fully paid'}</b></p>
     <button class="btn primary block" id="startTrip" style="font-size:17px;padding:14px">▶ Start the trip</button></div>`;
   }

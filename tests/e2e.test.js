@@ -46,6 +46,8 @@ test.before(async () => {
   const r = await api('POST', '/api/admin/login', { email: 'owner@test.lk', password: 'owner-pass-123' });
   assert.equal(r.status, 200);
   adminCookie = r.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  // Private safaris are off by default (shared-only site); most tests below cover both.
+  assert.equal((await admin('PUT', '/api/admin/settings/features', { private: true })).status, 200);
 });
 test.after(async () => { server.close(); await pool.end(); });
 
@@ -407,4 +409,91 @@ test('settings: only owners may change them; staff may not', async () => {
 test('cross-site posts are blocked', async () => {
   const r = await fetch(base + '/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' });
   assert.equal(r.status, 403);
+});
+
+/* ---------------- Shared-only site, parks, seat locks, guide, handover ---------------- */
+test('private switch: off hides private pages and refuses private bookings', async () => {
+  assert.equal((await admin('PUT', '/api/admin/settings/features', { private: false })).status, 200);
+  try {
+    assert.equal((await api('POST', '/api/bookings', guest())).status, 409);
+    const home = await fetch(base + '/'); assert.match(await home.text(), /Shared jeep safaris/);
+    const r = await fetch(base + '/book/session', { redirect: 'manual' }); assert.equal(r.status, 302);
+    const cfg = await (await fetch(base + '/api/config.js')).text(); assert.match(cfg, /"privateOn":false/);
+  } finally { await admin('PUT', '/api/admin/settings/features', { private: true }); }
+});
+
+test('parks: each park has its own jeeps, seat price and base; trips open at the right park', async () => {
+  const add = await admin('PUT', '/api/admin/settings/location', { isNew: true, id: 'Udawalawe', name: 'Udawalawe', lat: 6.4747, lng: 80.8987, radiusKm: 5, fleet: 1, sessions: { morning: { seat: 6000, start: '06:00' } } });
+  assert.equal(add.status, 200);
+  assert.equal((await admin('PUT', '/api/admin/settings/location', { isNew: true, id: 'paris', name: 'Paris', lat: 48.85, lng: 2.35 })).status, 400, 'base must be in Sri Lanka');
+  const month = U.addDays(U.todayStr(), 12).slice(0, 7);
+  const cal = await api('GET', `/api/shared-trips?month=${month}&session=morning&loc=udawalawe`);
+  assert.equal(cal.status, 200); assert.equal(cal.json.price, 6000);
+  const date = U.addDays(U.todayStr(), 12);
+  const j = await api('POST', '/api/shared-trips/open', { date, ses: 'morning', loc: 'udawalawe' });
+  assert.equal(j.status, 200);
+  const t = (await query('SELECT * FROM shared_trips WHERE id=$1', [j.json.id])).rows[0];
+  assert.equal(t.location_id, 'udawalawe'); assert.equal(t.seat_price, 6000);
+  const v = (await api('GET', `/api/shared/${t.id}`)).json; assert.equal(v.locName, 'Udawalawe');
+  assert.match(v.time, /6:00 AM/);
+});
+
+test('seat locks: a seat being chosen is locked for 15 minutes to that browser only', async () => {
+  const date = U.addDays(U.todayStr(), 13);
+  const id = (await api('POST', '/api/shared-trips/open', { date, ses: 'evening' })).json.id;
+  const A = 'tokenAAAAAAAAAAAAAAAAAAA', B = 'tokenBBBBBBBBBBBBBBBBBBBB';
+  const h1 = await api('POST', `/api/shared/${id}/hold`, { seat: 1, token: A, on: true });
+  assert.equal(h1.status, 200); assert.deepEqual(h1.json.mine.map(x => x.n), [1]);
+  const h2 = await api('POST', `/api/shared/${id}/hold`, { seat: 1, token: B, on: true });
+  assert.equal(h2.status, 409); assert.deepEqual(h2.json.locked, [1]);
+  const viewB = (await api('GET', `/api/shared/${id}?token=${B}`)).json; assert.deepEqual(viewB.locked, [1]);
+  const who = { name: 'Bea B', phone: '771112223', email: 'bea@x.lk', pay: 'later' };
+  assert.equal((await api('POST', `/api/shared/${id}/seats`, { ...who, seats: [1], token: B })).status, 409, 'B cannot book A\'s locked seat');
+  const ok = await api('POST', `/api/shared/${id}/seats`, { ...who, name: 'Ann A', email: 'ann@x.lk', seats: [1, 2], token: A, guide: true, bino: true, meals: { 1: 'Vegan' } });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.json.total, 2 * 7500 + 1500 + 5000 + 1000, 'seats + 1 meal + guide + binoculars');
+  assert.equal((await query('SELECT COUNT(*)::int n FROM seat_holds WHERE trip_id=$1', [id])).rows[0].n, 0, 'locks cleared after booking');
+  const seats = (await query('SELECT * FROM shared_seats WHERE trip_id=$1 ORDER BY seat_no', [id])).rows;
+  assert.equal(seats[0].has_guide, true); assert.equal(seats[1].has_guide, false);
+  const data = (await admin('GET', '/api/admin/data')).json;
+  assert.equal(data.shared.find(t => t.id === id).guideWanted, true);
+  // an expired lock can be taken by someone else
+  await api('POST', `/api/shared/${id}/hold`, { seat: 3, token: A, on: true });
+  await query(`UPDATE seat_holds SET expires_at = now() - interval '1 second' WHERE trip_id=$1`, [id]);
+  assert.equal((await api('POST', `/api/shared/${id}/hold`, { seat: 3, token: B, on: true })).status, 200);
+});
+
+test('handover: only the driver holding the job can start the trip; office or driver can hand it over', async () => {
+  const hash = await require('../server/lib/auth').hashPassword('drive-pass-99');
+  const d1 = (await query(`INSERT INTO partners(type,name,email,status,password_hash,vehicle_plate) VALUES('JEEP_DRIVER','Kamal','kamal@t.lk','ACTIVE',$1,'CAB-1111') RETURNING id`, [hash])).rows[0].id;
+  const d2 = (await query(`INSERT INTO partners(type,name,email,status,password_hash,vehicle_plate) VALUES('JEEP_DRIVER','Nimal','nimal@t.lk','ACTIVE',$1,'CAB-2222') RETURNING id`, [hash])).rows[0].id;
+  const cookie = async e => (await api('POST', '/api/partner/login', { email: e, password: 'drive-pass-99' })).headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const c1 = await cookie('kamal@t.lk'), c2 = await cookie('nimal@t.lk');
+  const out = await admin('POST', '/api/admin/bookings', guest({ date: U.todayStr(), guests: 2, status: 'Confirmed' }));
+  const code = out.json.code;
+  await query(`UPDATE bookings SET status='CONFIRMED' WHERE code=$1`, [code]);
+  assert.equal((await admin('POST', `/api/admin/bookings/${code}/assign`, { jeep: d1 })).status, 200);
+  const aid = (await query(`SELECT id FROM assignments WHERE partner_id=$1`, [d1])).rows[0].id;
+  await api('POST', `/api/partner/jobs/${aid}/accept`, null, c1);
+  const blocked = await api('POST', '/api/checkin', { code, preview: true }, c2);
+  assert.equal(blocked.json.kind, 'bad'); assert.match(blocked.json.msg, /Kamal/);
+  // Kamal hands the job and the vehicle to Nimal
+  const ho = await api('POST', `/api/partner/jobs/${aid}/handover`, { to: d2, plate: 'cab-9999' }, c1);
+  assert.equal(ho.status, 200); assert.equal(ho.json.handed, true);
+  assert.equal((await api('POST', '/api/checkin', { code, preview: true }, c1)).json.kind, 'bad', 'Kamal can no longer start it');
+  const ready = await api('POST', '/api/checkin', { code, preview: true }, c2);
+  assert.equal(ready.json.kind, 'ready'); assert.equal(ready.json.info.plate, 'CAB-9999');
+  assert.ok((await emails('vendor_job')).some(e => e.to_addr === 'nimal@t.lk' && /handed/i.test(e.subject)));
+  // office can change it back directly
+  assert.equal((await admin('POST', '/api/admin/jobs/handover', { code, role: 'JEEP', to: d1 })).status, 200);
+  assert.equal((await api('POST', '/api/checkin', { code, preview: true }, c1)).json.kind, 'ready');
+  const started = await api('POST', '/api/checkin', { code }, c1);
+  assert.equal(started.json.kind, 'ok');
+});
+
+test('profit report counts money kept from cancelled bookings', async () => {
+  const b = (await query(`SELECT code FROM bookings WHERE status='CANCELLED' AND paid > refunded LIMIT 1`)).rows[0];
+  const data = (await admin('GET', '/api/admin/data')).json;
+  if (b) assert.ok(data.trips.some(t => t.code === b.code && t.status === 'Cancelled'));
+  data.trips.forEach(t => assert.equal(t.profit, t.revenue - t.cost.total));
 });

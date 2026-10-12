@@ -1,11 +1,12 @@
 /* Partner portal: jobs, scanning tickets, payments, days off. Built for phones. */
-const NAV = [['#home', 'Home', 'home'], ['#jobs', 'My jobs', 'jobs'], ['#checkin', 'Scan tickets', 'scan'], ['#payments', 'Payments', 'money'], ['#availability', 'Availability', 'cal'], ['#profile', 'Profile', 'user']];
+const NAV = [['#home', 'Home', 'home'], ['#jobs', 'My jobs', 'jobs'], ['#checkin', 'Scan tickets', 'scan'], ['#payments', 'Payments', 'money'], ['#availability', 'Calendar', 'cal'], ['#profile', 'Profile', 'user']];
 let PD = null, off = new Set(), scanner = null;
 function onPartnerLoggedOut() { if (PD) { PD = null; location.reload() } }   // only when a signed-in session expires, never on first load
 
 async function boot() {
   try { PD = await GET('/api/partner/data'); } catch (e) { if (e.status === 401 || !PD) { login(e.offline ? e.message : ''); return } }
   $('#loginView').remove(); $('#content').hidden = false; off = new Set(PD.off); app();
+  try { if (pushOK() && Notification.permission === 'granted') enablePush(true).catch(() => { }) } catch (e) { }
 }
 function login(note) {
   const expired = P.get('link') === 'expired';
@@ -39,7 +40,44 @@ function jobCard(j, full) {
   <div class="kv"><div>Pickup<b>${s.pickup} · ${sh ? 'several hotels' : j.pmode === 'hotel' ? esc(j.hotel || 'hotel') : 'Office'}</b></div><div>Guests<b>${ppl(j.guests)}${sh ? '' : ` · ${j.jeeps} jeep${j.jeeps > 1 ? 's' : ''}`}</b></div><div>Collect from guest<b style="color:${j.balance ? 'var(--bad)' : 'inherit'}">${j.balance ? fmt(j.balance) : 'Nothing'}</b></div><div>Your fee<b>${fmt(fee(j))}</b></div></div>
   ${Object.keys(mc).length ? `<div class="small"><b>Meal packs</b><div class="meals">${Object.entries(mc).map(([k, v]) => `<span>${v}× ${esc(k)}</span>`).join('')}${j.allergy ? `<span style="background:var(--bad-bg);color:var(--bad)">⚠ ${esc(j.allergy)}</span>` : ''}</div></div>` : ''}
   ${full && !isNew ? (sh ? `<ul class="pax">${j.seats.map(x => `<li><span>Seat ${x.n} · ${esc(x.name)}${x.meal ? ' · ' + esc(x.meal) : ''}${x.pay !== 'Paid' ? ' · <b style="color:var(--bad)">not paid</b>' : ''}</span><a href="tel:${(x.cc + x.phone).replace(/\s/g, '')}">Call</a></li>`).join('') || '<li><span class="muted">No guests yet</span></li>'}</ul>` : `<ul class="pax"><li><span>Lead guest · ${esc(j.name)}</span><a href="tel:${(j.cc + j.phone).replace(/\s/g, '')}">Call</a></li>${j.notes ? `<li><span>Note: ${esc(j.notes)}</span></li>` : ''}</ul>`) : ''}
-  <div class="acts" style="margin-top:10px">${isNew ? `<button class="btn sm ok" data-acc="${j.aid}">Accept job</button><button class="btn sm" data-dec="${j.aid}">Decline</button>` : live ? `<span class="small" style="color:var(--info);font-weight:700">Trip in progress since ${j.startedAt}</span><button class="btn sm" data-done="${esc(j.code)}">Trip finished</button>` : `<a class="btn sm ${today ? 'primary' : ''}" href="#checkin">Scan ticket to start trip</a>${!sh && j.pmode === 'hotel' ? `<a class="btn sm" target="_blank" rel="noopener" href="${mapsHref(j)}">Directions</a>` : ''}`}</div></div>`;
+  <div class="acts" style="margin-top:10px">${isNew ? `<button class="btn sm ok" data-acc="${j.aid}">Accept job</button><button class="btn sm" data-dec="${j.aid}">Decline</button>` : live ? `<span class="small" style="color:var(--info);font-weight:700">Trip in progress since ${j.startedAt}</span><button class="btn sm" data-done="${esc(j.code)}">Trip finished</button>` : `<a class="btn sm ${today ? 'primary' : ''}" href="#checkin">Scan ticket to start trip</a>${!sh && j.pmode === 'hotel' ? `<a class="btn sm" target="_blank" rel="noopener" href="${mapsHref(j)}">Directions</a>` : ''}<a class="btn sm" target="_blank" rel="noopener" href="${gcal(j)}">📅 Add to calendar</a>${['JEEP', 'GUIDE'].includes(j.role) ? `<button class="btn sm" data-ho="${j.aid}">Hand over / vehicle</button>` : ''}`}</div>
+  ${!isNew && (j.plate || j.handedFrom) ? `<div class="tiny muted" style="margin-top:8px">${j.role === 'JEEP' && j.plate ? 'Vehicle <b>' + esc(j.plate) + '</b>' : ''}${j.handedFrom ? ' · handed to you by ' + esc(j.handedFrom) : ''}</div>` : ''}</div>`;
+}
+const gcal = j => { const s = SESS[j.ses] || {}, c = (d, t) => d.replace(/-/g, '') + 'T' + (t || '00:00').replace(':', '') + '00'; return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${j.roleLabel}: ${j.code}`)}&dates=${c(j.date, s.pickupRaw || s.start)}/${c(j.date, s.end)}&ctz=Asia%2FColombo&details=${encodeURIComponent(`${s.name || ''} · ${ppl(j.guests)} · pickup ${s.pickup || ''}`)}` };
+function handover(aid) {
+  const j = PD.jobs.find(x => x.aid === +aid); if (!j) return;
+  openModal(`<h3>Hand over or change vehicle</h3><p class="small muted">Can't drive this trip, or using a different jeep? Give the job to another partner, or just change the number plate. The new driver gets it straight away and is the only one who can start the trip.</p>
+  <div class="field"><label for="hoTo">Give the job to</label><select class="inp" id="hoTo"><option value="">Keep it (only change the vehicle)</option></select></div>
+  ${j.role === 'JEEP' ? `<div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" value="${esc(j.plate || '')}" style="text-transform:uppercase" placeholder="e.g. CAB-1234"></div>` : ''}
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">Save</button></div>`);
+  GET('/api/partner/colleagues').then(rows => { $('#hoTo').insertAdjacentHTML('beforeend', rows.map(x => `<option value="${x.id}">${esc(x.name)}${x.plate ? ' · ' + esc(x.plate) : ''}</option>`).join('')) }).catch(() => { });
+  $('#hoOk').onclick = e => busy(e.target, async () => {
+    const to = $('#hoTo').value;
+    if (to && !confirm('Hand this job over? You will no longer be able to start this trip.')) return;
+    const r = await POST(`/api/partner/jobs/${aid}/handover`, { to: to || undefined, plate: $('#hoPlate') ? $('#hoPlate').value : undefined });
+    closeModal(); toast(r.handed ? 'Job handed over · they have been notified' : 'Vehicle updated'); await refresh();
+  });
+}
+/* Phone notifications (Web Push) */
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function pushCard() {
+  if (!pushOK()) return `<div class="note small" style="margin-top:14px">📱 To get job alerts on your phone, add this portal to your home screen${/iPhone|iPad/.test(navigator.userAgent) ? ' (Share → Add to Home Screen) and open it from there' : ''}.</div>`;
+  if (Notification.permission === 'granted') return `<div class="note ok small" style="margin-top:14px">🔔 Job notifications are on for this phone. <a href="#" id="pushTest">Send a test</a></div>`;
+  if (Notification.permission === 'denied') return `<div class="note bad small" style="margin-top:14px">🔕 Notifications are blocked. Allow them in your browser settings to get job alerts.</div>`;
+  return `<div class="card" style="margin-top:14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><b>Get new jobs on your phone</b><div class="small muted">A notification pops up when the office offers you a job or hands one to you.</div></div><button class="btn primary" id="pushOn">🔔 Turn on notifications</button></div>`;
+}
+const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...b].map(c => c.charCodeAt(0))) };
+async function enablePush(silent) {
+  const reg = await navigator.serviceWorker.ready;
+  if (!silent && Notification.permission !== 'granted' && (await Notification.requestPermission()) !== 'granted') throw new Error('Notifications were not allowed.');
+  const { key } = await GET('/api/partner/push/key');
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(key) });
+  await POST('/api/partner/push/subscribe', sub.toJSON());
+}
+function wirePush() {
+  const on = $('#pushOn'); if (on) on.onclick = () => busy(on, async () => { await enablePush(false); toast('Notifications are on'); show() });
+  const t = $('#pushTest'); if (t) t.onclick = e => { e.preventDefault(); POST('/api/partner/push/test').then(r => toast(r.sent ? 'Test sent' : 'No device found, turn notifications on again')).catch(toastErr) };
 }
 const upcoming = () => PD.jobs.filter(j => (parseIso(j.date) >= TODAY || j.status === 'Started') && !['Completed', 'Cancelled'].includes(j.status)).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -51,7 +89,7 @@ function show() {
   const up = upcoming(), L = PD.lines, owed = L.filter(l => !l.paid).reduce((a, l) => a + l.amount, 0); let h = '';
   if (PD.me.status === 'PAUSED') h += '<div class="note" style="margin-bottom:12px">Your account is paused, so you will not get new job offers. Contact the office to start again.</div>';
   if (tab === 'home') h += `<div class="kpis"><div class="kpi"><div class="l">Next job</div><div class="v" style="font-size:20px">${up[0] ? shortDate(up[0].date) + ' · ' + esc((SESS[up[0].ses] || {}).short) : '-'}</div></div><div class="kpi"><div class="l">Jobs this week</div><div class="v">${up.filter(j => (parseIso(j.date) - TODAY) / 864e5 < 7).length}</div></div><div class="kpi"><div class="l">Owed to you</div><div class="v">${fmt(owed)}</div><div class="d"><a href="#payments">See payments →</a></div></div><div class="kpi"><div class="l">Rating</div><div class="v">★ ${PD.me.rating}</div></div></div>
-    <h3 style="margin:20px 0 10px">Coming up</h3>${up.slice(0, 3).map(j => jobCard(j, false)).join('') || '<div class="empty">No jobs yet. The office will email you when a job is offered.</div>'}${up.length ? '<a class="btn" href="#jobs">See all jobs</a>' : ''}`;
+    ${pushCard()}<h3 style="margin:20px 0 10px">Coming up</h3>${up.slice(0, 3).map(j => jobCard(j, false)).join('') || '<div class="empty">No jobs yet. The office will email you when a job is offered.</div>'}${up.length ? '<a class="btn" href="#jobs">See all jobs</a>' : ''}`;
   if (tab === 'jobs') h += up.map(j => jobCard(j, true)).join('') || '<div class="empty">No jobs yet</div>';
   if (tab === 'checkin') h += `<div class="panel" style="max-width:600px"><div class="pb"><p class="muted" style="margin-bottom:12px">At pickup, scan the guest's e-ticket QR (or type the code), check the details, then tap <b>Start the trip</b>. The guest gets an email and the office sees it live.</p>
     <div class="cam" id="cam"><div class="frame"></div><div class="line"></div><span class="small" style="position:absolute;bottom:10px" id="camNote">Tap “Use camera” to scan</span></div>
@@ -65,10 +103,11 @@ function show() {
     <p class="tiny muted" style="margin-top:10px">Amounts are added when a trip starts (you scan the ticket). Something wrong? Email ${esc(CFG.email)}.</p>`;
   }
   if (tab === 'availability') {
-    const jd = new Set(up.map(j => j.date)), first = (TODAY.getDay() + 6) % 7;
-    h += `<div class="panel"><div class="pb"><p class="muted" style="margin-bottom:12px">Tap a day to mark yourself <b>off</b>. You won't get job offers on those days. Dots are jobs you already have.</p>
-    <div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="h">${d}</div>`).join('')}${'<div></div>'.repeat(first)}${Array.from({ length: 35 }, (_, i) => { const d = D(i); return `<button data-d="${d}" class="${off.has(d) ? 'off' : ''} ${jd.has(d) ? 'jb' : ''}" ${jd.has(d) ? 'disabled title="You have a job"' : ''}>${addDays(TODAY, i).getDate()}</button>` }).join('')}</div>
-    <p class="small" style="margin-top:12px">Days off: <b id="offl"></b></p></div></div>`;
+    const byDay = {}; up.forEach(j => (byDay[j.date] = byDay[j.date] || []).push(j));
+    const first = (TODAY.getDay() + 6) % 7;
+    h += `<div class="panel"><div class="pb"><p class="muted" style="margin-bottom:12px">Your jobs are marked on the calendar: <b style="color:var(--ok)">green</b> = accepted, <b style="color:var(--warn)">orange</b> = offer waiting for you. Tap a free day to mark yourself <b>off</b>; tap a job day to see the job.</p>
+    <div class="cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="h">${d}</div>`).join('')}${'<div></div>'.repeat(first)}${Array.from({ length: 42 - first }, (_, i) => { const d = D(i), js = byDay[d] || [], acc = js.filter(j => j.state === 'ACCEPTED'), ofr = js.filter(j => j.state === 'OFFERED'); return `<button data-d="${d}" class="${off.has(d) ? 'off' : ''} ${acc.length ? 'acc' : ofr.length ? 'ofr' : ''}" title="${js.map(j => j.code + ' ' + (SESS[j.ses] || {}).short).join(', ')}"><span>${addDays(TODAY, i).getDate()}</span>${js.length ? `<small>${acc.length ? '✓ ' : ''}${esc(((SESS[js[0].ses] || {}).short || '').slice(0, 4))}${js.length > 1 ? ' +' + (js.length - 1) : ''}</small>` : ''}</button>` }).join('')}</div>
+    <p class="small" style="margin-top:12px">Days off: <b id="offl"></b></p><div id="dayJobs"></div></div></div>`;
   }
   if (tab === 'profile') h += `<div class="panel" style="max-width:620px"><div class="pb"><div style="display:flex;gap:14px;align-items:center;margin-bottom:14px"><span class="av" style="width:56px;height:56px;font-size:18px">${esc(PD.me.name.split(' ').map(x => x[0]).join('').slice(0, 2))}</span><div><b style="font-size:18px">${esc(PD.me.name)}</b><div class="small muted">${PD.me.type} · partner since ${esc(PD.me.since)}</div></div></div>
     <div class="field"><label>Email (job offers and payouts go here)</label><input class="inp" value="${esc(PD.me.email)}" disabled></div><div class="field"><label>Mobile</label><input class="inp" id="pf_phone" value="${esc(PD.me.phone)}"></div>${PD.me.plate ? `<div class="field"><label>Jeep</label><input class="inp" value="${esc(PD.me.plate)} · ${PD.me.seats} seats" disabled></div>` : ''}
@@ -76,12 +115,19 @@ function show() {
     <div class="field"><label>${PD.me.hasPassword ? 'Change password' : 'Set a password'} <span class="muted">(8+ characters, optional)</span></label><input class="inp" id="pf_pw" type="password" autocomplete="new-password"></div>
     <button class="btn primary" style="margin-top:6px" id="pf_save">Save</button></div></div>`;
   const c = $('#content'); c.innerHTML = h; c.style.animation = 'none'; void c.offsetWidth; c.style.animation = 'fade .35s ease';
-  $$('[data-acc]').forEach(b => b.onclick = () => busy(b, async () => { await POST(`/api/partner/jobs/${b.dataset.acc}/accept`); toast('Job accepted · the office can see it'); await refresh() }));
+  wireJobs(); wirePush(); showRest(tab, L, up);
+}
+function wireJobs() {
+  $$('[data-ho]').forEach(b => b.onclick = () => handover(b.dataset.ho));
+  $$('[data-acc]').forEach(b => b.onclick = () => busy(b, async () => { await POST(`/api/partner/jobs/${b.dataset.acc}/accept`); toast('Job accepted · it is on your calendar now'); await refresh() }));
   $$('[data-dec]').forEach(b => b.onclick = () => busy(b, async () => { await POST(`/api/partner/jobs/${b.dataset.dec}/decline`); toast('Job declined · it goes to the next partner'); await refresh() }));
   $$('[data-done]').forEach(b => b.onclick = () => busy(b, async () => { await POST('/api/partner/jobs/finish', { code: b.dataset.done }); toast('Trip finished · thank-you email sent to the guest'); await refresh() }));
+}
+function showRest(tab, L, up) {
   if (tab === 'availability') {
     const ol = () => $('#offl').textContent = [...off].sort().map(shortDate).join(', ') || 'none'; ol();
-    $$('.cal button:not(:disabled)').forEach(b => b.onclick = async () => {
+    $$('.cal button.acc, .cal button.ofr').forEach(b => b.onclick = () => { const js = up.filter(j => j.date === b.dataset.d); $('#dayJobs').innerHTML = `<h3 style="margin:16px 0 10px">${nice(b.dataset.d)}</h3>` + js.map(j => jobCard(j, true)).join(''); wireJobs(); $('#dayJobs').scrollIntoView({ behavior: 'smooth', block: 'start' }) });
+    $$('.cal button:not(.acc):not(.ofr)').forEach(b => b.onclick = async () => {
       const d = b.dataset.d, had = off.has(d); had ? off.delete(d) : off.add(d); b.classList.toggle('off'); ol();
       try { await PUT('/api/partner/days-off', { dates: [...off] }); toast('Availability saved') } catch (e) { had ? off.add(d) : off.delete(d); b.classList.toggle('off'); ol(); toastErr(e) }
     });

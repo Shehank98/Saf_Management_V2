@@ -38,7 +38,16 @@ function publicConfig(conf) {
     sharedAllowLater: conf.shared.allowLater, maxAheadMonths: conf.rules.maxAheadMonths,
     providers: providers.list(), today: U.todayStr(),
     mealOptions: pricing.MEAL_OPTIONS,
+    privateOn: !!(conf.features && conf.features.private), locations: locationsForClient(conf), defaultLoc: conf.defaultLoc,
   };
+}
+
+/** Parks guests can book, with their own base, pickup range, times and seat prices. */
+function locationsForClient(conf) {
+  return conf.locList.map(id => conf.locations[id]).filter(l => l && l.active).map(l => ({
+    id: l.id, name: l.name, tagline: l.tagline, office: l.office, lat: l.lat, lng: l.lng, radiusKm: l.radiusKm, fleet: l.fleet,
+    sessions: Object.fromEntries(Object.entries(l.sessions).filter(([, s]) => s.active).map(([k, s]) => [k, { time: s.time, pickup: s.pickup, start: s.start, end: s.end, seat: s.seat }])),
+  }));
 }
 
 /** Bookings in prototype shape, with meals and assigned partners attached. */
@@ -47,7 +56,7 @@ async function bookings(db, where = 'TRUE', params = []) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
   const meals = (await db.query('SELECT booking_id, guest_no, preference FROM booking_meals WHERE booking_id = ANY($1) ORDER BY guest_no', [ids])).rows;
-  const asg = (await db.query(`SELECT booking_id, role, partner_id, status FROM assignments WHERE booking_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
+  const asg = (await db.query(`SELECT booking_id, role, partner_id, status, vehicle_plate FROM assignments WHERE booking_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
   const mealMap = {}, asgMap = {};
   meals.forEach(m => (mealMap[m.booking_id] = mealMap[m.booking_id] || []).push(pricing.MEAL_LABELS[m.preference] || 'Non-veg'));
   asg.forEach(a => (asgMap[a.booking_id] = asgMap[a.booking_id] || {})[a.role] = a);
@@ -56,9 +65,9 @@ async function bookings(db, where = 'TRUE', params = []) {
     return {
       code: b.code, name: b.lead_name, cc: b.phone_cc, phone: b.phone, email: b.email, ses: b.session_id, date: b.date, guests: b.guests, kids: b.children,
       pmode: b.pickup_mode === 'HOTEL' ? 'hotel' : 'office', hotel: b.hotel_name || '', pdist: b.pickup_km == null ? 0 : +b.pickup_km, lat: b.pickup_lat, lng: b.pickup_lng,
-      meals: b.has_meals ? 1 : 0, mealPrefs: mealMap[b.id] || [], allergy: b.allergy_note || '', bino: b.has_bino ? 1 : 0, cam: b.has_cam ? 1 : 0,
+      meals: b.has_meals ? 1 : 0, mealPrefs: mealMap[b.id] || [], allergy: b.allergy_note || '', bino: b.has_bino ? 1 : 0, cam: b.has_cam ? 1 : 0, guideReq: b.has_guide ? 1 : 0, loc: b.location_id,
       pay: PAY_UI[b.pay_option], paid: b.paid, total: b.total, refunded: b.refunded, jeeps: b.jeeps, status: uiStatus(b), declined: b.status === 'DECLINED',
-      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
+      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
       created: U.dateOf(b.created_at), notes: b.notes || '', startedAt: b.started_at ? U.hhmm(b.started_at) : '', startedBy: b.started_by || '',
       ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code),
     };
@@ -72,7 +81,7 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
   if (!trips.length) return [];
   const ids = trips.map(t => t.id);
   const seats = (await db.query(`SELECT * FROM shared_seats WHERE trip_id = ANY($1) AND status IN ('RESERVED','PAYMENT_PENDING','PAID','REFUNDED') ORDER BY seat_no`, [ids])).rows;
-  const asg = (await db.query(`SELECT shared_trip_id, role, partner_id, status FROM assignments WHERE shared_trip_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
+  const asg = (await db.query(`SELECT shared_trip_id, role, partner_id, status, vehicle_plate FROM assignments WHERE shared_trip_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
   const seatMap = {}, asgMap = {};
   seats.forEach(s => (seatMap[s.trip_id] = seatMap[s.trip_id] || []).push(s));
   asg.forEach(a => (asgMap[a.shared_trip_id] = asgMap[a.shared_trip_id] || {})[a.role] = a);
@@ -83,9 +92,10 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
     return {
       id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, status: STATUS[t.status], minSeats: t.min_seats, seatsMax: t.seats,
       deadline: U.dateOf(t.auto_cancel_at), deadlineTime: U.hhmm(t.auto_cancel_at),
-      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
-      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto,
-      seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline })),
+      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
+      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id,
+      guideWanted: mine.some(s => s.has_guide && s.status !== 'REFUNDED'),
+      seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline, hotel: s.hotel_name || '', pdist: s.pickup_km == null ? null : +s.pickup_km, lat: s.pickup_lat, lng: s.pickup_lng, bino: s.has_bino, guideReq: s.has_guide, amount: s.amount })),
     };
   });
 }
@@ -129,6 +139,12 @@ async function trips(db, sinceDate) {
     const c = costOf(b.code);
     const revenue = b.total - b.refunded;
     out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue, paid: b.paid, mealsN: c.mealsN, cam: b.has_cam ? 1 : 0, vendor: c.vendor, guide: c.guide, name: b.lead_name, status: uiStatus(b), cost: c.cost, profit: revenue - c.cost.total });
+  }
+  // Cancelled bookings where we kept part of the money (cancellation fee) are income with no trip cost.
+  const kept = (await db.query(`SELECT * FROM bookings WHERE status IN ('CANCELLED','DECLINED') AND paid > refunded AND date >= $1`, [sinceDate])).rows;
+  for (const b of kept) {
+    const revenue = b.paid - b.refunded, zero = { jeep: 0, guide: 0, meals: 0, cam: 0, total: 0 };
+    out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: 0, revenue, paid: b.paid, mealsN: 0, cam: 0, vendor: '', guide: '', name: b.lead_name + ' (cancelled, fee kept)', status: 'Cancelled', cost: zero, profit: revenue });
   }
   const ts = (await db.query(`SELECT t.*, COALESCE((SELECT SUM(amount) FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID'),0)::int AS revenue,
       (SELECT COUNT(*)::int FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID') AS n FROM shared_trips t WHERE t.status IN ('STARTED','COMPLETED') AND t.date >= $1`, [sinceDate])).rows;

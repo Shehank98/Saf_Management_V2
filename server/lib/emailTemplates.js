@@ -106,7 +106,7 @@ function admin_new_shared({ trip, session, seats, name, phone, payText, held, pa
     subject: `Shared seat booked | ${trip.id}, ${shortDate(trip.date)} (${held}/${maxSeats})`,
     html: layout({
       kind: 'admin', icon: '🪑', small: 'Shared jeep update', title: `Seat ${seats.join(', ')} booked on ${esc(trip.id)}`, c, foot: false,
-      body: table([row('Trip', esc(session.name) + ' · ' + niceDate(trip.date)), row('Guest', esc(name)), row('Phone', esc(phone)), row('Payment', payText), row('Seats now', `${held} of ${maxSeats} booked · ${paid} paid`)])
+      body: table([row('Trip', esc(session.name) + ' · ' + niceDate(trip.date)), ...(session.park ? [row('Park', esc(session.park))] : []), row('Guest', esc(name)), row('Phone', esc(phone)), row('Payment', payText), row('Seats now', `${held} of ${maxSeats} booked · ${paid} paid`)])
         + bar(Math.round(paid / maxSeats * 100), Math.round((held - paid) / maxSeats * 100))
         + (held >= minSeats ? callout(`🎯 ${held} seats are booked. This jeep is going ahead once ${minSeats} are paid. Assign a jeep and a tracker.`, 'ok') : muted(`Payment links go out automatically at ${minSeats} booked seats.`))
         + btn(`${c.base}/admin/shared?open=${encodeURIComponent(trip.id)}`, 'Open this trip') + pills([{ href: telHref(phone), label: '📞 Call guest' }, { href: waHref(phone), label: '💬 WhatsApp guest' }]),
@@ -151,7 +151,7 @@ function admin_shared_status({ trip, session, kind, paid }, c) {
     subject: `Shared trip ${trip.id} ${ok ? 'confirmed' : 'cancelled'} | ${shortDate(trip.date)}`,
     html: layout({
       kind: 'admin', icon: ok ? '✅' : '⚠️', small: 'Shared jeep', title: `${esc(trip.id)} ${ok ? 'is going ahead' : 'was cancelled'}`, c, foot: false,
-      body: table([row('Trip', esc(session.name) + ' · ' + niceDate(trip.date)), row('Paid seats', String(paid))]) + (ok ? callout('Remember to assign a jeep and a tracker.', 'info') : callout('Paid seats were refunded and guests were emailed.', 'warn'))
+      body: table([row('Trip', esc(session.name) + ' · ' + niceDate(trip.date)), ...(session.park ? [row('Park', esc(session.park))] : []), row('Paid seats', String(paid))]) + (ok ? callout('Remember to assign a jeep and a tracker.', 'info') : callout('Paid seats were refunded and guests were emailed.', 'warn'))
         + btn(`${c.base}/admin/shared?open=${encodeURIComponent(trip.id)}`, 'Open this trip'),
     }),
   };
@@ -294,7 +294,7 @@ function cust_shared_ticket({ trip, session, seats, code, ticketUrl, name }, c) 
     html: layout({
       icon: '🎟️', small: 'Shared jeep confirmed', title: 'It is happening!', c,
       body: p(`Hi ${esc(name.split(' ')[0])}, your shared jeep has enough travellers. Here is your ticket.`) + btn(ticketUrl, '🎟️ Open my e-ticket')
-        + qrBlock(code, `<div style="margin-top:8px;font:14px/1.5 ${FONT};color:${MUTE}">Seat ${seats.join(', ')} · ${esc(session.name)} · ${niceDate(trip.date)}<br>Pickup ${esc(session.pickup)}</div>`)
+        + qrBlock(code, `<div style="margin-top:8px;font:14px/1.5 ${FONT};color:${MUTE}">Seat ${seats.join(', ')} · ${esc(session.name)}${session.park ? ' · ' + esc(session.park) : ''} · ${niceDate(trip.date)}<br>Pickup ${esc(session.pickup)}</div>`)
         + pills([{ href: calHref({ session: { ...session, name: session.name }, date: trip.date, code, pickupWhere: 'your hotel' }), label: '📅 Add to calendar' }]),
     }),
   };
@@ -334,6 +334,19 @@ function vendor_job(j, c) {
         + table([row('Pickup', esc(j.session.pickup) + ' · ' + esc(j.pickupWhere)), row('Guests', ppl(j.guests) + (j.leadName ? ` (lead: ${esc(j.leadName)})` : '')), j.mealsText && row('Meal packs', esc(j.mealsText)), j.collect != null && row('Collect at pickup', fmtLkr(j.collect)), row('Your fee', `<b style="color:#3a6f34">${fmtLkr(j.fee)}</b>`)])
         + (j.aid ? btn(jobHref(c, j.aid, 'accept'), '✅ Accept this job', 'success') + btn(jobHref(c, j.aid, 'decline'), 'Decline', 'danger') : btn(portal, 'Open my jobs'))
         + pills([{ href: portal, label: '📋 Open partner portal' }, j.phone && { href: telHref(j.phone), label: '📞 Call guest' }, { href: telHref(c.conf.business.phone), label: '📞 Call the office' }]),
+    }),
+  };
+}
+
+function vendor_handover(j, c) {
+  const portal = `${c.base}/partner#jobs`;
+  return {
+    subject: `Job handed to you: ${shortDate(j.date)}, ${j.session.short} (${j.code})`,
+    html: layout({
+      kind: 'vendor', icon: '🔑', small: 'Job handed over to you', title: `${shortDate(j.date)} · ${esc(j.session.name)}`, c, foot: false, preheader: `${j.from} handed this job to you. You can now start the trip.`,
+      body: p(`<b>${esc(j.from)}</b> handed this job to you as <b>${esc(j.roleLabel)}</b>. It is already accepted in your name, so you are the one who scans the guest QR and starts the trip.`)
+        + table([row('Trip', `<span style="font-family:'Courier New',monospace">${esc(j.code)}</span>`), row('Pickup', esc(j.session.pickup)), j.plate && row('Vehicle', esc(j.plate)), row('Your fee', `<b style="color:#3a6f34">${fmtLkr(j.fee)}</b>`)])
+        + btn(portal, '📋 Open my jobs', 'success') + pills([{ href: telHref(c.conf.business.phone), label: '📞 Call the office' }]),
     }),
   };
 }
@@ -385,7 +398,7 @@ function vendor_login({ link }, c) {
 const TEMPLATES = {
   admin_new_private, admin_new_shared, admin_started, admin_vendor_app, admin_cancelled, admin_shared_status, admin_daily,
   cust_request, cust_confirmed, cust_reminder, cust_started, cust_thanks, cust_declined, cust_cancelled,
-  cust_shared_seat, cust_shared_pay, cust_shared_ticket, cust_shared_cancel, cust_shared_released,
+  vendor_handover, cust_shared_seat, cust_shared_pay, cust_shared_ticket, cust_shared_cancel, cust_shared_released,
   vendor_job, vendor_approved, vendor_rejected, vendor_payout, vendor_login,
 };
 

@@ -1,4 +1,5 @@
 const { todayStr, addDays, addMonths, localDate } = require('./util');
+const fleetOf = (conf, loc) => { const L = conf.locations && conf.locations[loc]; return L ? L.fleet : conf.rules.fleet; };
 
 const USED_STATUSES = `status IN ('REQUEST','CONFIRMED','STARTED','COMPLETED') OR (status='PENDING_PAYMENT' AND hold_until > now())`;
 
@@ -6,7 +7,7 @@ const USED_STATUSES = `status IN ('REQUEST','CONFIRMED','STARTED','COMPLETED') O
  * Jeeps in use per date: { 'YYYY-MM-DD': { morning, evening } }.
  * A full-day booking (or shared trip) uses its jeep in both the morning and evening slots.
  */
-async function usageRange(db, from, to) {
+async function usageRange(db, from, to, loc = null) {
   const out = {};
   const slot = d => (out[d] = out[d] || { morning: 0, evening: 0 });
   const add = (d, session, n) => {
@@ -14,15 +15,17 @@ async function usageRange(db, from, to) {
     if (session === 'morning' || session === 'full') u.morning += n;
     if (session === 'evening' || session === 'full') u.evening += n;
   };
+  // Each park has its own jeeps: count only bookings and trips at that park.
+  const p = loc ? [from, to, loc] : [from, to];
   const b = await db.query(
     `SELECT date, session_id, COALESCE(SUM(jeeps),0)::int AS n FROM bookings
-      WHERE date BETWEEN $1 AND $2 AND (${USED_STATUSES}) GROUP BY date, session_id`, [from, to]);
+      WHERE date BETWEEN $1 AND $2 AND (${USED_STATUSES}) ${loc ? 'AND location_id=$3' : ''} GROUP BY date, session_id`, p);
   b.rows.forEach(r => add(r.date, r.session_id, r.n));
   const s = await db.query(
     `SELECT t.date, t.session_id, COUNT(*)::int AS n FROM shared_trips t
-      WHERE t.date BETWEEN $1 AND $2 AND t.status <> 'CANCELLED'
+      WHERE t.date BETWEEN $1 AND $2 AND t.status <> 'CANCELLED' ${loc ? 'AND t.location_id=$3' : ''}
         AND (NOT t.auto OR EXISTS (SELECT 1 FROM shared_seats s WHERE s.trip_id=t.id AND s.status IN ('RESERVED','PAYMENT_PENDING','PAID')))
-      GROUP BY t.date, t.session_id`, [from, to]);
+      GROUP BY t.date, t.session_id`, p);
   s.rows.forEach(r => add(r.date, r.session_id, r.n));
   return out;
 }
@@ -58,8 +61,8 @@ async function dayAvailability(db, date, sessionId, conf, now = Date.now()) {
   if (!s || !s.active) return { closed: true, reason: 'Unavailable' };
   const reason = dateBlocked(date, s, conf, now);
   if (reason) return { closed: true, reason };
-  const usage = await usageRange(db, date, date);
-  return { closed: false, jeeps: jeepsFree(usage, date, sessionId, conf.rules.fleet) };
+  const usage = await usageRange(db, date, date, conf.defaultLoc);
+  return { closed: false, jeeps: jeepsFree(usage, date, sessionId, fleetOf(conf, conf.defaultLoc)) };
 }
 
 /** Calendar for a whole month: { 'YYYY-MM-DD': { closed, reason } | { jeeps } }. */
@@ -67,11 +70,12 @@ async function monthAvailability(db, month, sessionId, conf, now = Date.now()) {
   const s = conf.sessions[sessionId];
   const first = month + '-01';
   const last = addDays(addMonths(first, 1), -1);
-  const usage = await usageRange(db, first, last);
+  const usage = await usageRange(db, first, last, conf.defaultLoc);
+  const fleet = fleetOf(conf, conf.defaultLoc);
   const out = {};
   for (let d = first; d <= last; d = addDays(d, 1)) {
     const reason = s && s.active ? dateBlocked(d, s, conf, now) : 'Unavailable';
-    out[d] = reason ? { closed: true, reason } : { closed: false, jeeps: jeepsFree(usage, d, sessionId, conf.rules.fleet) };
+    out[d] = reason ? { closed: true, reason } : { closed: false, jeeps: jeepsFree(usage, d, sessionId, fleet) };
   }
   return out;
 }

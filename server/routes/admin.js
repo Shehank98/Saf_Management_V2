@@ -7,6 +7,7 @@ const live = require('../lib/live');
 const mailer = require('../lib/mailer');
 const bookings = require('../services/bookings');
 const shared = require('../services/shared');
+const assignments = require('../services/assignments');
 const partners = require('../services/partners');
 const payouts = require('../services/payouts');
 const U = require('../lib/util');
@@ -58,7 +59,8 @@ async function adminData(req) {
     business: conf.business, rules: conf.rules, policy: conf.policy, shared: conf.shared, payments: conf.payments, costs: conf.costs, pickup: conf.pickup,
     emails: conf.emails, partners: conf.partners,
     sessions: Object.fromEntries(Object.entries(conf.sessions).map(([k, s]) => [k, { name: s.name, short: s.short, start: s.start, end: s.end, pickup: s.pickup, pickupRaw: s.pickupRaw, time: s.time, jeep: s.jeep, seat: s.seat, active: s.active }])),
-    extras: conf.extras, closed: conf.closed,
+    extras: conf.extras, closed: conf.closed, features: conf.features,
+    locations: conf.locList.map(id => { const l = conf.locations[id]; return { id, name: l.name, tagline: l.tagline, office: l.office, lat: l.lat, lng: l.lng, radiusKm: l.radiusKm, fleet: l.fleet, active: l.active, sessions: l.raw }; }),
   };
   return {
     me: { id: req.admin.id, name: req.admin.name, email: req.admin.email, role: req.admin.role },
@@ -115,6 +117,17 @@ r.post('/shared/:id/seats/:n', staff, U.wrap(async (req, res) => { await shared.
 r.post('/shared/:id/seats/:n/paid', staff, U.wrap(async (req, res) => { await shared.markPaid(req.params.id, req.params.n, who(req)); res.json({ ok: true }); }));
 r.delete('/shared/:id/seats/:n', staff, U.wrap(async (req, res) => { await shared.removeGuest(req.params.id, req.params.n, who(req)); res.json({ ok: true }); }));
 
+/* Change the vehicle or give the job to another partner straight away (they can start the trip at once). */
+r.post('/jobs/handover', staff, U.wrap(async (req, res) => {
+  const b = req.body || {}, role = ['JEEP', 'GUIDE'].includes(b.role) ? b.role : 'JEEP';
+  const a = b.trip
+    ? (await query(`SELECT id FROM assignments WHERE shared_trip_id=$1 AND role=$2 AND status<>'DECLINED' ORDER BY id DESC LIMIT 1`, [U.normCode(b.trip), role])).rows[0]
+    : (await query(`SELECT a.id FROM assignments a JOIN bookings k ON k.id=a.booking_id WHERE k.code=$1 AND a.role=$2 AND a.status<>'DECLINED' ORDER BY a.id DESC LIMIT 1`, [U.normCode(b.code), role])).rows[0];
+  if (!a) throw U.notFound('Assign a partner first.');
+  const out = await assignments.handoverJob({ aid: a.id, toPartnerId: b.to ? +b.to : null, plate: b.plate, model: b.model, by: { kind: 'ADMIN', id: req.admin.id, name: who(req) } });
+  res.json({ ok: true, handed: !!out.partner });
+}));
+
 /* ---------------- Partners & payouts ---------------- */
 r.post('/partners/:id/approve', staff, U.wrap(async (req, res) => { await partners.approve(+req.params.id, req.body, who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/reject', staff, U.wrap(async (req, res) => { await partners.reject(+req.params.id, req.body.reason, who(req)); res.json({ ok: true }); }));
@@ -168,6 +181,33 @@ r.put('/settings/:section', owner, U.wrap(async (req, res) => {
     if (!policy.length) throw U.bad('Add at least one cancellation rule.');
     await settings.set('rules', { fleet: num(b.fleet, 1, 100, 4), maxPerJeep: num(b.maxPerJeep, 1, 20, 6), minLead: ['daybefore20', '24h', '48h'].includes(b.minLead) ? b.minLead : 'daybefore20', maxAheadMonths: num(b.maxAheadMonths, 1, 24, 4) });
     await settings.set('policy', policy);
+  } else if (sec === 'features') {
+    await settings.set('features', { private: !!b.private });
+  } else if (sec === 'location') {
+    // One park: its base on the map, free pickup range, jeeps and per-session times / seat prices.
+    const id = str(b.id, 40).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+    const name = str(b.name, 80);
+    if (!id || name.length < 2) throw U.bad('Give the park a name.');
+    if (!U.inSriLanka(+b.lat, +b.lng)) throw U.bad('The base location must be in Sri Lanka. Search for it or click the map.');
+    const sess = {};
+    for (const sid of Object.keys(conf.sessions)) {
+      const o = (b.sessions || {})[sid] || {};
+      const x = { active: o.active !== false };
+      if (o.start) { if (!hm(o.start)) throw U.bad('Use times like 05:30.'); x.start = hm(o.start); }
+      if (o.end) { if (!hm(o.end)) throw U.bad('Use times like 05:30.'); x.end = hm(o.end); }
+      if (o.pickup) { if (!hm(o.pickup)) throw U.bad('Use times like 05:30.'); x.pickup = hm(o.pickup); }
+      if (o.seat !== '' && o.seat != null && Number.isFinite(+o.seat)) x.seat = num(o.seat, 0, 1_000_000, 0);
+      sess[sid] = x;
+    }
+    const vals = [id, name, str(b.tagline, 120), str(b.office, 200), +b.lat, +b.lng, num(b.radiusKm, 0.5, 100, 7), num(b.fleet, 1, 200, 4), JSON.stringify(sess), b.active !== false];
+    if (b.isNew) {
+      if (conf.locations[id]) throw U.conflict('A park with that name already exists.');
+      await query(`INSERT INTO locations(id,name,tagline,office,base_lat,base_lng,radius_km,fleet,sessions,active,sort) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,(SELECT COALESCE(MAX(sort),0)+1 FROM locations))`, vals);
+    } else {
+      if (!conf.locations[id]) throw U.notFound('Park not found');
+      if (b.active === false && conf.locList.filter(x => conf.locations[x].active && x !== id).length === 0) throw U.bad('Keep at least one park switched on.');
+      await query(`UPDATE locations SET name=$2, tagline=$3, office=$4, base_lat=$5, base_lng=$6, radius_km=$7, fleet=$8, sessions=$9, active=$10 WHERE id=$1`, vals);
+    }
   } else if (sec === 'shared') {
     const seats = num(b.seats, 2, 12, 6);
     await settings.set('shared', { seats, minSeats: num(b.minSeats, 1, seats, 4), payWindowH: num(b.payWindowH, 1, 168, 24), autoCancelH: num(b.autoCancelH, 1, 168, 24), allowLater: !!b.allowLater, privateUpgrade: !!b.privateUpgrade });
@@ -182,6 +222,8 @@ r.put('/settings/:section', owner, U.wrap(async (req, res) => {
   } else if (sec === 'pickup') {
     if (!U.inSriLanka(+b.baseLat, +b.baseLng)) throw U.bad('The base location must be in Sri Lanka. Search for it or click the map.');
     await settings.set('pickup', { radiusKm: num(b.radiusKm, 0.5, 100, 7), baseLat: num(b.baseLat, -90, 90, 6.2833), baseLng: num(b.baseLng, -180, 180, 81.2886) });
+    // The main park holds the base now (Settings → Parks & pickup); keep it in step.
+    await query('UPDATE locations SET base_lat=$2, base_lng=$3, radius_km=$4 WHERE id=$1', [conf.defaultLoc, +b.baseLat, +b.baseLng, num(b.radiusKm, 0.5, 100, 7)]);
   } else if (sec === 'partners') {
     await settings.set('partners', { scanAny: !!b.scanAny });
   } else if (sec === 'closed') {

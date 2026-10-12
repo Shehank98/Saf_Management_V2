@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shared jeep safaris in Sri Lanka</title>
+<meta name="description" content="Book a seat on a shared jeep safari. Pick your park, session and date, choose your seat and pay securely online.">
+<meta name="theme-color" content="#c0682a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Yala Safaris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+<link rel="stylesheet" href="/assets/customer.css">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/assets/pwa.css">
+<style>
+
+.hero{position:relative;min-height:640px;overflow:hidden;background:linear-gradient(180deg,var(--sky1),var(--sky2) 72%,var(--hill1));color:#2b160a}
+.hero svg.scene{position:absolute;inset:0;width:100%;height:100%}
+.hero .in{position:relative;z-index:2;padding-top:56px;padding-bottom:230px;text-align:center}
+.hero .eb{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;background:rgba(255,248,235,.75);padding:6px 12px;border-radius:99px;color:#5a3216}
+.hero h1{font-size:clamp(34px,6vw,64px);margin:14px 0 8px;color:#2b160a}
+.hero .sub{max-width:560px;margin:0 auto;color:#3d2412;font-size:17px}
+.quick{max-width:860px;margin:26px auto 0;background:rgba(255,253,247,.95);color:#2b2118;border-radius:18px;padding:12px;display:grid;grid-template-columns:1.1fr 1.2fr 1fr auto;gap:8px;box-shadow:0 20px 50px rgba(60,30,10,.25);text-align:left}
+.quick .f{padding:6px 10px;border-radius:12px;background:#f6eedc}
+.quick label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6f604f}
+.quick select,.quick input{border:0;background:transparent;font-weight:700;font-size:15px;width:100%;padding:4px 0;color:#2b2118}
+.quick .btn{height:100%}
+@media (max-width:760px){.quick{grid-template-columns:1fr 1fr}.quick .btn{grid-column:1/-1}}
+.sun{animation:rise 5s ease-out both}@keyframes rise{from{transform:translateY(120px)}}
+.drive{animation:drive 20s linear infinite;animation-delay:-6s}@keyframes drive{from{transform:translateX(-240px)}to{transform:translateX(1700px)}}
+.bnc{animation:bnc .45s ease-in-out infinite alternate}@keyframes bnc{to{transform:translateY(-2.5px)}}
+.whl{animation:spin .6s linear infinite;transform-box:fill-box;transform-origin:center}@keyframes spin{to{transform:rotate(360deg)}}
+.dust{animation:dust 1.2s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes dust{0%{opacity:.7;transform:scale(.5)}100%{opacity:0;transform:translate(-40px,-14px) scale(2)}}
+.walk{animation:walk 64s linear infinite;animation-delay:-30s}@keyframes walk{from{transform:translateX(1500px)}to{transform:translateX(-300px)}}
+.trunk{animation:trunk 2.4s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:top center}@keyframes trunk{from{transform:rotate(-6deg)}to{transform:rotate(8deg)}}
+.fly{animation:fly 26s linear infinite}@keyframes fly{from{transform:translate(-120px,0)}to{transform:translate(1600px,-60px)}}
+.flap{animation:flap .5s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}@keyframes flap{to{transform:scaleY(-.5)}}
+.sway{animation:sway 3s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:bottom center}@keyframes sway{from{transform:skewX(-5deg)}to{transform:skewX(5deg)}}
+section{padding:56px 0 8px}
+.sess .card{position:relative;overflow:hidden}
+.sess .t{font-family:Fraunces,serif;font-size:20px;font-weight:700}
+.price{font-family:Fraunces,serif;font-size:22px;font-weight:700;color:var(--ochre)}
+.seatrow{display:flex;gap:6px;margin:12px 0}
+.seatrow i{width:30px;height:30px;border-radius:8px;background:var(--sand);border:2px solid var(--line);animation:fill 6s ease-in-out infinite}
+.seatrow i:nth-child(1){animation-delay:0s}.seatrow i:nth-child(2){animation-delay:.6s}.seatrow i:nth-child(3){animation-delay:1.2s}.seatrow i:nth-child(4){animation-delay:1.8s}.seatrow i:nth-child(5){animation-delay:2.4s;opacity:.6}.seatrow i:nth-child(6){animation-delay:3s;opacity:.6}
+@keyframes fill{0%,10%{background:var(--sand);border-color:var(--line)}25%,85%{background:var(--olive);border-color:var(--olive)}100%{background:var(--sand)}}
+details{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:8px}
+summary{cursor:pointer;padding:14px 16px;font-weight:700;list-style:none;display:flex;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--ochre);font-size:20px;line-height:1;transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{padding:0 16px 14px;margin:0;color:var(--muted)}
+.how{counter-reset:h}
+.how .card{position:relative;padding-top:44px}
+.how .card::before{counter-increment:h;content:counter(h);position:absolute;top:14px;left:18px;width:24px;height:24px;border-radius:50%;background:var(--ochre);color:var(--ochre-ink);font-weight:700;font-size:13px;display:grid;place-items:center}
+footer{padding:50px 0 120px;color:var(--muted);font-size:13px;text-align:center}
+
+.quick{grid-template-columns:1.3fr 1fr .8fr auto}
+@media (max-width:760px){.quick{grid-template-columns:1fr 1fr}}
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px}
+.why .card b{display:block;font-size:16px;margin:8px 0 4px}
+.why .ic{width:42px;height:42px;border-radius:12px;background:var(--sand);display:grid;place-items:center;color:var(--ochre)}
+.partner{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;background:linear-gradient(120deg,#5b6b3a,#3f5a2e);color:#fff6e6;border:0}
+.partner p{color:#e8dcc4}
+@media (max-width:640px){.partner{grid-template-columns:1fr}}
+
+.quick{grid-template-columns:1.3fr 1fr 1fr auto}
+@media (max-width:760px){.quick{grid-template-columns:1fr 1fr}.quick .f:first-child{grid-column:1/-1}}
+.parks{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;margin-top:14px;align-items:start}
+@media (max-width:860px){.parks{grid-template-columns:1fr}}
+.pmap{height:430px;border-radius:18px;border:1px solid var(--line);overflow:hidden;box-shadow:var(--shadow);background:var(--sand)}
+@media (max-width:860px){.pmap{height:300px}}
+.plist{display:grid;gap:10px}
+.park{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;width:100%;cursor:pointer;transition:border-color .2s,transform .2s}
+.park:hover{transform:translateY(-2px);border-color:var(--ochre)}
+.park.on{border-color:var(--ochre);box-shadow:0 0 0 3px color-mix(in srgb,var(--ochre) 22%,transparent)}
+.park .pin{width:42px;height:42px;border-radius:12px;background:var(--sand);display:grid;place-items:center;color:var(--ochre)}
+.park b{font-family:Fraunces,serif;font-size:18px}
+.park .from{text-align:right;white-space:nowrap}
+.steps4{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px;counter-reset:h}
+.steps4 .card{position:relative;padding-top:46px}
+.steps4 .card::before{counter-increment:h;content:counter(h);position:absolute;top:14px;left:18px;width:26px;height:26px;border-radius:50%;background:var(--ochre);color:var(--ochre-ink);font-weight:700;font-size:13px;display:grid;place-items:center}
+.extras3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px}
+.extras3 .card b{display:block;font-size:16px;margin:8px 0 4px}
+.extras3 .ic{width:42px;height:42px;border-radius:12px;background:var(--sand);display:grid;place-items:center;font-size:20px}
+.sess .seatrow i{width:22px;height:22px;border-radius:6px}
+.partner .btn{color:#2b2118;background:#fff6e6}
+</style>
+</head>
+<body>
+<div class="hero">
+  <svg class="scene" viewBox="0 0 1440 720" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs><radialGradient id="sg"><stop offset="0" stop-color="#fff3c9"/><stop offset=".6" stop-color="#ffd98a"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>
+    <g id="ac"><path d="M0 0 L-3 -70 M-3 -55 L-28 -82 M-2 -62 L24 -88" stroke="#3a2414" stroke-width="5" fill="none" stroke-linecap="round"/><ellipse cx="-30" cy="-88" rx="44" ry="10" fill="#4a5a2a"/><ellipse cx="22" cy="-94" rx="50" ry="11" fill="#55672f"/></g>
+    <g id="bd"><path class="flap" d="M0 0 Q6 -6 12 0 Q18 -6 24 0" stroke="#3a2414" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+    <g id="el"><path d="M0 0 C-6 -30 18 -48 52 -46 C80 -44 96 -32 98 -10 L98 18 L88 18 L86 2 L74 2 L72 18 L62 18 L60 4 L30 4 L28 18 L18 18 L16 4 L10 4 L8 18 L-2 18 Z" fill="#4b3424"/><path class="trunk" d="M-6 -20 C-22 -10 -22 10 -16 24" stroke="#4b3424" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M6 -34 C-6 -30 -4 -10 10 -8 Z" fill="#3a271a"/></g></defs>
+    <circle class="sun" cx="1080" cy="420" r="150" fill="url(#sg)"/><circle class="sun" cx="1080" cy="420" r="66" fill="#ffe7a8"/>
+    <g class="fly"><use href="#bd" x="0" y="230"/><use href="#bd" x="36" y="214"/><use href="#bd" x="66" y="236"/></g>
+    <path d="M0 500 C200 460 340 480 520 465 C720 445 860 490 1040 468 C1200 450 1320 475 1440 462 L1440 720 L0 720Z" fill="var(--hill1)" opacity=".8"/>
+    <g class="walk"><use href="#el" x="0" y="490"/><use href="#el" transform="translate(130,500) scale(.6)"/></g>
+    <use href="#ac" x="160" y="505"/><use href="#ac" x="1290" y="495"/>
+    <path d="M0 565 C180 540 360 556 560 545 C780 530 960 562 1160 548 C1300 540 1380 548 1440 544 L1440 720 L0 720Z" fill="var(--hill2)"/>
+    <g fill="#6d5a2a"><path class="sway" d="M90 568 l4 -22 l3 22 l5 -16 l2 16 z"/><path class="sway" d="M760 548 l4 -22 l3 22 l5 -16 l2 16 z" style="animation-delay:-1s"/><path class="sway" d="M1350 548 l4 -22 l3 22 l5 -16 l2 16 z" style="animation-delay:-2s"/></g>
+    <path d="M0 640 C300 618 600 630 900 622 C1150 616 1300 626 1440 618" stroke="#c99a62" stroke-width="32" fill="none" opacity=".55"/>
+    <g class="drive"><g transform="translate(0,578)">
+      <circle class="dust" cx="-6" cy="48" r="8" fill="#e4c08c"/><circle class="dust" cx="-14" cy="44" r="6" fill="#e4c08c" style="animation-delay:.4s"/>
+      <g class="bnc"><path d="M8 18 L30 18 L40 -4 L120 -4 L128 18 L170 22 L174 42 L4 42 Z" fill="#5b6b3a"/><rect x="44" y="-2" width="34" height="18" rx="3" fill="#cfe6ee" opacity=".85"/><rect x="82" y="-2" width="36" height="18" rx="3" fill="#cfe6ee" opacity=".85"/><path d="M36 -4 L36 -22 L126 -22 L126 -4" stroke="#3f4a28" stroke-width="4" fill="none"/><rect x="34" y="-26" width="96" height="6" rx="2" fill="#a64b2a"/><circle cx="58" cy="6" r="5" fill="#3a2414"/><circle cx="100" cy="6" r="5" fill="#3a2414"/><circle cx="2" cy="26" r="11" fill="#2b1a0e"/></g>
+      <g class="whl"><circle cx="38" cy="44" r="14" fill="#2b1a0e"/><circle cx="38" cy="44" r="6" fill="#8a7a5a"/><rect x="36" y="32" width="4" height="24" fill="#5a4a32"/></g>
+      <g class="whl"><circle cx="142" cy="44" r="14" fill="#2b1a0e"/><circle cx="142" cy="44" r="6" fill="#8a7a5a"/><rect x="140" y="32" width="4" height="24" fill="#5a4a32"/></g></g></g>
+    <path d="M0 670 C240 652 520 664 760 658 C1000 650 1200 666 1440 660 L1440 720 L0 720Z" fill="var(--hill3)"/>
+  </svg>
+  <div class="wrap in">
+    <span class="eb fade">Shared jeep safaris · Sri Lanka</span>
+    <h1 class="fade d1">Share the jeep.<br>Keep the adventure.</h1>
+    <p class="sub fade d2">Book a seat on a shared safari jeep with an expert tracker. Pick your park, choose your seat and pay securely online.</p>
+    <form class="quick fade d3" id="quick">
+      <div class="f"><label for="qLoc">Park</label><select id="qLoc"></select></div>
+      <div class="f"><label for="qSes">Session</label><select id="qSes"></select></div>
+      <div class="f"><label for="qDate">Date</label><input type="date" id="qDate"></div>
+      <button class="btn primary" type="submit">Find seats</button>
+    </form>
+  </div>
+</div>
+<main class="wrap">
+<section><h2>Choose your park</h2><p class="muted">Every park has its own pickup area. Pickup is free within the ring on the map.</p>
+  <div class="parks"><div class="pmap" id="pmap" role="img" aria-label="Map of Sri Lanka with our safari parks"></div><div class="plist" id="parks"></div></div></section>
+<section><h2>Sessions</h2><p class="muted" id="sessNote">Price is per seat. A shared jeep takes up to <span data-cfg="sharedSeats">6</span> guests.</p><div class="grid g3 sess" id="sessCards" style="margin-top:14px"></div></section>
+<section><h2>How shared safaris work</h2>
+  <div class="steps4">
+    <div class="card"><b>Pick a date</b><p class="small muted">Choose your park, session and day. Every open day shows how many seats are left.</p></div>
+    <div class="card"><b>Choose your seats</b><p class="small muted">Tap the seats you want. They are locked for you for 15 minutes while you finish.</p></div>
+    <div class="card"><b>Pay securely</b><p class="small muted">Pay by card on a secure page, or reserve now and pay when the jeep fills up.</p></div>
+    <div class="card"><b>Get your e-ticket</b><p class="small muted">Once <span data-cfg="minSeats">4</span> seats are paid the safari is on and your QR ticket is emailed. Not enough people? Full refund.</p></div>
+  </div></section>
+<section><h2>Add to your safari</h2><div class="extras3" id="extras"></div></section>
+<section><h2>Good to know</h2><div style="margin-top:14px">
+  <details><summary>When is the shared jeep confirmed?</summary><p>As soon as <span data-cfg="minSeats">4</span> seats are paid. Everyone on the jeep gets their QR e-ticket by email at that moment.</p></details>
+  <details><summary>What if not enough people book?</summary><p>If a jeep doesn't reach <span data-cfg="minSeats">4</span> paid seats before the deadline, it is cancelled and every payment is refunded in full.</p></details>
+  <details><summary>Can I cancel?</summary><p><span id="policyText"></span></p></details>
+  <details><summary>Where do you pick me up?</summary><p>Free pickup from your hotel inside the pickup ring of your park (you drop a pin on the map when you book). Outside the ring, you meet us at our office.</p></details>
+</div></section>
+<section><div class="card partner"><div><h2 style="color:#fff6e6">Own a safari jeep or work as a guide?</h2><p style="margin-top:6px">Partner with us and get booked for shared safaris.</p></div><a class="btn" href="/partners/apply">Apply as a partner</a></div></section>
+</main>
+<footer>© <span id="yr"></span> <span data-cfg="brand">Yala Wild Safaris</span> · <a href="/shared">Book a seat</a> · <a href="/partners/apply">Partner with us</a></footer>
+
+<script defer src="/api/config.js"></script>
+<script defer src="/assets/core.js"></script>
+<script defer src="/assets/customer.js"></script>
+<script defer src="/vendor/leaflet/leaflet.js"></script>
+<script defer src="/assets/map.js"></script>
+<script defer src="/assets/pages/landing.js"></script>
+</body>
+</html>

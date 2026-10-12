@@ -9,6 +9,11 @@ const EV_LABELS = {
   partners: [['vendor_job', 'New job offer'], ['vendor_payout', 'Payout sent + statement']],
 };
 let emailLog = null;
+let locSel = (CONF.locations[0] || {}).id;
+function curLoc() {
+  if (locSel === '__new') { const m = CONF.locations[0] || { lat: 6.2833, lng: 81.2886 }; return { isNew: true, id: '', name: '', tagline: '', office: '', lat: m.lat, lng: m.lng, radiusKm: 7, fleet: 2, active: true, sessions: {} } }
+  return CONF.locations.find(l => l.id === locSel) || CONF.locations[0];
+}
 const SECTIONS = {
   business: ['Business', () => `<h3>Business details</h3><p class="small muted" style="margin-bottom:14px">Shown on the website, e-tickets and emails.</p>
   <div class="g2f"><div class="field"><label>Business name</label><input class="inp" id="b_name" value="${esc(CONF.business.name)}" ${dis}></div><div class="field"><label>Website domain</label><input class="inp" id="b_domain" value="${esc(CONF.business.domain)}" ${dis}></div>
@@ -40,7 +45,12 @@ const SECTIONS = {
     const ap = $('#addPol'); if (ap) ap.onclick = () => $('#pol').insertAdjacentHTML('beforeend', `<tr><td><input class="inp ph" type="number" min="0" value="0" style="width:90px"> hours before</td><td><input class="inp pp" type="number" min="0" max="100" value="0" style="width:90px"> %</td></tr>`);
   }],
 
-  shared: ['Shared trips', () => `<h3>Shared trips</h3><p class="small muted" style="margin-bottom:14px">Shared trips are link-only. These are the defaults for new trips.</p>
+  website: ['Website', () => `<h3>Website</h3><p class="small muted" style="margin-bottom:14px">Choose what guests can book on your website.</p>
+  <div class="sw"><div><b>Shared safaris</b><div class="small muted">Always on. Guests pick a park, a session and a date, then choose seats on a shared jeep.</div></div><span class="tag ok">On</span></div>
+  <div class="sw"><div><b>Private safaris</b><div class="small muted">Off = the private-jeep pages are hidden from the website and from this admin panel. Nothing is deleted: switch it back on any time.</div></div>${sw('ft_private', CONF.features && CONF.features.private)}</div>`,
+  () => ({ private: isOn('ft_private') }), 'features'],
+
+  shared: ['Shared trips', () => `<h3>Shared trips</h3><p class="small muted" style="margin-bottom:14px">These are the defaults for new shared jeeps.</p>
   <div class="g2f"><div class="field"><label>Seats per shared jeep</label><input class="inp" type="number" min="2" max="12" id="sh_seats" value="${CONF.shared.seats}" ${dis}></div><div class="field"><label>Minimum paid seats to run</label><input class="inp" type="number" min="1" id="sh_min" value="${CONF.shared.minSeats}" ${dis}></div>
   <div class="field"><label>Payment window after links go out</label><select class="inp" id="sh_win" ${dis}>${[12, 24, 48].map(h => `<option value="${h}" ${CONF.shared.payWindowH === h ? 'selected' : ''}>${h} hours</option>`).join('')}</select></div><div class="field"><label>Auto-cancel if not enough paid</label><select class="inp" id="sh_auto" ${dis}>${[24, 36, 48].map(h => `<option value="${h}" ${CONF.shared.autoCancelH === h ? 'selected' : ''}>${h} hours before start</option>`).join('')}</select></div></div>
   <div class="sw"><div><b>Allow "reserve now, pay later"</b><div class="small muted">Off = guests must pay to hold a seat.</div></div>${sw('sh_later', CONF.shared.allowLater)}</div>
@@ -73,17 +83,34 @@ const SECTIONS = {
     $$('[data-rt]').forEach(b => b.onclick = () => busy(b, async () => { await POST(`/api/admin/emails/${b.dataset.rt}/retry`); toast('Queued again'); setTimeout(() => render(), 1500) }));
   }],
 
-  pickup: ['Pickup area', () => `<h3>Pickup area</h3><div class="g2f" style="margin-top:12px"><div class="field"><label>Free pickup radius (km)</label><input class="inp" type="number" min="0.5" step="0.5" id="pk_r" value="${CONF.pickup.radiusKm}" ${dis}></div><div class="field"><label>Base location (latitude, longitude)</label><div style="display:flex;gap:8px"><input class="inp" id="pk_lat" value="${CONF.pickup.baseLat}" ${dis}><input class="inp" id="pk_lng" value="${CONF.pickup.baseLng}" ${dis}></div></div></div>
+  locations: ['Parks & pickup', () => {
+    const L = curLoc();
+    return `<h3>Parks &amp; pickup</h3><p class="small muted" style="margin-bottom:12px">Each park has its own base on the map, free pickup range, jeeps, session times and seat price. Guests pick the park on the website.</p>
+  <div class="seg" id="locSeg" style="margin-bottom:14px">${CONF.locations.map(l => `<button type="button" data-l="${esc(l.id)}" class="${l.id === L.id ? 'on' : ''}">${esc(l.name)}${l.active ? '' : ' (off)'}</button>`).join('')}${RO ? '' : '<button type="button" data-l="__new" class="' + (L.isNew ? 'on' : '') + '">+ Add a park</button>'}</div>
+  <div class="g2f"><div class="field"><label>Park name</label><input class="inp" id="lc_name" value="${esc(L.name)}" placeholder="Udawalawe National Park" ${dis}></div><div class="field"><label>Short line for the website</label><input class="inp" id="lc_tag" value="${esc(L.tagline || '')}" placeholder="Elephants up close" ${dis}></div>
+  <div class="field"><label>Office / meeting point</label><input class="inp" id="lc_office" value="${esc(L.office || '')}" ${dis}></div><div class="field"><label>Jeeps at this park (per session)</label><input class="inp" type="number" min="1" id="lc_fleet" value="${L.fleet}" ${dis}></div>
+  <div class="field"><label>Free pickup range (km from the base)</label><input class="inp" type="number" min="0.5" step="0.5" id="pk_r" value="${L.radiusKm}" ${dis}></div><div class="field"><label>Base location (latitude, longitude)</label><div style="display:flex;gap:8px"><input class="inp" id="pk_lat" value="${L.lat}" ${dis}><input class="inp" id="pk_lng" value="${L.lng}" ${dis}></div></div></div>
   ${RO ? '' : '<button class="btn sm" id="pk_here" type="button">📍 Use my current location as the base</button>'}
   ${RO ? '' : '<div class="msearch" style="margin-top:12px"><input class="inp" id="pk_search" placeholder="Search a place in Sri Lanka (for example Tissamaharama)" autocomplete="off"><div class="mres" id="pk_res"></div></div>'}
-  <div class="lmap" id="pkmap" style="margin-top:${RO ? 12 : 0}px"></div><p class="tiny muted">The map shows Sri Lanka only. Search for your base, click the map or drag the pin. Guests pick their hotel on the same map; the server measures the real distance from this base and refuses pins outside the free radius.</p>`,
-  () => ({ radiusKm: num('pk_r'), baseLat: +$('#pk_lat').value, baseLng: +$('#pk_lng').value }), 'pickup',
+  <div class="lmap" id="pkmap" style="margin-top:${RO ? 12 : 0}px"></div><p class="tiny muted">Sri Lanka only. Search for the base, click the map or drag the pin. The ring is the free pickup range. Guests drop their hotel pin on the same map.</p>
+  <div class="sec-t">Sessions at this park</div><p class="small muted">Leave a box empty to use the main time or price from "Sessions &amp; prices".</p>
+  <div class="tblw"><table class="t"><thead><tr><th>Session</th><th>Starts</th><th>Ends</th><th>Pickup</th><th>Seat price (LKR)</th><th>On</th></tr></thead><tbody>${Object.entries(CONF.sessions).map(([k, s]) => { const o = (L.sessions || {})[k] || {}; return `<tr><td><b>${esc(s.short)}</b></td><td><input class="inp" type="time" id="ls_${k}_start" value="${esc(o.start || '')}" placeholder="${s.start}" ${dis}></td><td><input class="inp" type="time" id="ls_${k}_end" value="${esc(o.end || '')}" ${dis}></td><td><input class="inp" type="time" id="ls_${k}_pickup" value="${esc(o.pickup || '')}" ${dis}></td><td><input class="inp" type="number" min="0" id="ls_${k}_seat" value="${o.seat ?? ''}" placeholder="${s.seat}" ${dis}></td><td>${sw(`ls_${k}_on`, o.active !== false)}</td></tr>` }).join('')}</tbody></table></div>
+  <div class="sw" style="margin-top:12px"><div><b>Park is open for booking</b><div class="small muted">Off = hidden from the website. Existing trips stay.</div></div>${sw('lc_on', L.active !== false)}</div>`;
+  },
   () => {
+    const L = curLoc();
+    return { id: L.isNew ? $('#lc_name').value : L.id, isNew: !!L.isNew, name: $('#lc_name').value, tagline: $('#lc_tag').value, office: $('#lc_office').value, fleet: num('lc_fleet'), radiusKm: num('pk_r'), lat: +$('#pk_lat').value, lng: +$('#pk_lng').value, active: isOn('lc_on'),
+      sessions: Object.fromEntries(Object.keys(CONF.sessions).map(k => [k, { start: $(`#ls_${k}_start`).value, end: $(`#ls_${k}_end`).value, pickup: $(`#ls_${k}_pickup`).value, seat: $(`#ls_${k}_seat`).value, active: isOn(`ls_${k}_on`) }])) };
+  }, 'location',
+  () => {
+    $$('#locSeg button').forEach(b => b.onclick = () => { if (dirty && !confirm('Discard your unsaved changes?')) return; dirty = false; locSel = b.dataset.l; render() });
     const mapEl = $('#pkmap'); if (typeof L === 'undefined') { mapEl.innerHTML = '<p class="small muted" style="padding:12px">Map unavailable.</p>'; return }
     const c0 = [+$('#pk_lat').value, +$('#pk_lng').value];
     const map = slMap(mapEl, { center: c0, zoom: 12 });
+    // Other parks are shown faintly for reference.
+    CONF.locations.filter(l => l.id !== curLoc().id).forEach(l => L.circleMarker([l.lat, l.lng], { radius: 6, color: '#6f604f', fillOpacity: .5 }).addTo(map).bindTooltip(l.name));
     const base = L.marker(c0, { draggable: !RO }).addTo(map), ring = L.circle(c0, { radius: num('pk_r') * 1000, color: '#c0682a', fillOpacity: .08 }).addTo(map);
-    const move = (lat, lng, pan = true) => { if (!inSriLanka(lat, lng)) return toast('That spot is outside Sri Lanka.'); $('#pk_lat').value = lat.toFixed(6); $('#pk_lng').value = lng.toFixed(6); base.setLatLng([lat, lng]); ring.setLatLng([lat, lng]); if (pan) map.setView([lat, lng], Math.max(map.getZoom(), 13)); dirty = true };
+    const move = (lat, lng, pan = true) => { if (!inSriLanka(lat, lng)) return toast('That spot is outside Sri Lanka.'); $('#pk_lat').value = lat.toFixed(6); $('#pk_lng').value = lng.toFixed(6); base.setLatLng([lat, lng]); ring.setLatLng([lat, lng]); dirty = true; if (pan) map.fitBounds(ring.getBounds().pad(0.3)) };
     if (!RO) {
       map.on('click', e => move(e.latlng.lat, e.latlng.lng, false)); base.on('dragend', () => { const p = base.getLatLng(); move(p.lat, p.lng, false) });
       $('#pk_r').oninput = () => ring.setRadius((num('pk_r') || 1) * 1000);
@@ -125,7 +152,12 @@ function render() {
 }
 $('#save').onclick = async e => {
   const sec = SECTIONS[cur], body = sec[2]();
-  if (await act(() => PUT(`/api/admin/settings/${sec[3]}`, body), 'Settings saved', e.target)) { dirty = false; render() }
+  if (await act(() => PUT(`/api/admin/settings/${sec[3]}`, body), 'Settings saved', e.target)) {
+    dirty = false;
+    if (cur === 'website') { location.reload(); return }
+    if (cur === 'locations' && body.isNew) locSel = (CONF.locations.find(l => l.name === body.name.trim()) || CONF.locations[CONF.locations.length - 1]).id;
+    render();
+  }
 };
 $('#reset').onclick = () => { dirty = false; render(); toast('Changes discarded') };
 addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = '' } });

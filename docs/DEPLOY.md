@@ -15,7 +15,8 @@ The whole system (public site, admin, partner portal, API, scheduler) is **one N
 | `NODE_ENV` | `production` |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | your first owner login (used once; delete the password afterwards) |
 | `APPS_SCRIPT_URL`, `APPS_SCRIPT_SECRET` | from [APPS_SCRIPT.md](APPS_SCRIPT.md) |
-| `PAYMENT_PROVIDERS` | `mock` to try it first, then `stripe`, `payhere` or `stripe,payhere` |
+| `PAYMENT_PROVIDERS` | `mock` to try it first, then `onepay,stripe` (OnePay first for local cards, Stripe for foreign cards) |
+| `ONEPAY_APP_ID`, `ONEPAY_APP_TOKEN`, `ONEPAY_HASH_SALT` | see OnePay below |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | see Stripe below |
 | `PAYHERE_MERCHANT_ID`, `PAYHERE_MERCHANT_SECRET`, `PAYHERE_SANDBOX` | see PayHere below |
 
@@ -30,9 +31,24 @@ Open `https://YOUR-DOMAIN/admin`, sign in with `ADMIN_EMAIL`/`ADMIN_PASSWORD`, t
 3. Guests pay on Stripe's hosted page; card details never touch your server. Amounts always come from the server.
 4. **Check that your Stripe account can be paid out in Sri Lanka and can charge in LKR.** If not, set `STRIPE_CURRENCY=usd` (prices stay in LKR on your site; you would need a conversion rule) or use PayHere.
 
-## 4b. PayHere (Sri Lanka)
+## 4a. OnePay (Sri Lanka, local cards)
+1. OnePay merchant dashboard → **Apps** → create (or open) your app. Copy the **App ID**, **App Token** and **Hash Salt** into `ONEPAY_APP_ID`, `ONEPAY_APP_TOKEN`, `ONEPAY_HASH_SALT`.
+2. In the same app set the **Callback URL** to `https://YOUR-DOMAIN/api/payments/webhook/onepay`.
+3. Set `PAYMENT_PROVIDERS=onepay,stripe`. Guests then see two buttons: Sri Lankan cards (OnePay) and Credit / debit card (Stripe).
+4. The app never trusts the callback alone: it asks OnePay's status API whether the transaction is paid before confirming a booking. Prices always come from the server.
+5. OnePay refunds are done in the OnePay dashboard; the app lists them under *Payments → Customer payments* for you to mark done.
+
+## 4b. PayHere (Sri Lanka, optional)
 Merchant ID and merchant secret come from the PayHere dashboard (Domains & Credentials). Add your site domain there. The notify URL is set for you: `/api/payments/webhook/payhere`. Keep `PAYHERE_SANDBOX=true` until you have tested, then set it to `false`. PayHere refunds are done in their dashboard; the app lists them under *Payments → Customer payments* for you to mark done.
 With both enabled, guests are offered the choice at checkout. More local gateways can be added in `server/payments/`.
+
+## 4c. Parks, private safaris and guides (in the admin panel)
+- **Settings → Parks & pickup**: add each park (Yala, Udawalawe, ...). Each has its own base pin on the Sri Lanka map, free pickup range, number of jeeps, and (optional) its own session times and seat price.
+- **Settings → Website**: private safaris are **off** by default, so the website shows shared safaris only. Switch them on again any time; nothing is deleted.
+- **Settings → Sessions & prices → Extras**: the *Naturalist guide* price (charged once per group). Guests tick it next to meals and binoculars; the trip then shows "Guide requested" in the admin panel so you can assign a guide.
+
+## 4d. Phone notifications for partners (optional variables)
+Partners tap **Turn on notifications** in the partner portal (on iPhone, add the portal to the home screen first). Keys are created automatically. To set your own, add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_EMAIL` (generate with `npx web-push generate-vapid-keys`).
 
 ## 5. Phone app (home screen)
 Nothing to build. Open the site on a phone:

@@ -15,7 +15,7 @@ function list() {
 async function open(code) {
   const b = BOOKINGS.find(x => x.code === code); if (!b) return; openCode = code;
   const s = SESS[b.ses], bal = b.total - b.paid, hrs = (startOf(b) - new Date()) / 36e5;
-  const ext = [b.meals ? 'Meal pack (' + ppl(b.mealPrefs.filter(x => x !== MEAL_NONE).length) + ')' : '', b.bino ? 'Binoculars' : '', b.cam ? 'Camera' : ''].filter(Boolean).join(', ') || 'None';
+  const ext = [b.meals ? 'Meal pack (' + ppl(b.mealPrefs.filter(x => x !== MEAL_NONE).length) + ')' : '', b.bino ? 'Binoculars' : '', b.cam ? 'Camera' : '', b.guideReq ? 'Naturalist guide (assign one below)' : ''].filter(Boolean).join(', ') || 'None';
   let main = '';
   if (b.status === 'Request') main = `<button class="btn ok" id="aConfirm">Confirm &amp; email ticket</button><button class="btn" id="aDecline">Decline</button>`;
   else if (b.status === 'Started') main = `<button class="btn ok" id="aDone">Mark completed</button><button class="btn" id="aPay">Record payment</button>`;
@@ -28,7 +28,7 @@ async function open(code) {
     <div class="sec-t">Safari</div><dl class="dl"><dt>When</dt><dd>${nice(b.date)} · ${esc(s.name)}</dd><dt>Pickup</dt><dd>${s.pickup} · ${b.pmode === 'hotel' ? esc(b.hotel || '-') + (b.pdist ? ` (${b.pdist} km)` : '') : 'Office'}</dd><dt>Group</dt><dd>${ppl(b.guests)}${b.kids ? ` (${b.kids} children)` : ''} · ${b.jeeps} jeep${b.jeeps > 1 ? 's' : ''}</dd><dt>Extras</dt><dd>${ext}</dd>${+b.meals ? `<dt>Meal choices</dt><dd>${mealSummary(b)}</dd>` : ''}${b.status === 'Started' ? `<dt>Trip started</dt><dd style="color:var(--info)">${b.startedAt} · scanned by ${esc(b.startedBy || vendorName(b.vendor) || 'driver')}</dd>` : ''}</dl>
     ${b.lat != null ? `<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${b.lat},${b.lng}">📍 Open pickup pin in Maps</a>` : ''}
     <div class="sec-t">Assign</div>
-    <div class="field"><label for="vJ">Jeep + driver${stateNote(b.vendorState)}</label><select class="inp" id="vJ" ${['Cancelled', 'Completed'].includes(b.status) ? 'disabled' : ''}>${vendorOpts('jeep', b.vendor)}</select></div>
+    <div class="field"><label for="vJ">Jeep + driver${stateNote(b.vendorState)}</label><select class="inp" id="vJ" ${['Cancelled', 'Completed'].includes(b.status) ? 'disabled' : ''}>${vendorOpts('jeep', b.vendor)}</select></div>${handoverButton(b, b.code)}
     <div class="field"><label for="vG">Tracker / guide${stateNote(b.guideState)}</label><select class="inp" id="vG" ${['Cancelled', 'Completed'].includes(b.status) ? 'disabled' : ''}>${vendorOpts('guide', b.guide)}</select></div>
     <div class="sec-t">Payment</div>
     <div class="payrow"><span>Total</span><b>${fmt(b.total)}</b></div><div class="payrow"><span>Paid</span><b style="color:var(--ok)">${fmt(b.paid)}</b></div>${b.refunded ? `<div class="payrow"><span>Refunded</span><b>${fmt(b.refunded)}</b></div>` : ''}<div class="payrow"><span>Collect at pickup</span><b>${fmt(Math.max(0, bal))}</b></div>
@@ -38,7 +38,7 @@ async function open(code) {
   GET(`/api/admin/activity?entity=booking&id=${encodeURIComponent(code)}`).then(rows => { const l = $('#log'); if (l && openCode === code) l.innerHTML = rows.map(r => `<li>${esc(r.msg)}<span>${shortDate(r.d)} ${r.t}</span></li>`).join('') || '<li class="muted">No activity yet</li>' }).catch(() => { });
   const redo = () => { list(); open(code) };
   const sv = async () => { const body = {}; if (!$('#vJ').disabled) { body.jeep = $('#vJ').value; body.guide = $('#vG').value } if (await act(() => POST(`/api/admin/bookings/${code}/assign`, body), 'Saved · partner notified by email')) redo(); else redo() };
-  $('#vJ').onchange = sv; $('#vG').onchange = sv;
+  $('#vJ').onchange = sv; $('#vG').onchange = sv; wireHandover(b, { code }, redo);
   const on = (id, fn) => { const e = $('#' + id); if (e) e.onclick = fn };
   on('aConfirm', async e => { if (await act(() => POST(`/api/admin/bookings/${code}/confirm`), `Confirmed · ticket emailed to ${b.email}`, e.target)) redo() });
   on('aDecline', () => { openModal(`<h3>Decline ${b.code}?</h3><div class="field" style="margin-top:12px"><label for="why">Message to guest</label><textarea class="inp" id="why" rows="3">Sorry, we're fully booked for that session. Could another date work?</textarea></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Back</button><button class="btn" id="dOk" style="background:var(--bad);border-color:var(--bad);color:#fff">Decline &amp; email</button></div>`);

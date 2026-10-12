@@ -22,7 +22,7 @@ function cleanMeals(prefs, n) {
  * total = jeeps x session price + extras. Per-person extras are multiplied by guests;
  * the meal pack is multiplied by the number of guests who actually picked a meal.
  */
-function calcBooking({ session, guests, meals, mealPrefs, bino, cam }, conf) {
+function calcBooking({ session, guests, meals, mealPrefs, bino, cam, guide }, conf) {
   const n = Math.max(1, Math.floor(+guests || 1));
   const jeeps = jeepsFor(n, conf.rules.maxPerJeep);
   const prefs = meals ? cleanMeals(mealPrefs, n) : [];
@@ -32,7 +32,8 @@ function calcBooking({ session, guests, meals, mealPrefs, bino, cam }, conf) {
   const mealsTotal = meals && ex.meals && ex.meals.active ? mealN * ex.meals.price : 0;
   const binoTotal = bino && ex.bino && ex.bino.active ? ex.bino.price : 0;
   const camTotal = cam && ex.cam && ex.cam.active ? ex.cam.price : 0;
-  return { n, jeeps, base, meals: mealsTotal, mealN: meals ? mealN : 0, bino: binoTotal, cam: camTotal, prefs, total: base + mealsTotal + binoTotal + camTotal };
+  const guideTotal = guide && ex.guide && ex.guide.active ? ex.guide.price : 0;
+  return { n, jeeps, base, meals: mealsTotal, mealN: meals ? mealN : 0, bino: binoTotal, cam: camTotal, guide: guideTotal, prefs, total: base + mealsTotal + binoTotal + camTotal + guideTotal };
 }
 
 const depositAmount = (total, conf) => Math.round(total * conf.payments.deposit);
@@ -51,4 +52,12 @@ function mealSummary(prefs, allergy) {
   return t + (t && allergy ? ' · ⚠ ' + allergy : '');
 }
 
-module.exports = { MEAL_CODES, MEAL_LABELS, MEAL_OPTIONS, jeepsFor, cleanMeals, calcBooking, depositAmount, dueNow, refundPct, mealSummary };
+/** Extras for one shared-seat purchase (binoculars and guide are per group, the meal pack per seat). */
+function sharedExtras({ bino, guide }, conf) {
+  const ex = conf.extras;
+  const b = bino && ex.bino && ex.bino.active ? ex.bino.price : 0;
+  const g = guide && ex.guide && ex.guide.active ? ex.guide.price : 0;
+  return { bino: b, guide: g, total: b + g };
+}
+
+module.exports = { sharedExtras, MEAL_CODES, MEAL_LABELS, MEAL_OPTIONS, jeepsFor, cleanMeals, calcBooking, depositAmount, dueNow, refundPct, mealSummary };

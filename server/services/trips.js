@@ -49,6 +49,25 @@ function canScan(actor, conf, assignedPartnerIds) {
   return conf.partners.scanAny || assignedPartnerIds.includes(actor.id);
 }
 
+/** The jeep job on a trip right now (driver + the vehicle doing it). */
+async function currentDriver(where, key) {
+  return (await query(
+    `SELECT a.*, p.name, p.phone, COALESCE(a.vehicle_plate, p.vehicle_plate) AS plate FROM assignments a JOIN partners p ON p.id=a.partner_id
+      WHERE a.${where}=$1 AND a.role='JEEP' AND a.status<>'DECLINED' ORDER BY a.id DESC LIMIT 1`, [key])).rows[0] || null;
+}
+/**
+ * Only the driver who holds the jeep job (or the office) can start the trip from a QR scan.
+ * If the office has not assigned a driver yet, the first driver who scans takes the job.
+ * Returns null when allowed, or an error result to show on the scanner.
+ */
+function startBlock(actor, drv) {
+  if (actor.kind === 'ADMIN') return null;
+  const who = drv ? `${drv.name}${drv.plate ? ' (' + drv.plate + ')' : ''}` : '';
+  if (actor.type !== 'JEEP_DRIVER') return bad('✕ Only the driver can start', drv ? `This trip is started by the assigned driver: ${who}.` : 'Only a jeep driver can start this trip.');
+  if (drv && drv.partner_id !== actor.id) return bad('✕ Not your trip', `This trip is assigned to ${who}. Only that driver can start it. If you are driving instead, ask the office or ${drv.name} to hand the job to you.`);
+  return null;
+}
+
 /**
  * POST /api/checkin. The first scan of a confirmed ticket on its day starts the trip:
  * status STARTED, payout lines created, guest emailed, dashboard updated.
@@ -70,19 +89,24 @@ async function checkin({ code, sig, force = false, preview = false, actor }) {
 async function checkinPrivate(b0, { force, preview, actor, conf, today }) {
   const session = conf.sessions[b0.session_id];
   const assigned = (await query(`SELECT partner_id FROM assignments WHERE booking_id=$1 AND status<>'DECLINED'`, [b0.id])).rows.map(r => r.partner_id);
-  if (!canScan(actor, conf, assigned)) return bad('✕ Not your trip', `${b0.code} is assigned to another driver.`);
+  if (!canScan(actor, conf, assigned)) return startBlock(actor, await currentDriver('booking_id', b0.id)) || bad('✕ Not your trip', `${b0.code} is assigned to another driver.`);
   if (['CANCELLED', 'DECLINED'].includes(b0.status)) return bad('✕ Cancelled', `${b0.code} · ${b0.lead_name} was cancelled. Don't board.`);
   if (['REQUEST', 'PENDING_PAYMENT'].includes(b0.status)) return bad('! Not confirmed yet', `${b0.code} is still a request. The office must confirm it first.`);
   if (b0.status === 'COMPLETED') return bad('! Already completed', `This safari finished on ${U.shortDate(b0.date)}.`);
   const info = b => ({ code: b.code, name: b.lead_name, guests: b.guests, sessionName: session.name, email: b.email, balance: b.total - b.paid, startedAt: b.started_at ? U.hhmm(b.started_at) : null, kind: 'Private' });
   if (b0.status === 'STARTED') return warn('Already started', `${b0.code} started at ${U.hhmm(b0.started_at)}. Nothing else to do.`, { info: info(b0) });
+  const drv0 = await currentDriver('booking_id', b0.id);
+  const blocked = startBlock(actor, drv0);
+  if (blocked) return blocked;
   if (b0.date !== today && !force) return warn('! Different day', `This ticket is for ${U.niceDate(b0.date)} (${session.short}).`, { canForce: true });
   // Scanning only looks the ticket up; the driver taps "Start the trip" to actually begin.
-  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(b0), mealsText: await mealsText(b0) } };
+  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(b0), mealsText: await mealsText(b0), driver: drv0 ? drv0.name : '', plate: drv0 ? drv0.plate || '' : '' } };
 
   const started = await tx(async db => {
     const b = (await db.query('SELECT * FROM bookings WHERE id=$1 FOR UPDATE', [b0.id])).rows[0];
     if (b.status !== 'CONFIRMED') return null;
+    const d1 = await currentDriver('booking_id', b.id);
+    if (startBlock(actor, d1)) throw U.forbidden('Only the assigned driver can start this trip.');
     await adoptRole(db, actor, 'booking_id', b.id, null, conf, b.session_id, b.jeeps);
     const jeep = await partnerFor(db, 'booking_id', b.id, 'JEEP');
     const guide = await partnerFor(db, 'booking_id', b.id, 'GUIDE');
@@ -117,9 +141,9 @@ async function mealsText(b) {
 
 async function checkinShared(s0, { force, preview, actor, conf, today }) {
   const t0 = (await query('SELECT * FROM shared_trips WHERE id=$1', [s0.trip_id])).rows[0];
-  const session = conf.sessions[t0.session_id];
+  const session = settings.sessionAt(conf, t0.location_id, t0.session_id);
   const assigned = (await query(`SELECT partner_id FROM assignments WHERE shared_trip_id=$1 AND status<>'DECLINED'`, [t0.id])).rows.map(r => r.partner_id);
-  if (!canScan(actor, conf, assigned)) return bad('✕ Not your trip', `${t0.id} is assigned to another driver.`);
+  if (!canScan(actor, conf, assigned)) return startBlock(actor, await currentDriver('shared_trip_id', t0.id)) || bad('✕ Not your trip', `${t0.id} is assigned to another driver.`);
   if (t0.status === 'CANCELLED') return bad('✕ Trip cancelled', `${t0.id} was cancelled. Don't board.`);
   const seats = (await query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND code=$2 AND status IN ('RESERVED','PAYMENT_PENDING','PAID') ORDER BY seat_no`, [t0.id, s0.code])).rows;
   if (!seats.length) return bad('✕ Seat released', `The seats on ${s0.code} are no longer held.`);
@@ -127,12 +151,16 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
   if (t0.status === 'COMPLETED') return bad('! Already completed', `This safari finished on ${U.shortDate(t0.date)}.`);
   const info = (startedAt, at) => ({ code: s0.code, name: s0.name, guests: seats.length, sessionName: 'Shared · ' + session.name, email: s0.email, balance: 0, startedAt, kind: 'Shared', seats: seats.map(s => s.seat_no), checkedInAt: at });
   if (seats.every(s => s.checked_in_at)) return warn('Already checked in', `${s0.name} (seat ${seats.map(s => s.seat_no).join(', ')}) is already on board.`, { info: info(t0.started_at ? U.hhmm(t0.started_at) : null) });
+  const drv0 = await currentDriver('shared_trip_id', t0.id);
+  const blocked = startBlock(actor, drv0);
+  if (blocked) return blocked;
   if (t0.date !== today && !force) return warn('! Different day', `This ticket is for ${U.niceDate(t0.date)} (${session.short}).`, { canForce: true });
-  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(t0.started_at ? U.hhmm(t0.started_at) : null), mealsText: '' }, tripRunning: t0.status === 'STARTED' };
+  if (preview) return { kind: 'ready', title: 'Ready to start', info: { ...info(t0.started_at ? U.hhmm(t0.started_at) : null), mealsText: '', driver: drv0 ? drv0.name : '', plate: drv0 ? drv0.plate || '' : '' }, tripRunning: t0.status === 'STARTED' };
 
   const res = await tx(async db => {
     const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1 FOR UPDATE', [t0.id])).rows[0];
     let startedNow = false;
+    if (startBlock(actor, await currentDriver('shared_trip_id', t.id))) throw U.forbidden('Only the assigned driver can start this trip.');
     if (!['STARTED'].includes(t.status)) {
       await adoptRole(db, actor, 'shared_trip_id', t.id, null, conf, t.session_id, 1);
       const jeep = await partnerFor(db, 'shared_trip_id', t.id, 'JEEP');
@@ -201,7 +229,7 @@ async function autoComplete() {
   }
   const ts = (await query(`SELECT * FROM shared_trips WHERE status='STARTED'`)).rows;
   for (const t of ts) {
-    const end = U.localDate(t.date, conf.sessions[t.session_id].end).getTime();
+    const end = U.localDate(t.date, settings.sessionAt(conf, t.location_id, t.session_id).end).getTime();
     if (end + 2 * 3600e3 < Date.now()) { try { await completeShared(t.id, 'System'); n++; } catch (e) { console.error('[trips] autoComplete', t.id, e.message); } }
   }
   return n;

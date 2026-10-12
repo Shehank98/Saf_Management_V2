@@ -3,17 +3,17 @@ const jeepsFor = n => Math.max(1, Math.ceil(n / (CFG.maxPerJeep || 6)));
 const MEAL_NONE = 'No meal';
 
 /* The booking is kept in the address bar while the guest moves through the steps. Contact details are not. */
-const DEF = { ses: 'morning', guests: '2', pmode: 'hotel', meals: '0', bino: '0', cam: '0', pay: 'deposit', code: '' };
+const DEF = { ses: 'morning', guests: '2', pmode: 'hotel', meals: '0', bino: '0', cam: '0', guide: '0', pay: 'deposit', code: '' };
 const V = k => (P.has(k) && P.get(k) !== '') ? P.get(k) : DEF[k];
-const stateBooking = () => ({ ses: V('ses'), date: V('date'), guests: V('guests'), meals: V('meals'), mealPrefs: (P.get('mp') || '').split('|').filter(Boolean), allergy: P.get('allergy') || '', bino: V('bino'), cam: V('cam'), pay: V('pay') });
+const stateBooking = () => ({ ses: V('ses'), date: V('date'), guests: V('guests'), meals: V('meals'), mealPrefs: (P.get('mp') || '').split('|').filter(Boolean), allergy: P.get('allergy') || '', bino: V('bino'), cam: V('cam'), guide: V('guide'), pay: V('pay') });
 if (!SESS[P.get('ses')] && P.has('ses')) P.delete('ses');
 
 /* Same maths as the server, for display only. The server recomputes everything when you book. */
 function calcBooking(b) {
   const s = SESS[b.ses] || Object.values(SESS)[0], n = Math.max(1, +b.guests || 1), j = jeepsFor(n);
   const mealN = +b.meals ? (Array.isArray(b.mealPrefs) && b.mealPrefs.length ? b.mealPrefs.filter(x => x !== MEAL_NONE).length : n) : 0;
-  const base = j * s.jeep, meals = EXTRAS.meals ? mealN * EXTRAS.meals.price : 0, bino = +b.bino && EXTRAS.bino ? EXTRAS.bino.price : 0, cam = +b.cam && EXTRAS.cam ? EXTRAS.cam.price : 0;
-  return { n, jeeps: j, base, meals, mealN, bino, cam, total: base + meals + bino + cam };
+  const base = j * s.jeep, meals = EXTRAS.meals ? mealN * EXTRAS.meals.price : 0, bino = +b.bino && EXTRAS.bino ? EXTRAS.bino.price : 0, cam = +b.cam && EXTRAS.cam ? EXTRAS.cam.price : 0, guide = +b.guide && EXTRAS.guide ? EXTRAS.guide.price : 0;
+  return { n, jeeps: j, base, meals, mealN, bino, cam, guide, total: base + meals + bino + cam + guide };
 }
 const dueNow = (total, pay) => pay === 'card' ? total : pay === 'deposit' ? Math.round(total * CFG.deposit) : 0;
 function refundPct(hoursLeft) { for (const [h, p] of CFG.policy) if (hoursLeft > h) return p; return 0 }
@@ -41,7 +41,7 @@ function requireStep(...keys) { if (keys.some(k => !P.get(k))) { go(keys.include
 const STEPS = [['01-session.html', 'Session'], ['02-date.html', 'Date'], ['03-group.html', 'Group'], ['04-pickup-extras.html', 'Pickup & extras'], ['05-checkout.html', 'Checkout']];
 function topbar() {
   return `<header class="top"><div class="wrap row"><a class="logo" href="/"><span class="mk">${JEEP('#fff6e6', 24, 16)}</span>${esc(BRAND)}</a>
-  <div class="links"><a class="lnk" href="/booking">My booking</a><button class="lnk" data-theme-toggle aria-label="Switch light or dark theme">${THEME_ICON}</button></div></div></header>`;
+  <div class="links">${CFG.privateOn ? '<a class="lnk" href="/booking">My booking</a>' : '<a class="lnk" href="/shared">Book a seat</a>'}<button class="lnk" data-theme-toggle aria-label="Switch light or dark theme">${THEME_ICON}</button></div></div></header>`;
 }
 function stepper(cur) {
   return `<div class="wrap stepper"><div class="track"><div class="fill" style="width:0"></div><div class="car" style="left:0">${JEEP()}</div></div>
@@ -55,7 +55,7 @@ function summaryHTML(upto) {
   let money = '';
   if (upto >= 2) {
     money = `<div class="r"><span>${c.jeeps} × ${fmt(s.jeep)}</span><b>${fmt(c.base)}</b></div>`;
-    if (upto >= 3) { if (c.meals) money += `<div class="r"><span>Meal pack × ${c.mealN}</span><b>${fmt(c.meals)}</b></div>`; if (c.bino) money += `<div class="r"><span>Binoculars</span><b>${fmt(c.bino)}</b></div>`; if (c.cam) money += `<div class="r"><span>Camera</span><b>${fmt(c.cam)}</b></div>` }
+    if (upto >= 3) { if (c.meals) money += `<div class="r"><span>Meal pack × ${c.mealN}</span><b>${fmt(c.meals)}</b></div>`; if (c.bino) money += `<div class="r"><span>Binoculars</span><b>${fmt(c.bino)}</b></div>`; if (c.guide) money += `<div class="r"><span>Naturalist guide</span><b>${fmt(c.guide)}</b></div>`; if (c.cam) money += `<div class="r"><span>Camera</span><b>${fmt(c.cam)}</b></div>` }
   }
   return `<div class="sum"><h3>Your safari</h3>${rows.map(([k, v, p]) => `<div class="r"><span>${k}</span><b>${v}<a href="${link(p)}">Edit</a></b></div>`).join('')}${money}<div class="tot"><span>Total</span><b>${upto >= 2 ? fmt(c.total) : 'from ' + fmt(s.jeep)}</b></div><p class="tiny muted" style="margin-top:8px">Price is per jeep (up to ${CFG.maxPerJeep} people). The final price is confirmed when you book.</p></div>`;
 }

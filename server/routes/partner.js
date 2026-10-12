@@ -6,6 +6,8 @@ const auth = require('../lib/auth');
 const pricing = require('../lib/pricing');
 const partnersSvc = require('../services/partners');
 const trips = require('../services/trips');
+const assignments = require('../services/assignments');
+const push = require('../lib/push');
 const activity = require('../lib/activity');
 const U = require('../lib/util');
 const { limits } = require('./common');
@@ -27,7 +29,8 @@ r.post('/logout', U.wrap(async (req, res) => { await auth.endSession(req, res, '
 async function jobsFor(p, conf) {
   const since = U.addDays(U.todayStr(), -7);
   const rows = (await query(
-    `SELECT a.id AS aid, a.role, a.fee, a.status AS astatus, a.booking_id, a.shared_trip_id FROM assignments a
+    `SELECT a.id AS aid, a.role, a.fee, a.status AS astatus, a.booking_id, a.shared_trip_id, a.vehicle_plate, a.handed_from,
+            (SELECT name FROM partners x WHERE x.id=a.handed_from) AS handed_from_name FROM assignments a
       WHERE a.partner_id=$1 AND a.status <> 'DECLINED'`, [p.id])).rows;
   const jobs = [];
   const bIds = rows.filter(x => x.booking_id).map(x => x.booking_id), tIds = rows.filter(x => x.shared_trip_id).map(x => x.shared_trip_id);
@@ -42,6 +45,7 @@ async function jobsFor(p, conf) {
     jobs.push({
       aid: a.aid, role: a.role, roleLabel: ROLE_LABEL[a.role], fee: a.fee, state: a.astatus, kind: 'Private', code: b.code, date: b.date, ses: b.ses, status: b.status,
       guests: b.guests, jeeps: b.jeeps, pmode: b.pmode, hotel: b.hotel, lat: b.lat, lng: b.lng, name: b.name, cc: accepted ? b.cc : '', phone: accepted ? b.phone : '',
+      plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: b.loc, guideReq: !!b.guideReq,
       notes: accepted ? b.notes : '', balance: Math.max(0, b.total - b.paid), meals: b.meals ? c : {}, allergy: b.allergy, startedAt: b.startedAt,
     });
   }
@@ -53,8 +57,8 @@ async function jobsFor(p, conf) {
     const c = {}; t.seats.filter(s => s.pay === 'Paid' && s.meal).forEach(s => { c[s.meal] = (c[s.meal] || 0) + 1; });
     jobs.push({
       aid: a.aid, role: a.role, roleLabel: ROLE_LABEL[a.role], fee: a.fee, state: a.astatus, kind: 'Shared', code: t.id, date: t.date, ses: t.ses, status: t.status, guests: t.seats.length,
-      jeeps: 1, pmode: 'hotel', hotel: '', balance: 0, meals: c, startedAt: t.startedAt,
-      seats: accepted ? t.seats.filter(s => s.pay !== 'Refunded').map(s => ({ n: s.n, name: s.name, cc: s.cc, phone: s.phone, meal: s.meal, pay: s.pay })) : [],
+      jeeps: 1, pmode: 'hotel', hotel: '', balance: 0, meals: c, startedAt: t.startedAt, plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: t.loc, guideReq: t.guideWanted,
+      seats: accepted ? t.seats.filter(s => s.pay !== 'Refunded').map(s => ({ n: s.n, name: s.name, cc: s.cc, phone: s.phone, meal: s.meal, pay: s.pay, hotel: s.hotel, lat: s.lat, lng: s.lng, bino: s.bino, guide: s.guideReq })) : [],
     });
   }
   return jobs.sort((a, b) => a.date.localeCompare(b.date));
@@ -96,6 +100,22 @@ r.post('/jobs/finish', auth.requirePartner, U.wrap(async (req, res) => {
   await trips.finish({ code: req.body.code, actor: { kind: 'PARTNER', id: req.partner.id, name: req.partner.name, type: req.partner.type } });
   res.json({ ok: true });
 }));
+
+/* Hand the job (and its vehicle) to another driver, or change the vehicle you use. */
+r.get('/colleagues', auth.requirePartner, U.wrap(async (req, res) => {
+  const rows = (await query(`SELECT id, name, vehicle_plate FROM partners WHERE status='ACTIVE' AND type=$1 AND id<>$2 ORDER BY name`, [req.partner.type, req.partner.id])).rows;
+  res.json(rows.map(x => ({ id: x.id, name: x.name, plate: x.vehicle_plate || '' })));
+}));
+r.post('/jobs/:id/handover', auth.requirePartner, U.wrap(async (req, res) => {
+  const out = await assignments.handoverJob({ aid: +req.params.id, toPartnerId: req.body.to ? +req.body.to : null, plate: req.body.plate, model: req.body.model, by: { kind: 'PARTNER', id: req.partner.id, name: req.partner.name } });
+  res.json({ ok: true, handed: !!out.partner });
+}));
+
+/* Phone notifications */
+r.get('/push/key', auth.requirePartner, U.wrap(async (req, res) => res.json({ key: await push.publicKey() })));
+r.post('/push/subscribe', auth.requirePartner, U.wrap(async (req, res) => { await push.subscribe(req.partner.id, req.body); res.json({ ok: true }); }));
+r.post('/push/unsubscribe', auth.requirePartner, U.wrap(async (req, res) => { await push.unsubscribe(req.body.endpoint); res.json({ ok: true }); }));
+r.post('/push/test', auth.requirePartner, U.wrap(async (req, res) => res.json({ sent: await push.toPartner(req.partner.id, { title: 'Notifications are on', body: 'You will get new jobs here, even when the app is closed.' }) })));
 
 r.put('/days-off', auth.requirePartner, U.wrap(async (req, res) => {
   const dates = [...new Set((req.body.dates || []).filter(U.isDate))].filter(d => d >= U.todayStr()).slice(0, 200);

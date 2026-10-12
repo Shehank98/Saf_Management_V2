@@ -300,3 +300,54 @@ CREATE TABLE IF NOT EXISTS job_runs (
 
 -- Jeeps opened automatically by the shared-trips site (empty ones are cleaned up and never block private bookings)
 ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS auto boolean NOT NULL DEFAULT false;
+
+-- Parks / locations (Yala, Udawalawe, ...). Each has its own base on the map, free pickup range, jeeps and session times/prices.
+CREATE TABLE IF NOT EXISTS locations (
+  id         text PRIMARY KEY,                    -- slug used in links, e.g. yala
+  name       text NOT NULL,
+  tagline    text NOT NULL DEFAULT '',
+  office     text NOT NULL DEFAULT '',
+  base_lat   double precision NOT NULL,
+  base_lng   double precision NOT NULL,
+  radius_km  numeric(5,1) NOT NULL DEFAULT 7,
+  fleet      int NOT NULL DEFAULT 4,
+  sessions   jsonb NOT NULL DEFAULT '{}',          -- per session: {start,end,pickup,seat,active}; empty = use the main session
+  active     boolean NOT NULL DEFAULT true,
+  sort       int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE shared_trips ADD COLUMN IF NOT EXISTS location_id text NOT NULL DEFAULT 'yala';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS location_id text NOT NULL DEFAULT 'yala';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS has_guide boolean NOT NULL DEFAULT false;
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS pickup_lat double precision;
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS pickup_lng double precision;
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS pickup_km numeric(6,2);
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS has_bino boolean NOT NULL DEFAULT false;
+ALTER TABLE shared_seats ADD COLUMN IF NOT EXISTS has_guide boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS shared_trips_loc_idx ON shared_trips (location_id, date);
+
+-- A seat someone is choosing right now: locked to their browser for 15 minutes so nobody else can pick it.
+CREATE TABLE IF NOT EXISTS seat_holds (
+  trip_id    text NOT NULL REFERENCES shared_trips(id) ON DELETE CASCADE,
+  seat_no    int NOT NULL,
+  token      text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY (trip_id, seat_no)
+);
+
+-- Which vehicle does the job, and who handed it over.
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS vehicle_plate text;
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS vehicle_model text;
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS handed_from int;
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS handed_at timestamptz;
+
+-- Phone notifications (Web Push) for partners who installed the portal.
+CREATE TABLE IF NOT EXISTS push_subs (
+  id         serial PRIMARY KEY,
+  partner_id int REFERENCES partners(id) ON DELETE CASCADE,
+  admin_id   int,
+  endpoint   text NOT NULL UNIQUE,
+  p256dh     text NOT NULL,
+  auth       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);

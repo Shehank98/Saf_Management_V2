@@ -21,7 +21,7 @@ async function launch(payment, { description, successUrl, cancelUrl, customer })
   const conf = await settings.load();
   const base = settings.baseUrl(conf);
   const prov = providers.get(payment.provider);
-  const out = await prov.createCheckout({ payment, description, successUrl, cancelUrl, customerEmail: customer.email, base });
+  const out = await prov.createCheckout({ payment, description, successUrl, cancelUrl, customerEmail: customer.email, customer, base });
   await query(`UPDATE payments SET provider_ref=$2, meta = meta || $3::jsonb WHERE id=$1`,
     [payment.id, out.providerRef, JSON.stringify({ description, successUrl, cancelUrl, customer })]);
   return out.url;
