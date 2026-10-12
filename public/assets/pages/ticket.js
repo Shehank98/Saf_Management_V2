@@ -47,7 +47,10 @@ function downloadJpg() {
 async function load() {
   let t;
   try { t = await GET(`/api/ticket/${encodeURIComponent(code)}?k=${encodeURIComponent(K)}`) }
-  catch (e) { if (!lastSig) $('#root').innerHTML = `<div class="card locked"><div style="font-size:40px">🎟️</div><h2>Ticket not found</h2><p class="muted">${esc(e.message)}</p><a class="btn primary" href="/booking">Find my booking</a></div>`; return }
+  catch (e) {
+    // Busy server or no signal: keep the ticket that is already on screen, or retry quietly. Only a real "not found" says so.
+    if (e.status !== 404 && e.status !== 403) { if (!lastSig) { $('#root').innerHTML = `<div class="card locked"><h2>Loading your ticket…</h2><p class="muted">${e.status === 429 ? 'The server is busy.' : 'Check your internet connection.'} Trying again in a few seconds.</p></div>`; setTimeout(load, 5000) } return }
+    if (!lastSig) $('#root').innerHTML = `<div class="card locked"><div style="font-size:40px">🎟️</div><h2>Ticket not found</h2><p class="muted">${esc(e.message)}</p><a class="btn primary" href="${CFG.privateOn ? '/booking' : '/'}">${CFG.privateOn ? 'Find my booking' : 'Back to the website'}</a></div>`; return }
   const sig = JSON.stringify(t); if (sig === lastSig) return; lastSig = sig;
   const s = SESS[t.ses] || Object.values(SESS)[0], shared = t.kind === 'shared';
   if (!t.ok) {

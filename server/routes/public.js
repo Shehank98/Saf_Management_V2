@@ -149,7 +149,7 @@ r.post('/bookings/:code/pay', limits.booking, U.wrap(async (req, res) => {
 }));
 
 /* ---------------- E-ticket ---------------- */
-r.get('/ticket/:code', limits.lookup, U.wrap(async (req, res) => {
+r.get('/ticket/:code', limits.poll, U.wrap(async (req, res) => {
   const code = U.normCode(req.params.code);
   if (!secrets.verify(code, String(req.query.k || ''))) throw U.notFound('This ticket link is not valid.');
   const conf = await settings.load();
@@ -193,7 +193,7 @@ async function pickupFor(t, seats) {
  * Calendar for the link-only shared-trips site. Every bookable date shows as available: a jeep is opened
  * automatically for the first guest, and another one when it fills. Seat counts only, never guest details.
  */
-r.get('/shared-trips', limits.lookup, U.wrap(async (req, res) => {
+r.get('/shared-trips', limits.poll, U.wrap(async (req, res) => {
   const month = String(req.query.month || '');
   if (!/^\d{4}-\d{2}$/.test(month)) throw U.bad('Bad month');
   const ses = String(req.query.session || '');
@@ -237,7 +237,7 @@ r.post('/shared-trips/open', limits.booking, U.wrap(async (req, res) => {
   res.json({ id: t.id });
 }));
 
-r.get('/shared/:id', limits.lookup, U.wrap(async (req, res) => {
+r.get('/shared/:id', limits.poll, U.wrap(async (req, res) => {
   const v = await shared.publicView(req.params.id, String(req.query.token || ''));
   if (!v) return res.status(404).json({ invalid: true, error: "This link isn't valid" });
   res.set('Cache-Control', 'no-store').json(v);
@@ -276,7 +276,7 @@ r.post('/shared/:id/seats', limits.booking, U.wrap(async (req, res) => {
 }));
 
 /** Status of one purchase (used after returning from the gateway, and for "pay now" links). */
-r.get('/shared/:id/purchase', limits.lookup, U.wrap(async (req, res) => {
+r.get('/shared/:id/purchase', limits.poll, U.wrap(async (req, res) => {
   const code = U.normCode(req.query.code);
   const info = await shared.payLinkInfo(req.params.id, code, String(req.query.k || '')).catch(e => { if (e.status === 404) return null; throw e; });
   if (!info) return res.json({ gone: true });
@@ -313,7 +313,7 @@ async function driveLink(req) {
   if (!d.active) throw U.forbidden('This driving link has been stopped or has expired. Please call the office.');
   return d;
 }
-r.get('/drive/:token', limits.lookup, U.wrap(async (req, res) => {
+r.get('/drive/:token', limits.poll, U.wrap(async (req, res) => {
   const d = await driveLink(req), t = d.trip, conf = await settings.load();
   const s = settings.sessionAt(conf, t.loc, t.ses), L = settings.locOf(conf, t.loc);
   let guests = [];
@@ -341,7 +341,7 @@ r.post('/drive/:token/checkin', limits.api, U.wrap(async (req, res) => {
 }));
 const tripsSvc = () => require('../services/trips');
 const tempActor = d => require('../services/tempDrivers').actorFor(d.temp);
-r.get('/drive/:token/run', limits.lookup, U.wrap(async (req, res) => {
+r.get('/drive/:token/run', limits.poll, U.wrap(async (req, res) => {
   const d = await driveLink(req);
   if (d.trip.kind !== 'shared') return res.json(null);
   res.set('Cache-Control', 'no-store').json(await tripsSvc().pickupRun({ query }, d.trip.code));
