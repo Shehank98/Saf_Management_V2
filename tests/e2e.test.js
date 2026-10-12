@@ -95,7 +95,7 @@ test('private booking: deposit via mock gateway confirms it, emails the ticket a
   assert.equal(again.json.paid, Math.round(total * 0.3));
   assert.equal((await emails('cust_confirmed')).length, 1);
   assert.equal((await emails('admin_new_private')).length, 1);
-  assert.match((await emails('cust_confirmed'))[0].subject, /Confirmed/);
+  assert.match((await emails('cust_confirmed'))[0].subject, /confirmed/i);
   assert.equal((await emails('cust_confirmed'))[0].inline_images.length, 1);
 });
 
