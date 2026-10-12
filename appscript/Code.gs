@@ -145,16 +145,20 @@ function testSend() {
     'image/png',
     'dot.png'
   );
+  var f = "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
   var html =
-    '<div style="background:#f3e8d0;padding:20px">' +
-    '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif">' +
-    '<div style="background:#e8863f;padding:26px;color:#2b160a"><div style="font-size:12px;letter-spacing:2px;font-weight:bold">TEST EMAIL</div>' +
-    '<div style="font:bold 26px Georgia,serif;margin-top:6px">Your email relay works!</div></div>' +
-    '<div style="padding:24px;color:#2b2118;font-size:16px;line-height:1.6">' +
-    'This is how a button looks in your emails.' +
-    '<div style="margin-top:14px"><a href="https://script.google.com" style="display:block;text-align:center;background:#c0682a;color:#fff;' +
-    'text-decoration:none;font-weight:bold;padding:16px;border-radius:14px">Open my e-ticket</a></div>' +
-    '<p style="color:#6f604f;font-size:13px">Inline image test: <img src="cid:dot" width="8" height="8" alt=""></p>' +
+    '<div style="background:#f2f0ec;padding:28px 12px">' +
+    '<div style="max-width:600px;margin:0 auto">' +
+    '<div style="font:bold 18px Georgia,serif;color:#1c1917;padding:0 4px 14px">Email relay</div>' +
+    '<div style="background:#ffffff;border:1px solid #e7e5e4;border-top:3px solid #b45f24;border-radius:8px;padding:34px 36px;' + f + '">' +
+    '<div style="font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#b45f24">Test email</div>' +
+    '<div style="font:bold 25px Georgia,serif;color:#1c1917;margin-top:10px">Your email relay works</div>' +
+    '<p style="color:#3f3a36;font-size:15px;line-height:1.65;margin:20px 0 0">This is how buttons and details look in your booking emails.</p>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;border:1px solid #e7e5e4;border-radius:8px">' +
+    '<tr><td style="padding:11px 16px;color:#78716c;font-size:13px;width:36%">Booking</td><td style="padding:11px 16px;font-weight:600;font-size:14px;color:#1c1917">TEST-0001</td></tr>' +
+    '<tr><td style="padding:11px 16px;border-top:1px solid #e7e5e4;color:#78716c;font-size:13px">Inline image</td><td style="padding:11px 16px;border-top:1px solid #e7e5e4;font-size:14px"><img src="cid:dot" width="8" height="8" alt=""> loaded</td></tr></table>' +
+    '<a href="https://script.google.com" style="display:block;text-align:center;background:#1c1917;color:#ffffff;' +
+    'text-decoration:none;font-weight:600;font-size:15px;padding:14px;border-radius:8px">Open my e-ticket</a>' +
     '</div></div></div>';
   MailApp.sendEmail(me, 'Test from the safari email relay', 'It works.', {
     htmlBody: html,
@@ -196,6 +200,8 @@ function log_(props, to, subject, result) {
 /** Plain text version for email apps that do not show HTML. */
 function htmlToText_(html) {
   return html
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<span style="display:none[\s\S]*?<\/span>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
     .replace(/<br\s*\/?>/gi, '\n')
