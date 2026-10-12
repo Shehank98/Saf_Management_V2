@@ -45,7 +45,7 @@ async function jobsFor(p, conf) {
     jobs.push({
       aid: a.aid, role: a.role, roleLabel: ROLE_LABEL[a.role], fee: a.fee, state: a.astatus, kind: 'Private', code: b.code, date: b.date, ses: b.ses, status: b.status,
       guests: b.guests, jeeps: b.jeeps, pmode: b.pmode, hotel: b.hotel, lat: b.lat, lng: b.lng, name: b.name, cc: accepted ? b.cc : '', phone: accepted ? b.phone : '',
-      plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: b.loc, guideReq: !!b.guideReq,
+      plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: b.loc, guideReq: !!b.guideReq, tempDriver: b.tempDriver,
       notes: accepted ? b.notes : '', balance: Math.max(0, b.total - b.paid), meals: b.meals ? c : {}, allergy: b.allergy, startedAt: b.startedAt,
     });
   }
@@ -57,7 +57,7 @@ async function jobsFor(p, conf) {
     const c = {}; t.seats.filter(s => s.pay === 'Paid' && s.meal).forEach(s => { c[s.meal] = (c[s.meal] || 0) + 1; });
     jobs.push({
       aid: a.aid, role: a.role, roleLabel: ROLE_LABEL[a.role], fee: a.fee, state: a.astatus, kind: 'Shared', code: t.id, date: t.date, ses: t.ses, status: t.status, guests: t.seats.length,
-      jeeps: 1, pmode: 'hotel', hotel: '', balance: 0, meals: c, startedAt: t.startedAt, plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: t.loc, guideReq: t.guideWanted,
+      jeeps: 1, pmode: 'hotel', hotel: '', balance: 0, meals: c, startedAt: t.startedAt, plate: a.vehicle_plate || p.vehicle_plate || '', handedFrom: a.handed_from_name || '', loc: t.loc, guideReq: t.guideWanted, tempDriver: t.tempDriver,
       seats: accepted ? t.seats.filter(s => s.pay !== 'Refunded').map(s => ({ n: s.n, name: s.name, cc: s.cc, phone: s.phone, meal: s.meal, pay: s.pay, hotel: s.hotel, lat: s.lat, lng: s.lng, bino: s.bino, guide: s.guideReq })) : [],
     });
   }
@@ -109,6 +109,19 @@ r.get('/colleagues', auth.requirePartner, U.wrap(async (req, res) => {
 r.post('/jobs/:id/handover', auth.requirePartner, U.wrap(async (req, res) => {
   const out = await assignments.handoverJob({ aid: +req.params.id, toPartnerId: req.body.to ? +req.body.to : null, plate: req.body.plate, model: req.body.model, by: { kind: 'PARTNER', id: req.partner.id, name: req.partner.name } });
   res.json({ ok: true, handed: !!out.partner });
+}));
+
+r.post('/jobs/:id/temp-driver', auth.requirePartner, U.wrap(async (req, res) => {
+  const a = (await query('SELECT * FROM assignments WHERE id=$1 AND partner_id=$2', [+req.params.id, req.partner.id])).rows[0];
+  if (!a) throw U.notFound('Job not found');
+  const key = a.shared_trip_id ? { trip: a.shared_trip_id } : { code: (await query('SELECT code FROM bookings WHERE id=$1', [a.booking_id])).rows[0].code };
+  const out = await require('../services/tempDrivers').create({ ...req.body, ...key }, { kind: 'PARTNER', id: req.partner.id, name: req.partner.name });
+  res.status(201).json({ url: out.url, id: out.temp.id });
+}));
+r.post('/temp-driver/:id/revoke', auth.requirePartner, U.wrap(async (req, res) => {
+  const x = (await query('SELECT * FROM temp_drivers WHERE id=$1 AND from_partner_id=$2', [+req.params.id, req.partner.id])).rows[0];
+  if (!x) throw U.notFound('Link not found');
+  await require('../services/tempDrivers').revoke(x.id, { name: req.partner.name }); res.json({ ok: true });
 }));
 
 /* Phone notifications */

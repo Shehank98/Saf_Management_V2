@@ -357,6 +357,19 @@ function vendor_handover(j, c) {
   };
 }
 
+function temp_driver({ name, plate, url, code, date, session, from }, c) {
+  return {
+    subject: `Your driving link for ${shortDate(date)}, ${session.short} (${code})`,
+    html: layout({
+      kind: 'vendor', small: 'Temporary driver', title: `${shortDate(date)} · ${esc(session.name)}`, c, foot: false, preheader: 'Open the link at pickup to scan tickets and start the trip.',
+      body: p(`Hello ${esc(name.split(' ')[0])}, ${esc(from)} has asked you to drive this safari. Open the link below on your phone at pickup, scan each guest's QR ticket and tap Start the trip.`)
+        + table([row('Trip', `<span style="font-family:'Courier New',monospace">${esc(code)}</span>`), row('Pickup', esc(session.pickup)), row('Vehicle', esc(plate))])
+        + btn(url, 'Open my driving link') + muted('The link works for this trip only and stops after the trip day. Please do not share it.')
+        + pills([{ href: telHref(c.conf.business.phone), label: 'Call the office' }]),
+    }),
+  };
+}
+
 function vendor_approved(pt, { loginUrl }, c) {
   return {
     subject: `Your partner account is active, ${pt.name.split(' ')[0]}`,
@@ -405,7 +418,7 @@ const TEMPLATES = {
   admin_new_private, admin_new_shared, admin_started, admin_vendor_app, admin_cancelled, admin_shared_status, admin_daily,
   cust_request, cust_confirmed, cust_reminder, cust_started, cust_thanks, cust_declined, cust_cancelled,
   vendor_handover, cust_shared_seat, cust_shared_pay, cust_shared_ticket, cust_shared_cancel, cust_shared_released,
-  vendor_job, vendor_approved, vendor_rejected, vendor_payout, vendor_login,
+  temp_driver, vendor_job, vendor_approved, vendor_rejected, vendor_payout, vendor_login,
 };
 
 // Subjects without emoji, whatever a template wrote.

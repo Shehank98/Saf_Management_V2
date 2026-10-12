@@ -351,3 +351,23 @@ CREATE TABLE IF NOT EXISTS push_subs (
   auth       text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- A stand-in driver who is not a partner: gets a one-trip link to scan tickets and start that trip only.
+CREATE TABLE IF NOT EXISTS temp_drivers (
+  id             serial PRIMARY KEY,
+  token_hash     text NOT NULL UNIQUE,
+  booking_id     int REFERENCES bookings(id) ON DELETE CASCADE,
+  shared_trip_id text REFERENCES shared_trips(id) ON DELETE CASCADE,
+  name           text NOT NULL,
+  phone          text NOT NULL,
+  plate          text NOT NULL,
+  email          text,
+  from_partner_id int REFERENCES partners(id),
+  created_by     text NOT NULL,
+  expires_at     timestamptz NOT NULL,
+  revoked_at     timestamptz,
+  used_at        timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CHECK ((booking_id IS NOT NULL) <> (shared_trip_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS temp_drivers_trip ON temp_drivers (booking_id, shared_trip_id);

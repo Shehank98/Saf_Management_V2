@@ -57,6 +57,8 @@ async function bookings(db, where = 'TRUE', params = []) {
   const ids = rows.map(r => r.id);
   const meals = (await db.query('SELECT booking_id, guest_no, preference FROM booking_meals WHERE booking_id = ANY($1) ORDER BY guest_no', [ids])).rows;
   const asg = (await db.query(`SELECT booking_id, role, partner_id, status, vehicle_plate FROM assignments WHERE booking_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
+  const temps = (await db.query(`SELECT * FROM temp_drivers WHERE booking_id = ANY($1) AND revoked_at IS NULL AND expires_at > now() ORDER BY id`, [ids])).rows;
+  const tempMap = Object.fromEntries(temps.map(x => [x.booking_id, { id: x.id, name: x.name, phone: x.phone, plate: x.plate, used: !!x.used_at }]));
   const mealMap = {}, asgMap = {};
   meals.forEach(m => (mealMap[m.booking_id] = mealMap[m.booking_id] || []).push(pricing.MEAL_LABELS[m.preference] || 'Non-veg'));
   asg.forEach(a => (asgMap[a.booking_id] = asgMap[a.booking_id] || {})[a.role] = a);
@@ -69,7 +71,7 @@ async function bookings(db, where = 'TRUE', params = []) {
       pay: PAY_UI[b.pay_option], paid: b.paid, total: b.total, refunded: b.refunded, jeeps: b.jeeps, status: uiStatus(b), declined: b.status === 'DECLINED',
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
       created: U.dateOf(b.created_at), notes: b.notes || '', startedAt: b.started_at ? U.hhmm(b.started_at) : '', startedBy: b.started_by || '',
-      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code),
+      ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code), tempDriver: tempMap[b.id] || null,
     };
   });
 }
@@ -82,6 +84,8 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
   const ids = trips.map(t => t.id);
   const seats = (await db.query(`SELECT * FROM shared_seats WHERE trip_id = ANY($1) AND status IN ('RESERVED','PAYMENT_PENDING','PAID','REFUNDED') ORDER BY seat_no`, [ids])).rows;
   const asg = (await db.query(`SELECT shared_trip_id, role, partner_id, status, vehicle_plate FROM assignments WHERE shared_trip_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
+  const temps = (await db.query(`SELECT * FROM temp_drivers WHERE shared_trip_id = ANY($1) AND revoked_at IS NULL AND expires_at > now() ORDER BY id`, [ids])).rows;
+  const tempMap = Object.fromEntries(temps.map(x => [x.shared_trip_id, { id: x.id, name: x.name, phone: x.phone, plate: x.plate, used: !!x.used_at }]));
   const seatMap = {}, asgMap = {};
   seats.forEach(s => (seatMap[s.trip_id] = seatMap[s.trip_id] || []).push(s));
   asg.forEach(a => (asgMap[a.shared_trip_id] = asgMap[a.shared_trip_id] || {})[a.role] = a);
@@ -93,7 +97,7 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
       id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, status: STATUS[t.status], minSeats: t.min_seats, seatsMax: t.seats,
       deadline: U.dateOf(t.auto_cancel_at), deadlineTime: U.hhmm(t.auto_cancel_at),
       vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
-      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id,
+      startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id, tempDriver: tempMap[t.id] || null,
       guideWanted: mine.some(s => s.has_guide && s.status !== 'REFUNDED'),
       seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline, hotel: s.hotel_name || '', pdist: s.pickup_km == null ? null : +s.pickup_km, lat: s.pickup_lat, lng: s.pickup_lng, bino: s.has_bino, guideReq: s.has_guide, amount: s.amount })),
     };

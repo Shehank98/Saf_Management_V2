@@ -506,3 +506,41 @@ test('profit report counts money kept from cancelled bookings', async () => {
   if (b) assert.ok(data.trips.some(t => t.code === b.code && t.status === 'Cancelled'));
   data.trips.forEach(t => assert.equal(t.profit, t.revenue - t.cost.total));
 });
+
+test('temporary driver link: one trip only, blocks the regular driver, can be stopped', async () => {
+  const hash = await require('../server/lib/auth').hashPassword('drive-pass-99');
+  const d1 = (await query(`INSERT INTO partners(type,name,email,status,password_hash,vehicle_plate) VALUES('JEEP_DRIVER','Saman','saman@t.lk','ACTIVE',$1,'CAB-3333') RETURNING id`, [hash])).rows[0].id;
+  const c1 = (await api('POST', '/api/partner/login', { email: 'saman@t.lk', password: 'drive-pass-99' })).headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const mk = async () => { const o = await admin('POST', '/api/admin/bookings', guest({ date: U.todayStr(), guests: 2 })); await query(`UPDATE bookings SET status='CONFIRMED' WHERE code=$1`, [o.json.code]); return o.json.code; };
+  const code = await mk(), other = await mk();
+  await admin('POST', `/api/admin/bookings/${code}/assign`, { jeep: d1 });
+  const aid = (await query(`SELECT id FROM assignments WHERE partner_id=$1`, [d1])).rows[0].id;
+  await api('POST', `/api/partner/jobs/${aid}/accept`, null, c1);
+  assert.equal((await api('POST', `/api/partner/jobs/${aid}/temp-driver`, { name: 'X', phone: '1', plate: 'A' }, c1)).status, 400, 'needs name, phone, plate');
+  const mkLink = await api('POST', `/api/partner/jobs/${aid}/temp-driver`, { name: 'Ravi Stand-in', phone: '0771234567', plate: 'cab-7777' }, c1);
+  assert.equal(mkLink.status, 201);
+  const token = mkLink.json.url.split('/drive/')[1];
+  const info = await api('GET', `/api/drive/${token}`);
+  assert.equal(info.status, 200); assert.equal(info.json.code, code); assert.equal(info.json.plate, 'CAB-7777'); assert.equal(info.json.guests.length, 1);
+  // the regular driver can no longer start it
+  const own = await api('POST', '/api/checkin', { code, preview: true }, c1);
+  assert.equal(own.json.kind, 'bad'); assert.match(own.json.msg, /Ravi/);
+  // the link cannot be used for another trip
+  assert.equal((await api('POST', `/api/drive/${token}/checkin`, { code: other, preview: true })).json.kind, 'bad');
+  assert.equal((await api('POST', `/api/drive/${token}/checkin`, { code, preview: true })).json.kind, 'ready');
+  const data = (await admin('GET', '/api/admin/data')).json;
+  const td = data.bookings.find(b => b.code === code).tempDriver;
+  assert.equal(td.name, 'Ravi Stand-in');
+  // office stops the link: it no longer works, the regular driver can start again
+  assert.equal((await admin('POST', `/api/admin/jobs/temp-driver/${td.id}/revoke`)).status, 200);
+  assert.equal((await api('GET', `/api/drive/${token}`)).status, 403);
+  assert.equal((await api('POST', '/api/checkin', { code, preview: true }, c1)).json.kind, 'ready');
+  // office creates a new link and the stand-in starts and finishes the trip
+  const l2 = await admin('POST', '/api/admin/jobs/temp-driver', { code, name: 'Ravi Stand-in', phone: '0771234567', plate: 'CAB-7777', email: 'ravi@x.lk' });
+  const t2 = l2.json.url.split('/drive/')[1];
+  assert.equal((await api('POST', `/api/drive/${t2}/checkin`, { code })).json.kind, 'ok');
+  assert.ok((await emails('temp_driver')).some(e => e.to_addr === 'ravi@x.lk'));
+  assert.equal((await api('POST', `/api/drive/${t2}/finish`)).status, 200);
+  assert.equal((await query('SELECT status FROM bookings WHERE code=$1', [code])).rows[0].status, 'COMPLETED');
+  assert.equal((await api('GET', '/api/drive/not-a-real-token-at-all-xx')).status, 404);
+});

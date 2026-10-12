@@ -128,6 +128,13 @@ r.post('/jobs/handover', staff, U.wrap(async (req, res) => {
   res.json({ ok: true, handed: !!out.partner });
 }));
 
+/* Driver not in the system: a one-trip link to scan and start that trip. */
+r.post('/jobs/temp-driver', staff, U.wrap(async (req, res) => {
+  const out = await require('../services/tempDrivers').create(req.body || {}, { kind: 'ADMIN', id: req.admin.id, name: who(req) });
+  res.status(201).json({ url: out.url, id: out.temp.id });
+}));
+r.post('/jobs/temp-driver/:id/revoke', staff, U.wrap(async (req, res) => { await require('../services/tempDrivers').revoke(req.params.id, { name: who(req) }); res.json({ ok: true }); }));
+
 /* ---------------- Partners & payouts ---------------- */
 r.post('/partners/:id/approve', staff, U.wrap(async (req, res) => { await partners.approve(+req.params.id, req.body, who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/reject', staff, U.wrap(async (req, res) => { await partners.reject(+req.params.id, req.body.reason, who(req)); res.json({ ok: true }); }));

@@ -288,6 +288,45 @@ r.post('/shared/:id/pay', limits.booking, U.wrap(async (req, res) => {
   res.json({ checkoutUrl: url });
 }));
 
+/* ---------------- Temporary driver link (one trip, no account) ---------------- */
+async function driveLink(req) {
+  const d = await require('../services/tempDrivers').fromToken(req.params.token);
+  if (!d) throw U.notFound('This driving link is not valid.');
+  if (!d.active) throw U.forbidden('This driving link has been stopped or has expired. Please call the office.');
+  return d;
+}
+r.get('/drive/:token', limits.lookup, U.wrap(async (req, res) => {
+  const d = await driveLink(req), t = d.trip, conf = await settings.load();
+  const s = settings.sessionAt(conf, t.loc, t.ses), L = settings.locOf(conf, t.loc);
+  let guests = [];
+  if (t.kind === 'private') {
+    const b = t.row;
+    guests = [{ name: b.lead_name, phone: `${b.phone_cc} ${b.phone}`.trim(), people: b.guests, pickup: b.pickup_mode === 'HOTEL' ? (b.hotel_name || 'Hotel') : 'Office', lat: b.pickup_lat, lng: b.pickup_lng, collect: Math.max(0, b.total - b.paid) }];
+  } else {
+    const seats = (await query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND status='PAID' ORDER BY seat_no`, [t.key])).rows;
+    const by = new Map(); seats.forEach(x => { if (!by.has(x.code)) by.set(x.code, { name: x.name, phone: `${x.phone_cc} ${x.phone}`.trim(), seats: [], pickup: x.hotel_name || 'Office', lat: x.pickup_lat, lng: x.pickup_lng, collect: 0 }); by.get(x.code).seats.push(x.seat_no); });
+    guests = [...by.values()].map(g => ({ ...g, people: g.seats.length }));
+  }
+  res.set('Cache-Control', 'no-store').json({
+    driver: d.temp.name, plate: d.temp.plate, code: t.code, kind: t.kind, date: t.date, status: t.status,
+    session: { name: s.name, short: s.short, time: s.time, pickup: s.pickup }, park: L ? L.name : '', office: L ? L.office : '', guests,
+  });
+}));
+r.post('/drive/:token/checkin', limits.api, U.wrap(async (req, res) => {
+  const d = await driveLink(req);
+  let code = String(req.body.code || req.body.text || '').trim(), sig = req.body.sig || null;
+  const m = code.match(/\/t\/([^/?#\s]+)(?:\?[^#]*?\bk=([A-Za-z0-9]+))?/i);
+  if (m) { code = decodeURIComponent(m[1]); sig = m[2] || sig; }
+  const out = await require('../services/trips').checkin({ code, sig, force: !!req.body.force, preview: !!req.body.preview, actor: require('../services/tempDrivers').actorFor(d.temp) });
+  if (out.kind === 'ok') await query('UPDATE temp_drivers SET used_at=COALESCE(used_at, now()) WHERE id=$1', [d.temp.id]);
+  res.set('Cache-Control', 'no-store').json(out);
+}));
+r.post('/drive/:token/finish', limits.api, U.wrap(async (req, res) => {
+  const d = await driveLink(req);
+  await require('../services/trips').finish({ code: d.trip.code, actor: require('../services/tempDrivers').actorFor(d.temp) });
+  res.json({ ok: true });
+}));
+
 /* ---------------- Partner application (documents stay private in the database) ---------------- */
 r.post('/partners/apply', limits.apply, upload.any(), U.wrap(async (req, res) => {
   const files = (req.files || []).filter(f => f.fieldname.startsWith('doc:')).map(f => ({ kind: f.fieldname.slice(4), name: f.originalname.slice(0, 120), mime: f.mimetype, buffer: f.buffer }));

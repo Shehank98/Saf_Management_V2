@@ -45,12 +45,14 @@ async function insertLines(db, lines, ctxRow) {
 }
 
 function canScan(actor, conf, assignedPartnerIds) {
-  if (actor.kind === 'ADMIN') return true;
+  if (actor.kind === 'ADMIN' || actor.kind === 'TEMP') return true; // a temporary link is already tied to its one trip
   return conf.partners.scanAny || assignedPartnerIds.includes(actor.id);
 }
 
 /** The jeep job on a trip right now (driver + the vehicle doing it). */
 async function currentDriver(where, key) {
+  const temp = await require('./tempDrivers').activeFor({ query }, where, key);
+  if (temp) return { temp: true, id: temp.id, partner_id: null, name: temp.name, plate: temp.plate, phone: temp.phone };
   return (await query(
     `SELECT a.*, p.name, p.phone, COALESCE(a.vehicle_plate, p.vehicle_plate) AS plate FROM assignments a JOIN partners p ON p.id=a.partner_id
       WHERE a.${where}=$1 AND a.role='JEEP' AND a.status<>'DECLINED' ORDER BY a.id DESC LIMIT 1`, [key])).rows[0] || null;
@@ -63,6 +65,11 @@ async function currentDriver(where, key) {
 function startBlock(actor, drv) {
   if (actor.kind === 'ADMIN') return null;
   const who = drv ? `${drv.name}${drv.plate ? ' (' + drv.plate + ')' : ''}` : '';
+  if (drv && drv.temp) {
+    if (actor.kind === 'TEMP' && actor.id === drv.id) return null;
+    return bad('✕ Handed to a temporary driver', `This trip was handed to ${who} with a one-trip link. Only they, or the office, can start it.`);
+  }
+  if (actor.kind === 'TEMP') return bad('✕ Link not active', 'This temporary link has been stopped or has expired. Please call the office.');
   if (actor.type !== 'JEEP_DRIVER') return bad('✕ Only the driver can start', drv ? `This trip is started by the assigned driver: ${who}.` : 'Only a jeep driver can start this trip.');
   if (drv && drv.partner_id !== actor.id) return bad('✕ Not your trip', `This trip is assigned to ${who}. Only that driver can start it. If you are driving instead, ask the office or ${drv.name} to hand the job to you.`);
   return null;
@@ -80,6 +87,8 @@ async function checkin({ code, sig, force = false, preview = false, actor }) {
   const today = U.todayStr();
 
   const booking = (await query('SELECT * FROM bookings WHERE code=$1', [code])).rows[0];
+  const seat0 = booking ? null : (await query(`SELECT trip_id FROM shared_seats WHERE code=$1 LIMIT 1`, [code])).rows[0];
+  if (actor.kind === 'TEMP' && (booking ? booking.id : seat0 && seat0.trip_id) !== actor.tempTrip) return bad('✕ Not this trip', 'This ticket is for a different trip. Your link only works for the trip you were given.');
   if (booking) return checkinPrivate(booking, { force, preview, actor, conf, today });
   const seat = (await query(`SELECT * FROM shared_seats WHERE code=$1 ORDER BY seat_no LIMIT 1`, [code])).rows[0];
   if (seat) return checkinShared(seat, { force, preview, actor, conf, today });
@@ -195,6 +204,10 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
 async function finish({ code, actor }) {
   code = U.normCode(code);
   const b0 = (await query('SELECT * FROM bookings WHERE code=$1', [code])).rows[0];
+  if (actor.kind === 'TEMP') {
+    if ((b0 ? b0.id : code) !== actor.tempTrip) throw U.forbidden('This is not your trip.');
+    return b0 ? require('./bookings').markCompleted(code, actor.name) : completeShared(code, actor.name);
+  }
   if (b0) {
     const assigned = (await query(`SELECT partner_id FROM assignments WHERE booking_id=$1 AND status<>'DECLINED'`, [b0.id])).rows.map(r => r.partner_id);
     if (actor.kind === 'PARTNER' && !assigned.includes(actor.id)) throw U.forbidden('This is not your trip.');

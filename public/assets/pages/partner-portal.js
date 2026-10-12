@@ -41,17 +41,29 @@ function jobCard(j, full) {
   ${Object.keys(mc).length ? `<div class="small"><b>Meal packs</b><div class="meals">${Object.entries(mc).map(([k, v]) => `<span>${v}× ${esc(k)}</span>`).join('')}${j.allergy ? `<span style="background:var(--bad-bg);color:var(--bad)">⚠ ${esc(j.allergy)}</span>` : ''}</div></div>` : ''}
   ${full && !isNew ? (sh ? `<ul class="pax">${j.seats.map(x => `<li><span>Seat ${x.n} · ${esc(x.name)}${x.meal ? ' · ' + esc(x.meal) : ''}${x.pay !== 'Paid' ? ' · <b style="color:var(--bad)">not paid</b>' : ''}</span><a href="tel:${(x.cc + x.phone).replace(/\s/g, '')}">Call</a></li>`).join('') || '<li><span class="muted">No guests yet</span></li>'}</ul>` : `<ul class="pax"><li><span>Lead guest · ${esc(j.name)}</span><a href="tel:${(j.cc + j.phone).replace(/\s/g, '')}">Call</a></li>${j.notes ? `<li><span>Note: ${esc(j.notes)}</span></li>` : ''}</ul>`) : ''}
   <div class="acts" style="margin-top:10px">${isNew ? `<button class="btn sm ok" data-acc="${j.aid}">Accept job</button><button class="btn sm" data-dec="${j.aid}">Decline</button>` : live ? `<span class="small" style="color:var(--info);font-weight:700">Trip in progress since ${j.startedAt}</span><button class="btn sm" data-done="${esc(j.code)}">Trip finished</button>` : `<a class="btn sm ${today ? 'primary' : ''}" href="#checkin">Scan ticket to start trip</a>${!sh && j.pmode === 'hotel' ? `<a class="btn sm" target="_blank" rel="noopener" href="${mapsHref(j)}">Directions</a>` : ''}<a class="btn sm" target="_blank" rel="noopener" href="${gcal(j)}">📅 Add to calendar</a>${['JEEP', 'GUIDE'].includes(j.role) ? `<button class="btn sm" data-ho="${j.aid}">Hand over / vehicle</button>` : ''}`}</div>
-  ${!isNew && (j.plate || j.handedFrom) ? `<div class="tiny muted" style="margin-top:8px">${j.role === 'JEEP' && j.plate ? 'Vehicle <b>' + esc(j.plate) + '</b>' : ''}${j.handedFrom ? ' · handed to you by ' + esc(j.handedFrom) : ''}</div>` : ''}</div>`;
+  ${!isNew && (j.plate || j.handedFrom) ? `<div class="tiny muted" style="margin-top:8px">${j.role === 'JEEP' && j.plate ? 'Vehicle <b>' + esc(j.plate) + '</b>' : ''}${j.handedFrom ? ' · handed to you by ' + esc(j.handedFrom) : ''}</div>` : ''}${j.tempDriver ? `<div class="note warn small" style="margin-top:8px">Temporary driver <b>${esc(j.tempDriver.name)}</b> (${esc(j.tempDriver.plate)}) has the driving link for this trip.</div>` : ''}</div>`;
 }
 const gcal = j => { const s = SESS[j.ses] || {}, c = (d, t) => d.replace(/-/g, '') + 'T' + (t || '00:00').replace(':', '') + '00'; return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${j.roleLabel}: ${j.code}`)}&dates=${c(j.date, s.pickupRaw || s.start)}/${c(j.date, s.end)}&ctz=Asia%2FColombo&details=${encodeURIComponent(`${s.name || ''} · ${ppl(j.guests)} · pickup ${s.pickup || ''}`)}` };
-function handover(aid) {
+function handover(aid, mode = 'partner') {
   const j = PD.jobs.find(x => x.aid === +aid); if (!j) return;
-  openModal(`<h3>Hand over or change vehicle</h3><p class="small muted">Can't drive this trip, or using a different jeep? Give the job to another partner, or just change the number plate. The new driver gets it straight away and is the only one who can start the trip.</p>
+  const temp = j.role === 'JEEP' && mode === 'temp';
+  openModal(`<h3>Hand over or change vehicle</h3>
+  ${j.role === 'JEEP' ? `<div class="seg" style="margin:8px 0 12px"><button type="button" data-m="partner" class="${temp ? '' : 'on'}">Partner in the system</button><button type="button" data-m="temp" class="${temp ? 'on' : ''}">Someone not in the system</button></div>` : ''}
+  ${temp ? `<p class="small muted">For a stand-in driver with no account. You get a one-trip link to send them by WhatsApp or SMS. With it they can scan the tickets and start <b>this trip only</b>. The trip payment still comes to you, and you can no longer start it yourself while the link is active.</p>${tempLinkForm()}`
+  : `<p class="small muted">Can't drive this trip, or using a different jeep? Give the job to another partner, or just change the number plate. The new driver gets it straight away and is the only one who can start the trip.</p>
   <div class="field"><label for="hoTo">Give the job to</label><select class="inp" id="hoTo"><option value="">Keep it (only change the vehicle)</option></select></div>
-  ${j.role === 'JEEP' ? `<div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" value="${esc(j.plate || '')}" style="text-transform:uppercase" placeholder="e.g. CAB-1234"></div>` : ''}
-  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">Save</button></div>`);
-  GET('/api/partner/colleagues').then(rows => { $('#hoTo').insertAdjacentHTML('beforeend', rows.map(x => `<option value="${x.id}">${esc(x.name)}${x.plate ? ' · ' + esc(x.plate) : ''}</option>`).join('')) }).catch(() => { });
+  ${j.role === 'JEEP' ? `<div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" value="${esc(j.plate || '')}" style="text-transform:uppercase" placeholder="e.g. CAB-1234"></div>` : ''}`}
+  ${j.tempDriver ? `<div class="note warn small" style="margin-bottom:10px">Active link: <b>${esc(j.tempDriver.name)}</b> (${esc(j.tempDriver.plate)}). <a href="#" id="tdStop">Stop it</a></div>` : ''}
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">${temp ? 'Create link' : 'Save'}</button></div>`);
+  $$('#modalBody [data-m]').forEach(x => x.onclick = () => handover(aid, x.dataset.m));
+  const st = $('#tdStop'); if (st) st.onclick = e => { e.preventDefault(); busy(st, async () => { await POST(`/api/partner/temp-driver/${j.tempDriver.id}/revoke`); closeModal(); toast('Link stopped'); await refresh() }) };
+  if (!temp) GET('/api/partner/colleagues').then(rows => { $('#hoTo').insertAdjacentHTML('beforeend', rows.map(x => `<option value="${x.id}">${esc(x.name)}${x.plate ? ' · ' + esc(x.plate) : ''}</option>`).join('')) }).catch(() => { });
   $('#hoOk').onclick = e => busy(e.target, async () => {
+    if (temp) {
+      const tb = tempLinkBody(); const r = await POST(`/api/partner/jobs/${aid}/temp-driver`, tb);
+      $('#modalBody').innerHTML = tempLinkResult(r.url, tb.phone, tb.name.trim()); wireTempResult(r.url);
+      $$('#modalBody [data-close]').forEach(x => x.onclick = () => { closeModal(); refresh() }); return;
+    }
     const to = $('#hoTo').value;
     if (to && !confirm('Hand this job over? You will no longer be able to start this trip.')) return;
     const r = await POST(`/api/partner/jobs/${aid}/handover`, { to: to || undefined, plate: $('#hoPlate') ? $('#hoPlate').value : undefined });

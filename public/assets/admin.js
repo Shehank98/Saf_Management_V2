@@ -124,18 +124,46 @@ const stateNote = st => st === 'OFFERED' ? ' <span class="tiny muted">(waiting f
 
 /* ===== Change the vehicle, or hand the job to another driver right away ===== */
 function handoverButton(rec, key) {
-  if (!rec.vendor || ['Cancelled', 'Completed', 'Started'].includes(rec.status)) return '';
-  return `<div class="small" style="margin:-4px 0 10px">Vehicle: <b>${esc(rec.jeepPlate || (VENDORS.find(v => v.id === rec.vendor) || {}).plate || 'driver\'s own jeep')}</b> · <a href="#" id="hoBtn" data-key="${esc(key)}">Change vehicle or hand over</a></div>`;
+  if (['Cancelled', 'Completed', 'Started'].includes(rec.status)) return '';
+  const td = rec.tempDriver;
+  return `<div class="small" style="margin:-4px 0 10px;line-height:1.7">${rec.vendor ? `Vehicle: <b>${esc(rec.jeepPlate || (VENDORS.find(v => v.id === rec.vendor) || {}).plate || 'driver\'s own jeep')}</b> · ` : ''}<a href="#" id="hoBtn" data-key="${esc(key)}">${rec.vendor ? 'Change vehicle or hand over' : 'Send a temporary driver link'}</a>
+    ${td ? `<div class="note warn" style="margin-top:6px">Temporary driver <b>${esc(td.name)}</b> (${esc(td.plate)}, ${esc(td.phone)}) holds a one-trip link${td.used ? ' and has used it' : ''}. Only they or the office can start this trip. <a href="#" id="tdStop" data-id="${td.id}">Stop link</a></div>` : ''}</div>`;
 }
+function tempLinkResult(url, phone, name) {
+  const msg = `Hello ${name}, this is your driving link for today's safari. Open it at pickup to scan the guests' QR tickets and start the trip: ${url}`;
+  return `<h3>Link ready</h3><p class="small muted">Send this to ${esc(name)}. It works for this trip only and stops after the trip day. Anyone with the link can start the trip, so send it only to the driver.</p>
+  <div class="lnkbox" style="margin:10px 0"><code style="word-break:break-all">${esc(url)}</code></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="tlCopy">Copy link</button><a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/${String(phone).replace(/\D/g, '').replace(/^0/, '94')}?text=${encodeURIComponent(msg)}">Send on WhatsApp</a><a class="btn sm" href="sms:${esc(phone)}?&body=${encodeURIComponent(msg)}">Send SMS</a><button class="btn sm" data-close>Done</button></div>`;
+}
+function tempLinkForm(prefill = {}) {
+  return `<div class="g2f"><div class="field"><label for="tdName">Driver name</label><input class="inp" id="tdName" value="${esc(prefill.name || '')}"></div><div class="field"><label for="tdPhone">Mobile</label><input class="inp" id="tdPhone" inputmode="tel" placeholder="077 123 4567"></div>
+  <div class="field"><label for="tdPlate">Vehicle number plate</label><input class="inp" id="tdPlate" style="text-transform:uppercase" placeholder="CAB-1234"></div><div class="field"><label for="tdEmail">Email <span class="muted">(optional)</span></label><input class="inp" id="tdEmail" type="email"></div></div>`;
+}
+const tempLinkBody = () => ({ name: $('#tdName').value, phone: $('#tdPhone').value, plate: $('#tdPlate').value, email: $('#tdEmail').value });
+function wireTempResult(url) { const c = $('#tlCopy'); if (c) c.onclick = () => { navigator.clipboard?.writeText(url).catch(() => { }); toast('Link copied') } }
 function wireHandover(rec, body, done) {
+  const stop = $('#tdStop'); if (stop) stop.onclick = async e => { e.preventDefault(); if (confirm('Stop this temporary link? The driver will no longer be able to start the trip.') && await act(() => POST(`/api/admin/jobs/temp-driver/${stop.dataset.id}/revoke`), 'Link stopped')) done() };
   const b = $('#hoBtn'); if (!b) return;
   b.onclick = e => {
     e.preventDefault();
-    openModal(`<h3>Change vehicle or driver</h3><p class="small muted">The new driver gets the job straight away (no need to accept) and is the only one who can start the trip by scanning the QR. They get an email and a phone notification.</p>
-    <div class="field"><label for="hoTo">Driver</label><select class="inp" id="hoTo"><option value="">Keep ${esc(vendorName(rec.vendor))}</option>${VENDORS.filter(v => v.status === 'Active' && v.type === 'Jeep + driver' && v.id !== rec.vendor).map(v => `<option value="${v.id}">${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('')}</select></div>
-    <div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" placeholder="e.g. CAB-1234 (empty = the driver's own jeep)" value="${esc(rec.jeepPlate || '')}" style="text-transform:uppercase"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">Save</button></div>`);
-    $('#hoOk').onclick = async ev => { if (await act(() => POST('/api/admin/jobs/handover', { ...body, role: 'JEEP', to: $('#hoTo').value || undefined, plate: $('#hoPlate').value }), r => r.handed ? 'Job handed over · new driver notified' : 'Vehicle updated', ev.target)) { closeModal(); done() } };
+    let mode = rec.vendor ? 'partner' : 'temp';
+    const draw = () => {
+      openModal(`<h3>Change vehicle or driver</h3>
+      <div class="seg" style="margin:8px 0 12px">${rec.vendor ? `<button type="button" data-m="partner" class="${mode === 'partner' ? 'on' : ''}">Partner in the system</button>` : ''}<button type="button" data-m="temp" class="${mode === 'temp' ? 'on' : ''}">Someone not in the system</button></div>
+      ${mode === 'partner' ? `<p class="small muted">The new driver gets the job straight away (no need to accept) and is the only one who can start the trip by scanning the QR. They get an email and a phone notification.</p>
+      <div class="field"><label for="hoTo">Driver</label><select class="inp" id="hoTo"><option value="">Keep ${esc(vendorName(rec.vendor))}</option>${VENDORS.filter(v => v.status === 'Active' && v.type === 'Jeep + driver' && v.id !== rec.vendor).map(v => `<option value="${v.id}">${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('')}</select></div>
+      <div class="field"><label for="hoPlate">Vehicle number plate</label><input class="inp" id="hoPlate" placeholder="e.g. CAB-1234 (empty = the driver's own jeep)" value="${esc(rec.jeepPlate || '')}" style="text-transform:uppercase"></div>`
+      : `<p class="small muted">For a stand-in driver who has no account. We create a one-trip link you send by WhatsApp or SMS. With it they can scan the guests' tickets and start <b>this trip only</b>. Payment for the trip stays with ${rec.vendor ? esc(vendorName(rec.vendor)) : 'the office'}.</p>${tempLinkForm()}`}
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hoOk">${mode === 'temp' ? 'Create link' : 'Save'}</button></div>`);
+      $$('#modalBody [data-m]').forEach(x => x.onclick = () => { mode = x.dataset.m; draw() });
+      $('#hoOk').onclick = async ev => {
+        if (mode === 'partner') { if (await act(() => POST('/api/admin/jobs/handover', { ...body, role: 'JEEP', to: $('#hoTo').value || undefined, plate: $('#hoPlate').value }), r => r.handed ? 'Job handed over · new driver notified' : 'Vehicle updated', ev.target)) { closeModal(); done() } return }
+        const tb = tempLinkBody(); ev.target.disabled = true;
+        try { const r = await POST('/api/admin/jobs/temp-driver', { ...body, ...tb }); await reload(); $('#modalBody').innerHTML = tempLinkResult(r.url, tb.phone, tb.name.trim()); $$('#modalBody [data-close]').forEach(x => x.onclick = () => { closeModal(); done() }); wireTempResult(r.url) }
+        catch (x) { toastErr(x); ev.target.disabled = false }
+      };
+    };
+    draw();
   };
 }
 

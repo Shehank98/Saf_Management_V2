@@ -136,6 +136,7 @@ app.get('/partner/job/:aid/:action', U.wrap(async (req, res) => {
   });
   card(status === 'ACCEPTED' ? '✅' : '👍', status === 'ACCEPTED' ? 'Job accepted' : 'Job declined', status === 'ACCEPTED' ? 'Thank you! The office can see it now. Guest details are in your partner portal.' : 'No problem. The office will offer it to someone else.');
 }));
+app.get('/drive/:token', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow').set('Referrer-Policy', 'no-referrer'); page('vendor/drive.html')(req, res); });
 app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('vendor/portal.html')(req, res); });
 
 // Web app manifests (home-screen install). Generated so the app name follows the business name in Settings.
@@ -160,7 +161,7 @@ app.get('/manifest.webmanifest', manifest('site'));
 app.get('/admin.webmanifest', manifest('admin'));
 app.get('/partner.webmanifest', manifest('partner'));
 
-app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\n'));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\nDisallow: /drive/\n'));
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), {

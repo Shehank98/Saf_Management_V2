@@ -115,7 +115,13 @@ async function handover(db, partner, { role, fee, code, date, session, from, pla
   require('../lib/push').toPartner(partner.id, { title: `Job handed to you · ${session.short} ${date}`, body: `${from} gave you ${code}${plate ? ' (vehicle ' + plate + ')' : ''}. You can start the trip.`, tag: 'job-' + code });
 }
 
-module.exports = { ctx, bookingView, send, toCompany, newRequest, confirmed, declined, cancelled, reminder, started, thanks, jobOffer, handover, qrInline };
+async function tempDriver(db, { to, name, plate, url, trip, from }) {
+  const c = await ctx();
+  const session = settings.sessionAt(c.conf, trip.loc, trip.ses);
+  await send(db, 'temp_driver', T.temp_driver({ name, plate, url, code: trip.code, date: trip.date, session, from }, c), { to, entity: trip.kind === 'shared' ? 'trip' : 'booking', entityId: trip.code });
+}
+
+module.exports = { tempDriver, ctx, bookingView, send, toCompany, newRequest, confirmed, declined, cancelled, reminder, started, thanks, jobOffer, handover, qrInline };
 
 /* ---- Shared trips: started / thanks go to every paid guest ---- */
 async function sharedGuests(db, trip, c) {
