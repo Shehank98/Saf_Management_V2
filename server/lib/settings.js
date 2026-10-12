@@ -35,7 +35,7 @@ const DEFAULT_EXTRAS = [
   { id: 'meals', name: 'Meal pack', price: 1500, per: 'person', sort: 1 },
   { id: 'bino', name: 'Binoculars', price: 1000, per: 'booking', sort: 2 },
   { id: 'cam', name: 'Camera + zoom lens', price: 3500, per: 'booking', sort: 3 },
-  { id: 'guide', name: 'Naturalist guide', price: 5000, per: 'booking', sort: 4 },
+  { id: 'guide', name: 'Naturalist guide', price: 5000, per: 'booking', sort: 4, active: false },
 ];
 const DEFAULT_LOCATION = { id: 'yala', name: 'Yala National Park', tagline: 'Leopards, elephants and sloth bears', office: 'Main Street, Tissamaharama' };
 
@@ -119,8 +119,11 @@ async function seedDefaults() {
       [s.id, s.name, s.short, s.start_time, s.end_time, s.pickup_time, s.private_jeep_price, s.shared_seat_price, s.sort]);
   }
   for (const e of DEFAULT_EXTRAS) {
-    await query(`INSERT INTO extras(id,name,price,per,sort) VALUES($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`, [e.id, e.name, e.price, e.per, e.sort]);
+    await query(`INSERT INTO extras(id,name,price,per,sort,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING`, [e.id, e.name, e.price, e.per, e.sort, e.active !== false]);
   }
+  // One time: the guide request is hidden for now (it was briefly on). Turning it on again in Settings sticks.
+  const once = await query(`INSERT INTO settings(key,value) VALUES('secret:once-guide-off','true') ON CONFLICT (key) DO NOTHING RETURNING key`);
+  if (once.rowCount) await query(`UPDATE extras SET active=false WHERE id='guide'`);
   for (const k of Object.keys(DEFAULTS)) {
     await query(`INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO NOTHING`, [k, JSON.stringify(DEFAULTS[k])]);
   }

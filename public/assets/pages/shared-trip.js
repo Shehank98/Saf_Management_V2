@@ -112,7 +112,7 @@ async function pickSeats() {
 
   function seatMap() {
     const rows = Math.ceil(maxSeats / 2), label = ['Front row', 'Middle row', 'Back row'];
-    let h = `<div class="vehicle" role="group" aria-label="Seat map"><div class="cab"><span class="drv"><i>🛞</i>Driver</span><span class="drv"><i>🧭</i>Tracker</span></div>`;
+    let h = `<div class="vehicle" role="group" aria-label="Seat map"><div class="cab"><span class="drv"><i>🧭</i>Tracker</span><span class="drv">Driver<i>🛞</i></span></div>`;
     for (let r = 0; r < rows; r++) {
       h += `<div class="row"><div class="rl">${rows <= 3 ? label[r] : 'Row ' + (r + 1)}</div>`;
       for (let c = 1; c <= 2; c++) {

@@ -442,6 +442,8 @@ test('seat locks: a seat being chosen is locked for 15 minutes to that browser o
   const date = U.addDays(U.todayStr(), 13);
   const id = (await api('POST', '/api/shared-trips/open', { date, ses: 'evening' })).json.id;
   const A = 'tokenAAAAAAAAAAAAAAAAAAA', B = 'tokenBBBBBBBBBBBBBBBBBBBB';
+  assert.match(await (await fetch(base + '/api/config.js')).text(), /^(?!.*"guide":\{).*$/s, 'guide extra is hidden by default');
+  await query(`UPDATE extras SET active=true WHERE id='guide'`); require('../server/lib/settings').invalidate();
   const h1 = await api('POST', `/api/shared/${id}/hold`, { seat: 1, token: A, on: true });
   assert.equal(h1.status, 200); assert.deepEqual(h1.json.mine.map(x => x.n), [1]);
   const h2 = await api('POST', `/api/shared/${id}/hold`, { seat: 1, token: B, on: true });
@@ -489,6 +491,13 @@ test('handover: only the driver holding the job can start the trip; office or dr
   assert.equal((await api('POST', '/api/checkin', { code, preview: true }, c1)).json.kind, 'ready');
   const started = await api('POST', '/api/checkin', { code }, c1);
   assert.equal(started.json.kind, 'ok');
+});
+
+test('profit report: upcoming paid trips show with estimated costs, dated by booking day', async () => {
+  const data = (await admin('GET', '/api/admin/data')).json;
+  const up = data.trips.filter(t => t.status === 'Upcoming');
+  assert.ok(up.length > 0);
+  up.forEach(t => { assert.ok(t.est); assert.equal(t.bookedOn <= U.todayStr(), true); assert.equal(t.profit, t.revenue - t.cost.total); });
 });
 
 test('profit report counts money kept from cancelled bookings', async () => {

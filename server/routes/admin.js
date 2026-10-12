@@ -41,7 +41,7 @@ async function adminData(req) {
     serialize.sharedTrips(db, `date >= $1 OR status NOT IN ('CANCELLED','COMPLETED')`, [since]),
     serialize.vendors(db),
     serialize.applications(db),
-    serialize.trips(db, since),
+    serialize.trips(db, since, conf),
     serialize.payoutLines(db, since),
     serialize.customerPayments(db, since),
     query(`SELECT message, actor, created_at FROM activity_log ORDER BY id DESC LIMIT 25`),

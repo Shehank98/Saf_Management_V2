@@ -121,7 +121,7 @@ async function applications(db) {
 }
 
 /** Trips that have started or finished, with the costs fixed at the start (the profit report). */
-async function trips(db, sinceDate) {
+async function trips(db, sinceDate, conf = null) {
   const lines = (await db.query(`SELECT * FROM payout_lines WHERE trip_date >= $1`, [sinceDate])).rows;
   const byCode = {};
   lines.forEach(l => (byCode[l.trip_code] = byCode[l.trip_code] || []).push(l));
@@ -144,13 +144,35 @@ async function trips(db, sinceDate) {
   const kept = (await db.query(`SELECT * FROM bookings WHERE status IN ('CANCELLED','DECLINED') AND paid > refunded AND date >= $1`, [sinceDate])).rows;
   for (const b of kept) {
     const revenue = b.paid - b.refunded, zero = { jeep: 0, guide: 0, meals: 0, cam: 0, total: 0 };
-    out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: 0, revenue, paid: b.paid, mealsN: 0, cam: 0, vendor: '', guide: '', name: b.lead_name + ' (cancelled, fee kept)', status: 'Cancelled', cost: zero, profit: revenue });
+    out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: 0, revenue, paid: b.paid, mealsN: 0, cam: 0, vendor: '', guide: '', name: b.lead_name + ' (cancelled, fee kept)', status: 'Cancelled', bookedOn: U.dateOf(b.cancelled_at || b.created_at), cost: zero, profit: revenue });
   }
   const ts = (await db.query(`SELECT t.*, COALESCE((SELECT SUM(amount) FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID'),0)::int AS revenue,
       (SELECT COUNT(*)::int FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID') AS n FROM shared_trips t WHERE t.status IN ('STARTED','COMPLETED') AND t.date >= $1`, [sinceDate])).rows;
   for (const t of ts) {
     const c = costOf(t.id);
     out.push({ code: t.id, kind: 'Shared', date: t.date, ses: t.session_id, guests: t.n, jeeps: 1, revenue: t.revenue, paid: t.revenue, mealsN: c.mealsN, cam: 0, vendor: c.vendor, guide: c.guide, name: t.n + ' guests', status: t.status === 'STARTED' ? 'Started' : 'Completed', cost: c.cost, profit: t.revenue - c.cost.total });
+  }
+  // Paid / confirmed trips that have not run yet: shown as "Upcoming" with costs estimated from Settings.
+  if (conf) {
+    const c = conf.costs, est = (ses, jeeps, guide, mealN, cam) => {
+      const x = { jeep: jeeps * (c.jeepFee[ses] || 0), guide: guide ? jeeps * (c.guideFee[ses] || 0) : 0, meals: mealN * c.mealCost, cam: cam ? c.camCost : 0 };
+      x.total = x.jeep + x.guide + x.meals + x.cam; return x;
+    };
+    const ub = (await db.query(`SELECT b.*, (SELECT COUNT(*)::int FROM booking_meals m WHERE m.booking_id=b.id AND m.preference<>'NONE') AS meal_n,
+        EXISTS (SELECT 1 FROM assignments a WHERE a.booking_id=b.id AND a.role='GUIDE' AND a.status<>'DECLINED') AS has_guide_partner
+      FROM bookings b WHERE b.status IN ('CONFIRMED','REQUEST') AND b.created_at >= $1::date`, [sinceDate])).rows;
+    for (const b of ub) {
+      const cost = est(b.session_id, b.jeeps, b.has_guide || b.has_guide_partner, b.has_meals ? b.meal_n : 0, b.has_cam);
+      out.push({ code: b.code, kind: 'Private', date: b.date, bookedOn: U.dateOf(b.created_at), ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue: b.total, paid: b.paid, mealsN: b.meal_n, cam: b.has_cam ? 1 : 0, vendor: '', guide: '', name: b.lead_name, status: 'Upcoming', est: true, cost, profit: b.total - cost.total });
+    }
+    const ut = (await db.query(`SELECT t.*, COALESCE(SUM(s.amount),0)::int AS revenue, COUNT(s.*)::int AS n, COUNT(*) FILTER (WHERE s.meals)::int AS meal_n, BOOL_OR(s.has_guide) AS guide,
+        MIN(s.created_at) AS first_paid
+      FROM shared_trips t JOIN shared_seats s ON s.trip_id=t.id AND s.status='PAID'
+      WHERE t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') GROUP BY t.id HAVING MIN(s.created_at) >= $1::date`, [sinceDate])).rows;
+    for (const t of ut) {
+      const cost = est(t.session_id, 1, t.guide, t.meal_n, false);
+      out.push({ code: t.id, kind: 'Shared', date: t.date, bookedOn: U.dateOf(t.first_paid), ses: t.session_id, guests: t.n, jeeps: 1, revenue: t.revenue, paid: t.revenue, mealsN: t.meal_n, cam: 0, vendor: '', guide: '', name: t.n + ' paid guests', status: 'Upcoming', est: true, cost, profit: t.revenue - cost.total });
+    }
   }
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
