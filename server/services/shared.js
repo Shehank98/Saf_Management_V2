@@ -489,16 +489,18 @@ async function remind(tripId, actor) {
   });
 }
 
-async function assignPartners(tripId, { jeep, guide }, actor) {
+async function assignPartners(tripId, { jeep, guide, meals }, actor) {
   const conf = await settings.load();
   return tx(async db => {
     const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1', [U.normCode(tripId)])).rows[0];
     if (!t || ['CANCELLED', 'COMPLETED'].includes(t.status)) throw U.notFound('Trip not found');
     const held = (await activeSeats(db, t.id)).length;
-    for (const [role, pid] of [['JEEP', jeep], ['GUIDE', guide]]) {
+    for (const [role, pid] of [['JEEP', jeep], ['GUIDE', guide], ['MEALS', meals]]) {
       if (pid === undefined) continue;
-      const fee = assignments.feeFor(role, { sessionId: t.session_id, jeeps: 1 }, conf);
+      const mealN = role === 'MEALS' ? (await db.query(`SELECT COUNT(*)::int n FROM shared_seats WHERE trip_id=$1 AND status IN ('RESERVED','PAYMENT_PENDING','PAID') AND meals`, [t.id])).rows[0].n : 0;
+      const fee = assignments.feeFor(role, { sessionId: t.session_id, jeeps: 1, mealN }, conf);
       const res = await assignments.assign(db, { tripId: t.id, date: t.date, role, partnerId: pid ? +pid : null, fee, actor });
+      if (res.partner && role === 'MEALS') { await assignments.mealOrderAssigned(db, res); continue; }
       if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, trip: { ...t, heldCount: held }, aid: res.aid })); });
     }
     return t;

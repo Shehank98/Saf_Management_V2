@@ -27,10 +27,10 @@ async function apply(raw, files) {
   if (!String(raw.bank || '').trim() || !String(raw.accName || '').trim() || String(raw.accNo || '').length < 6) throw U.bad('Please add your bank details so we can pay you.');
   if (type === 'JEEP_DRIVER' && (String(raw.plate || '').trim().length < 5 || U.int(raw.year, 0) < 1990)) throw U.bad('Please add your number plate and the jeep year.');
   if (type === 'GUIDE' && String(raw.lic || '').trim().length < 3) throw U.bad('Please add your guide licence number.');
-  const need = DOC_KINDS[type];
-  const have = new Set((files || []).map(f => f.kind));
-  const missing = need.filter(k => !have.has(k));
-  if (missing.length) throw U.bad('Please upload: ' + missing.join(', '));
+  if (type === 'MEAL_SUPPLIER' && String(raw.model || '').trim().length < 2) throw U.bad('Please add your business or kitchen name.');
+  // Documents are optional (the online form no longer asks for them); any that are sent are still checked and kept private.
+  files = (files || []).filter(f => (DOC_KINDS[type] || []).includes(f.kind));
+  const have = new Set(files.map(f => f.kind));
   for (const f of files) if (!ALLOWED_MIME.has(f.mime)) throw U.bad(`"${f.name}" must be a photo or PDF.`);
 
   const exists = await query(`SELECT 1 FROM partners WHERE lower(email)=$1 AND status IN ('APPLIED','ACTIVE','PAUSED')`, [email]);

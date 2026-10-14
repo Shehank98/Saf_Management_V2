@@ -614,3 +614,30 @@ test('currency: USD for guests, LKR for the office (rate locked per booking)', a
     await query(`UPDATE sessions SET shared_seat_price=7500 WHERE id='morning'`); require('../server/lib/settings').invalidate();
   }
 });
+
+test('partner applications without documents: meal supplier and tracker get their work in the app', async () => {
+  const apply = async (fields) => { const fd = new FormData(); Object.entries(fields).forEach(([k, v]) => fd.append(k, v)); const r = await fetch(base + '/api/partners/apply', { method: 'POST', body: fd }); return { status: r.status, json: await r.json() }; };
+  const common = { nic: '901234567V', phone: '0771234567', bank: 'BOC', accName: 'Test', accNo: '12345678', password: 'partner-pass-1', area: 'Yala National Park' };
+  assert.equal((await apply({ ...common, type: 'Meal supplier', name: 'Kumari Kitchen', email: 'kitchen@x.lk' })).status, 400, 'kitchen name is required');
+  assert.equal((await apply({ ...common, type: 'Meal supplier', name: 'Kumari Perera', email: 'kitchen@x.lk', model: 'Kumari Kitchen', exp: '40' })).status, 201);
+  assert.equal((await apply({ ...common, type: 'Tracker / guide', name: 'Nuwan Silva', email: 'tracker@x.lk', lic: 'GL-2231', exp: '8' })).status, 201);
+  const apps = (await admin('GET', '/api/admin/data')).json.applications;
+  const kitchen = apps.find(a => a.email === 'kitchen@x.lk'), tracker = apps.find(a => a.email === 'tracker@x.lk');
+  assert.equal(kitchen.docs.length, 0); assert.equal(kitchen.model, 'Kumari Kitchen');
+  for (const a of [kitchen, tracker]) assert.equal((await admin('POST', `/api/admin/partners/${a.id}/approve`, { fee: 0 })).status, 200);
+  // make this kitchen the one the office picks for a trip with meal packs
+  const tid = 'SH-MEAL';
+  await query(`INSERT INTO shared_trips(id, session_id, date, seat_price, seats, min_seats, status, auto_cancel_at) VALUES($1,'morning',$2,7500,6,1,'CONFIRMED',now() + interval '2 days')`, [tid, U.addDays(U.todayStr(), 3)]);
+  await query(`INSERT INTO shared_seats(trip_id, seat_no, code, name, phone, pay_option, amount, status, meals, meal) VALUES($1,1,'YWS-ML01X','Meal Guest','0771234567','NOW',9000,'PAID',true,'VEGAN'),($1,2,'YWS-ML01X','Meal Guest','0771234567','NOW',9000,'PAID',true,'HALAL')`, [tid]);
+  assert.equal((await admin('POST', `/api/admin/shared/${tid}/assign`, { meals: kitchen.id, guide: tracker.id })).status, 200);
+  const login = async e => (await api('POST', '/api/partner/login', { email: e, password: 'partner-pass-1' })).headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const kd = (await api('GET', '/api/partner/data', null, await login('kitchen@x.lk'))).json;
+  const order = kd.jobs.find(j => j.code === tid);
+  assert.ok(order && order.mealOrder); assert.equal(order.mealN, 2); assert.equal(order.meals.Vegan, 1); assert.equal(order.state, 'ACCEPTED');
+  const td = (await api('GET', '/api/partner/data', null, await login('tracker@x.lk'))).json;
+  const job = td.jobs.find(j => j.code === tid);
+  assert.ok(job); assert.equal(job.role, 'GUIDE'); assert.equal(job.state, 'OFFERED');
+  // a tracker cannot start a trip from a QR
+  const scan = await api('POST', '/api/checkin', { code: 'YWS-ML01X', preview: true }, await login('tracker@x.lk'));
+  assert.equal(scan.json.kind, 'bad');
+});

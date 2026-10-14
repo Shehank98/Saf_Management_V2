@@ -243,17 +243,18 @@ async function markCompleted(code, actor) {
 }
 
 /** Give a booking's jeep / tracker to partners and email them the offer. */
-async function assignPartners(code, { jeep, guide }, actor) {
+async function assignPartners(code, { jeep, guide, meals }, actor) {
   const conf = await settings.load();
   return tx(async db => {
     const b = await getByCode(db, code);
     if (!b) throw U.notFound('Booking not found');
     if (['CANCELLED', 'DECLINED', 'COMPLETED'].includes(b.status)) throw U.conflict('This booking is closed.');
     const mealN = b.has_meals ? (await db.query(`SELECT COUNT(*)::int n FROM booking_meals WHERE booking_id=$1 AND preference<>'NONE'`, [b.id])).rows[0].n : 0;
-    for (const [role, pid] of [['JEEP', jeep], ['GUIDE', guide]]) {
+    for (const [role, pid] of [['JEEP', jeep], ['GUIDE', guide], ['MEALS', meals]]) {
       if (pid === undefined) continue;
       const fee = assignments.feeFor(role, { sessionId: b.session_id, jeeps: b.jeeps, mealN }, conf);
       const res = await assignments.assign(db, { bookingId: b.id, date: b.date, role, partnerId: pid ? +pid : null, fee, actor });
+      if (res.partner && role === 'MEALS') { await assignments.mealOrderAssigned(db, res); continue; }
       if (res.partner) db.after(async () => { await tx(c => notify.jobOffer(c, res.partner, { role, fee, booking: b, aid: res.aid })); });
     }
     return b;

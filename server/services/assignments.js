@@ -33,7 +33,7 @@ async function assign(db, { bookingId = null, tripId = null, date, role, partner
   if (cur) await db.query('DELETE FROM assignments WHERE id=$1', [cur.id]);
   const ins = await db.query(`INSERT INTO assignments(booking_id, shared_trip_id, partner_id, role, fee) VALUES($1,$2,$3,$4,$5) RETURNING id`,
     [bookingId, tripId, partnerId, role, fee]);
-  await activity.log(db, bookingId ? 'booking' : 'trip', key, `Assigned ${pr.name} (${ROLE_LABEL[role]}) · offer emailed`, actor);
+  await activity.log(db, bookingId ? 'booking' : 'trip', key, `Assigned ${pr.name} (${ROLE_LABEL[role]})${role === 'MEALS' ? '' : ' · offer emailed'}`, actor);
   return { changed: true, partner: pr, fee, aid: ins.rows[0].id };
 }
 
@@ -91,4 +91,10 @@ async function handoverJob(params) {
   return out;
 }
 
-module.exports = { assign, feeFor, TYPE_FOR_ROLE, handover, handoverJob };
+/** Meal orders need no "accept": the supplier simply sees the order in their app (and gets a phone notification). */
+async function mealOrderAssigned(db, res) {
+  await db.query(`UPDATE assignments SET status='ACCEPTED', responded_at=now() WHERE id=$1`, [res.aid]);
+  db.after(() => require('../lib/push').toPartner(res.partner.id, { title: 'New meal order', body: 'Open the app to see what to prepare.', url: '/partner#jobs' }));
+}
+
+module.exports = { assign, feeFor, TYPE_FOR_ROLE, handover, handoverJob, mealOrderAssigned };

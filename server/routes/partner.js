@@ -31,7 +31,7 @@ async function jobsFor(p, conf) {
   const rows = (await query(
     `SELECT a.id AS aid, a.role, a.fee, a.status AS astatus, a.booking_id, a.shared_trip_id, a.vehicle_plate, a.handed_from,
             (SELECT name FROM partners x WHERE x.id=a.handed_from) AS handed_from_name FROM assignments a
-      WHERE a.partner_id=$1 AND a.status <> 'DECLINED'`, [p.id])).rows;
+      WHERE a.partner_id=$1 AND a.status <> 'DECLINED' AND a.role <> 'MEALS'`, [p.id])).rows; // meal orders are built below
   const jobs = [];
   const bIds = rows.filter(x => x.booking_id).map(x => x.booking_id), tIds = rows.filter(x => x.shared_trip_id).map(x => x.shared_trip_id);
   const bks = bIds.length ? await serialize.bookings({ query }, 'id = ANY($1) AND date >= $2', [bIds, since]) : [];
@@ -61,7 +61,40 @@ async function jobsFor(p, conf) {
       seats: accepted ? t.seats.filter(s => s.pay !== 'Refunded').map(s => ({ n: s.n, name: s.name, cc: s.cc, phone: s.phone, meal: s.meal, pay: s.pay, hotel: s.hotel, lat: s.lat, lng: s.lng, bino: s.bino, guide: s.guideReq })) : [],
     });
   }
+  if (p.type === 'MEAL_SUPPLIER') jobs.push(...await mealOrders(p, conf, since, jobs));
   return jobs.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Meal suppliers don't accept jobs one by one: every confirmed trip with meal packs is an order for the
+ * supplier the office picked for it, or for the main supplier (the first active one) when none was picked.
+ * This is the same rule used for the payout when the trip starts.
+ */
+async function mealOrders(p, conf, since, already) {
+  const main = (await query(`SELECT id FROM partners WHERE type='MEAL_SUPPLIER' AND status='ACTIVE' ORDER BY id LIMIT 1`)).rows[0];
+  const isMain = main && main.id === p.id;
+  const seen = new Set(already.map(j => j.code));
+  const out = [];
+  const mine = `(EXISTS (SELECT 1 FROM assignments a WHERE a.role='MEALS' AND a.status<>'DECLINED' AND a.partner_id=$2 AND a.%COL%=%KEY%)
+     OR ($3 AND NOT EXISTS (SELECT 1 FROM assignments a WHERE a.role='MEALS' AND a.status<>'DECLINED' AND a.%COL%=%KEY%)))`;
+  const bs = (await query(`SELECT b.* FROM bookings b WHERE b.date >= $1 AND b.has_meals AND b.status IN ('CONFIRMED','STARTED','COMPLETED') AND ${mine.replace(/%COL%/g, 'booking_id').replace(/%KEY%/g, 'b.id')}`, [since, p.id, !!isMain])).rows;
+  for (const b of bs) {
+    if (seen.has(b.code)) continue;
+    const prefs = (await query(`SELECT preference FROM booking_meals WHERE booking_id=$1 AND preference<>'NONE'`, [b.id])).rows.map(r => pricing.MEAL_LABELS[r.preference]);
+    const c = {}; prefs.forEach(x => { c[x] = (c[x] || 0) + 1; });
+    out.push({ aid: null, role: 'MEALS', roleLabel: 'Meal order', fee: prefs.length * conf.costs.mealCost, state: 'ACCEPTED', kind: 'Private', code: b.code, date: b.date, ses: b.session_id,
+      status: serialize.uiStatus(b), guests: b.guests, jeeps: b.jeeps, pmode: 'office', hotel: '', balance: 0, meals: c, allergy: b.allergy_note || '', mealOrder: true, mealN: prefs.length });
+  }
+  const ts = (await query(`SELECT t.* FROM shared_trips t WHERE t.date >= $1 AND t.status IN ('CONFIRMED','FULL','STARTED','COMPLETED') AND ${mine.replace(/%COL%/g, 'shared_trip_id').replace(/%KEY%/g, 't.id')}`, [since, p.id, !!isMain])).rows;
+  for (const t of ts) {
+    if (seen.has(t.id)) continue;
+    const seats = (await query(`SELECT meal FROM shared_seats WHERE trip_id=$1 AND status='PAID' AND meals`, [t.id])).rows;
+    if (!seats.length) continue;
+    const c = {}; seats.forEach(x => { const l = pricing.MEAL_LABELS[x.meal] || 'Non-veg'; c[l] = (c[l] || 0) + 1; });
+    out.push({ aid: null, role: 'MEALS', roleLabel: 'Meal order', fee: seats.length * conf.costs.mealCost, state: 'ACCEPTED', kind: 'Shared', code: t.id, date: t.date, ses: t.session_id,
+      status: { STARTED: 'Started', COMPLETED: 'Completed' }[t.status] || 'Confirmed', guests: seats.length, jeeps: 1, pmode: 'office', hotel: '', balance: 0, meals: c, mealOrder: true, mealN: seats.length });
+  }
+  return out;
 }
 
 r.get('/data', auth.requirePartner, U.wrap(async (req, res) => {

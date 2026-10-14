@@ -103,14 +103,14 @@ r.post('/bookings/:code/cancel', staff, U.wrap(async (req, res) => {
   res.json({ ok: true, refund: out.refund });
 }));
 r.post('/bookings/:code/pay', staff, U.wrap(async (req, res) => { await bookings.recordPayment(req.params.code, req.body.amount, req.body.method, who(req)); res.json({ ok: true }); }));
-r.post('/bookings/:code/assign', staff, U.wrap(async (req, res) => { await bookings.assignPartners(req.params.code, { jeep: req.body.jeep, guide: req.body.guide }, who(req)); res.json({ ok: true }); }));
+r.post('/bookings/:code/assign', staff, U.wrap(async (req, res) => { await bookings.assignPartners(req.params.code, { jeep: req.body.jeep, guide: req.body.guide, meals: req.body.meals }, who(req)); res.json({ ok: true }); }));
 r.post('/bookings/:code/ticket', staff, U.wrap(async (req, res) => { await bookings.resendTicket(req.params.code, who(req)); res.json({ ok: true }); }));
 r.delete('/bookings/:code', owner, U.wrap(async (req, res) => { await bookings.remove(req.params.code, who(req)); res.json({ ok: true }); }));
 r.post('/bookings/:code/complete', staff, U.wrap(async (req, res) => { await bookings.markCompleted(req.params.code, who(req)); res.json({ ok: true }); }));
 
 /* ---------------- Shared trips ---------------- */
 r.post('/shared', staff, U.wrap(async (req, res) => { const t = await shared.createTrip(req.body, who(req)); res.status(201).json({ id: t.id }); }));
-r.post('/shared/:id/assign', staff, U.wrap(async (req, res) => { await shared.assignPartners(req.params.id, { jeep: req.body.jeep, guide: req.body.guide }, who(req)); res.json({ ok: true }); }));
+r.post('/shared/:id/assign', staff, U.wrap(async (req, res) => { await shared.assignPartners(req.params.id, { jeep: req.body.jeep, guide: req.body.guide, meals: req.body.meals }, who(req)); res.json({ ok: true }); }));
 r.get('/shared/:id/run', staff, U.wrap(async (req, res) => res.json(await require('../services/trips').pickupRun({ query }, U.normCode(req.params.id)))));
 r.post('/shared/:id/start', staff, U.wrap(async (req, res) => res.json(await require('../services/trips').startShared(req.params.id, { kind: 'ADMIN', id: req.admin.id, name: who(req) }, { force: !!req.body.force }))));
 r.post('/shared/:id/cancel', staff, U.wrap(async (req, res) => { await shared.cancelTrip(req.params.id, { actor: who(req), reason: 'cancelled by office' }); res.json({ ok: true }); }));

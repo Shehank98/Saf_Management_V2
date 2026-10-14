@@ -135,7 +135,7 @@ function admin_vendor_app({ partner, typeLabel, docs }, c) {
     subject: `New partner application | ${partner.name} (${typeLabel})`,
     html: layout({
       kind: 'admin', icon: '🤝', small: 'Partner application', title: esc(partner.name), c, foot: false,
-      body: table([row('Type', esc(typeLabel)), partner.vehicle_plate && row('Vehicle', `${esc(partner.vehicle_plate)} · ${partner.seats || '?'} seats · ${partner.vehicle_year || ''}`), row('Phone', esc(partner.phone)), row('Email', esc(partner.email)), row('Documents', esc(docs.join(', ')) || 'none')])
+      body: table([row('Type', esc(typeLabel)), partner.vehicle_plate && row('Vehicle', `${esc(partner.vehicle_plate)} · ${partner.seats || '?'} seats · ${partner.vehicle_year || ''}`), partner.licence_no && row('Guide licence', esc(partner.licence_no)), partner.type === 'MEAL_SUPPLIER' && partner.vehicle_model && row('Kitchen', esc(partner.vehicle_model)), row('Phone', esc(partner.phone)), row('Email', esc(partner.email)), docs && docs.length && row('Documents', esc(docs.join(', ')))])
         + btn(`${c.base}/admin/partners`, 'Review the application') + pills([{ href: telHref(partner.phone), label: '📞 Call applicant' }]),
     }),
   };

@@ -70,7 +70,7 @@ async function bookings(db, where = 'TRUE', params = []) {
       pmode: b.pickup_mode === 'HOTEL' ? 'hotel' : 'office', hotel: b.hotel_name || '', pdist: b.pickup_km == null ? 0 : +b.pickup_km, lat: b.pickup_lat, lng: b.pickup_lng,
       meals: b.has_meals ? 1 : 0, mealPrefs: mealMap[b.id] || [], allergy: b.allergy_note || '', bino: b.has_bino ? 1 : 0, cam: b.has_cam ? 1 : 0, guideReq: b.has_guide ? 1 : 0, loc: b.location_id,
       pay: PAY_UI[b.pay_option], paid: b.paid, total: b.total, refunded: b.refunded, jeeps: b.jeeps, status: uiStatus(b), declined: b.status === 'DECLINED',
-      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
+      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '', mealSupplier: a.MEALS ? String(a.MEALS.partner_id) : '',
       created: U.dateOf(b.created_at), notes: b.notes || '', startedAt: b.started_at ? U.hhmm(b.started_at) : '', startedBy: b.started_by || '',
       ticketSent: !!b.ticket_sent_at, createdBy: b.created_by, k: secrets.sign(b.code), tempDriver: tempMap[b.id] || null, cur: b.currency || 'LKR', fx: +b.fx || 1,
     };
@@ -97,7 +97,7 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
     return {
       id: t.id, date: t.date, ses: t.session_id, price: t.seat_price, status: STATUS[t.status], minSeats: t.min_seats, seatsMax: t.seats,
       deadline: U.dateOf(t.auto_cancel_at), deadlineTime: U.hhmm(t.auto_cancel_at),
-      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '',
+      vendor: a.JEEP ? String(a.JEEP.partner_id) : '', vendorState: a.JEEP ? a.JEEP.status : '', jeepPlate: a.JEEP ? a.JEEP.vehicle_plate || '' : '', guide: a.GUIDE ? String(a.GUIDE.partner_id) : '', guideState: a.GUIDE ? a.GUIDE.status : '', mealSupplier: a.MEALS ? String(a.MEALS.partner_id) : '',
       startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id, tempDriver: tempMap[t.id] || null, cur: t.currency || 'LKR',
       fx: (seatMap[t.id] || []).length ? +(seatMap[t.id][0].fx) || 1 : 1,
       guideWanted: mine.some(s => s.has_guide && s.status !== 'REFUNDED'),

@@ -43,14 +43,15 @@ function open(id) {
     <div class="sec-t">Assign</div>
     <div class="field"><label for="vJ">Jeep + driver${stateNote(t.vendorState)}</label><select class="inp" id="vJ" ${locked ? 'disabled' : ''}>${vendorOpts('jeep', t.vendor)}</select></div>${handoverButton({ ...t, status: st }, t.id)}
     <div class="field"><label for="vG">Tracker / guide${stateNote(t.guideState)}</label><select class="inp" id="vG" ${locked ? 'disabled' : ''}>${vendorOpts('guide', t.guide)}</select></div>
+    ${t.seats.some(x => x.meal) && VENDORS.some(v => v.type === 'Meal supplier') ? `<div class="field"><label for="vM">Meal supplier <span class="muted">(${t.seats.filter(x => x.meal).length} meal packs)</span></label><select class="inp" id="vM" ${locked ? 'disabled' : ''}>${vendorOpts('meals', t.mealSupplier)}</select></div>` : ''}
     <div class="sec-t">Rules for this trip</div><dl class="dl"><dt>Price</dt><dd>${gm(t.price, t)} per seat</dd><dt>Min. to run</dt><dd>${t.minSeats} paid seats</dd><dt>Auto-cancel</dt><dd>${shortDate(t.deadline)}, ${t.deadlineTime} if under ${t.minSeats} paid</dd></dl>
     <div class="sec-t">Activity</div><ul class="log" id="log"><li class="muted">Loading…</li></ul>
   </div>
   <div class="df">${!locked && st !== 'Started' && t.seats.some(x => x.pay === 'Paid') ? `<button class="btn" id="runBtn">Pickup run</button>` : ''}${!locked && st !== 'Started' ? `<button class="btn" id="remind" ${t.seats.some(x => x.pay !== 'Paid') ? '' : 'disabled'}>Send payment reminders</button><button class="btn danger" id="cx">Cancel trip</button>` : ''}</div>`);
   GET(`/api/admin/activity?entity=trip&id=${encodeURIComponent(id)}`).then(rows => { const l = $('#log'); if (l && openId === id) l.innerHTML = rows.map(r => `<li>${esc(r.msg)}<span>${shortDate(r.d)} ${r.t}</span></li>`).join('') || '<li class="muted">No activity yet</li>' }).catch(() => { });
   $('#cp').onclick = () => { navigator.clipboard?.writeText(tripLink(t)).catch(() => { }); toast('Link copied') };
-  const sv = async () => { await act(() => POST(`/api/admin/shared/${id}/assign`, { jeep: $('#vJ').value, guide: $('#vG').value }), 'Saved · partner notified by email'); list(); open(id) };
-  $('#vJ').onchange = sv; $('#vG').onchange = sv; wireHandover(t, { trip: id }, () => { list(); open(id) });
+  const sv = async () => { await act(() => POST(`/api/admin/shared/${id}/assign`, { jeep: $('#vJ').value, guide: $('#vG').value, ...($('#vM') ? { meals: $('#vM').value } : {}) }), 'Saved · partner notified'); list(); open(id) };
+  $('#vJ').onchange = sv; $('#vG').onchange = sv; if ($('#vM')) $('#vM').onchange = sv; wireHandover(t, { trip: id }, () => { list(); open(id) });
   $$('.st').forEach(b => b.onclick = () => seat(t, +b.dataset.n));
   const rb = $('#runBtn'); if (rb) rb.onclick = () => openRun(id);
   const r = $('#remind'); if (r) r.onclick = () => act(async () => POST(`/api/admin/shared/${id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, r);
