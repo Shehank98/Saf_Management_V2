@@ -87,6 +87,8 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
   const asg = (await db.query(`SELECT shared_trip_id, role, partner_id, status, vehicle_plate FROM assignments WHERE shared_trip_id = ANY($1) AND status <> 'DECLINED'`, [ids])).rows;
   const temps = (await db.query(`SELECT * FROM temp_drivers WHERE shared_trip_id = ANY($1) AND revoked_at IS NULL AND expires_at > now() ORDER BY id`, [ids])).rows;
   const tempMap = Object.fromEntries(temps.map(x => [x.shared_trip_id, { id: x.id, name: x.name, phone: x.phone, plate: x.plate, used: !!x.used_at }]));
+  const payRows = (await db.query(`SELECT DISTINCT ON (seat_code) seat_code, method, provider, completed_at FROM payments WHERE trip_id = ANY($1) AND status='SUCCEEDED' AND kind<>'REFUND' AND seat_code IS NOT NULL ORDER BY seat_code, completed_at DESC`, [ids])).rows;
+  const payHow = Object.fromEntries(payRows.map(x => [x.seat_code, { how: x.method === 'CASH' ? 'Cash' : x.method === 'BANK' ? 'Bank transfer' : 'Card', at: x.completed_at ? U.dateOf(x.completed_at) : '' }]));
   const seatMap = {}, asgMap = {};
   seats.forEach(s => (seatMap[s.trip_id] = seatMap[s.trip_id] || []).push(s));
   asg.forEach(a => (asgMap[a.shared_trip_id] = asgMap[a.shared_trip_id] || {})[a.role] = a);
@@ -101,7 +103,7 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
       startedAt: t.started_at ? U.hhmm(t.started_at) : '', auto: !!t.auto, loc: t.location_id, tempDriver: tempMap[t.id] || null, cur: t.currency || 'LKR',
       fx: (seatMap[t.id] || []).length ? +(seatMap[t.id][0].fx) || 1 : 1,
       guideWanted: mine.some(s => s.has_guide && s.status !== 'REFUNDED'),
-      seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline, hotel: s.hotel_name || '', pdist: s.pickup_km == null ? null : +s.pickup_km, lat: s.pickup_lat, lng: s.pickup_lng, bino: s.has_bino, guideReq: s.has_guide, amount: s.amount })),
+      seats: mine.map(s => ({ n: s.seat_no, name: s.name, cc: s.phone_cc, phone: s.phone, email: s.email || '', pay: SEAT_PAY[s.status], meal: s.meal === 'NONE' ? '' : (pricing.MEAL_LABELS[s.meal] || ''), code: s.code, checkedIn: !!s.checked_in_at, deadline: s.pay_deadline, hotel: s.hotel_name || '', pdist: s.pickup_km == null ? null : +s.pickup_km, lat: s.pickup_lat, lng: s.pickup_lng, bino: s.has_bino, guideReq: s.has_guide, amount: s.amount, payHow: (payHow[s.code] || {}).how || '', paidAt: (payHow[s.code] || {}).at || '' })),
     };
   });
 }

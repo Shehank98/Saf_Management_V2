@@ -56,15 +56,34 @@
 .feed .ev{display:flex;gap:10px;padding:8px 0;font-size:13px;border-bottom:1px dashed var(--line);animation:fade .4s both}
 .feed .ev b.t{font-family:ui-monospace,monospace;color:var(--muted);min-width:44px}
 .feed .ev.new{background:color-mix(in srgb,var(--info) 10%,transparent);border-radius:8px;padding:8px}
+.lscene{width:100%;height:auto;display:block;border-radius:14px 0 0 14px;max-height:150px}
+.lempty{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:center;gap:14px;padding:0 16px 0 0}
+.lmsg{display:grid;gap:6px;padding:12px 0;font-size:14px}.lmsg b{font-size:17px;font-family:Fraunces,serif}.lmsg>span{color:var(--muted)}
+.lnext{margin-top:4px;padding:10px 12px;border-radius:12px;background:var(--info-bg);font-size:13px;line-height:1.5}.lnext i{font-style:normal;color:var(--info);font-weight:700}
+@keyframes ldrive{0%{transform:translate(-60px,64px)}100%{transform:translate(420px,64px)}}
+@keyframes lroad{to{stroke-dashoffset:-52}}
+@keyframes lbird{0%{transform:translate(-30px,0)}100%{transform:translate(440px,-14px)}}
+@keyframes lsun{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.12);opacity:1}}
+.ljeep{animation:ldrive 9s linear infinite}.lroad path{animation:lroad 1s linear infinite}
+.lbird{animation:lbird 16s linear infinite}.lbird.b2{animation-duration:23s;animation-delay:-8s}
+.lsun{transform-origin:320px 44px;animation:lsun 3s ease-in-out infinite}
+.lt{background:linear-gradient(90deg,color-mix(in srgb,var(--info) 7%,transparent),transparent)}
+.trackline .rd{background:repeating-linear-gradient(90deg,var(--sand) 0 12px,transparent 12px 20px);height:3px;animation:lroadx 1s linear infinite}
+@keyframes lroadx{to{background-position:-20px 0}}
+.dust{position:absolute;left:-6px;bottom:1px;width:8px;height:8px;border-radius:50%;background:#c9a877;opacity:0;animation:dust 1.1s ease-out infinite}.dust.d2{animation-delay:.5s}
+@keyframes dust{0%{opacity:.7;transform:translate(0,0) scale(.5)}100%{opacity:0;transform:translate(-24px,-8px) scale(1.8)}}
+.lcount{margin-left:8px;font-size:12px;font-weight:800;background:var(--info-bg);color:var(--info);padding:2px 9px;border-radius:99px}.lcount:empty{display:none}
+@media (max-width:700px){.lempty{grid-template-columns:1fr;padding:0}.lscene{border-radius:14px 14px 0 0}.lmsg{padding:0 16px 14px}}
+@media (prefers-reduced-motion:reduce){.ljeep,.lroad path,.lbird,.lsun,.dust,.trackline .rd{animation:none}}
 </style>
 </head>
 <body>
 <main id="content">
   <div class="kpis" id="kpis"></div>
-  <div class="panel live"><div class="ph"><h3><i></i>Live now</h3></div><div class="lgrid"><div id="lives"></div><div class="feed" id="feed"></div></div></div>
+  <div class="panel live"><div class="ph"><h3><i></i>Live now<span class="lcount" id="lcount"></span></h3></div><div class="lgrid"><div id="lives"></div><div class="feed" id="feed"></div></div></div>
   <div class="two">
     <div class="panel"><div class="ph"><h3>Needs your action</h3><span class="tag warn" id="actCount"></span></div><div class="pb" id="actions"></div></div>
-    <div class="panel"><div class="ph"><h3>Today &amp; tomorrow</h3><a class="small" href="/admin/bookings">All bookings →</a></div><div class="pb sched" id="sched"></div></div>
+    <div class="panel"><div class="ph"><h3>Upcoming confirmed trips</h3><a class="small" href="/admin/bookings">All bookings →</a></div><div class="pb sched" id="sched"></div></div>
   </div>
   <div class="two">
     <div class="panel"><div class="ph"><h3>Money received, last 14 days</h3><span class="small muted">card, cash and bank</span></div><div class="pb"><div class="chart" id="chart"></div><div class="axis" id="axis"></div></div></div>
