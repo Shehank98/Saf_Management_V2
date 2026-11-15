@@ -702,3 +702,16 @@ test('money-flow report: needs staff login and a valid period, returns JSON and 
   assert.equal(pdf.status, 200); assert.match(pdf.headers.get('content-type'), /application\/pdf/);
   const buf = Buffer.from(await pdf.arrayBuffer()); assert.equal(buf.slice(0, 4).toString(), '%PDF'); assert.ok(buf.length > 2000);
 });
+
+test('partner details: the office sees bank details and can correct them', async () => {
+  const hash = await require('../server/lib/auth').hashPassword('bank-pass-123');
+  const pid = (await query(`INSERT INTO partners(type,name,email,status,password_hash,phone,bank_name,branch,account_name,account_no) VALUES('GUIDE','Bank Guide','bankguide@t.lk','ACTIVE',$1,'0771110000','Sampath','Kandy','B Guide','111222333') RETURNING id`, [hash])).rows[0].id;
+  const data = (await fetch(base + '/api/admin/data', { headers: { Cookie: adminCookie } }).then(r => r.json())).vendors.find(v => v.id === String(pid));
+  assert.equal(data.bank.name, 'Sampath'); assert.equal(data.bank.accountNo, '111222333'); assert.equal(data.bank.accountName, 'B Guide');
+  const put = await fetch(base + '/api/admin/partners/' + pid, { method: 'PUT', headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: '0772220000', area: 'Tissa', bankName: 'Commercial', branch: 'Tissa', accountName: 'B Guide', accountNo: '99-88 77' }) });
+  assert.equal(put.status, 200);
+  const after = (await fetch(base + '/api/admin/data', { headers: { Cookie: adminCookie } }).then(r => r.json())).vendors.find(v => v.id === String(pid));
+  assert.equal(after.bank.name, 'Commercial'); assert.equal(after.phone, '0772220000'); assert.equal(after.area, 'Tissa');
+  assert.equal((await fetch(base + '/api/admin/partners/999999', { method: 'PUT', headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+  assert.equal((await fetch(base + '/api/admin/partners/' + pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401, 'staff only');
+});

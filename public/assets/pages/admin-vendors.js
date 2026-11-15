@@ -30,18 +30,47 @@ function review(id) {
     $('#rOk').onclick = async e => { if (await act(() => POST(`/api/admin/partners/${id}/reject`, { reason: $('#why').value }), 'Application rejected · applicant emailed', e.target)) { closeModal(); closeDrawer(); list() } };
   };
 }
-function vendor(id) {
+function vendor(id, editing) {
   const v = VENDORS.find(x => x.id === id); if (!v) return;
-  const jobs = BOOKINGS.filter(b => (b.vendor === id || b.guide === id) && b.status !== 'Cancelled').map(b => ({ code: b.code, date: b.date, ses: b.ses, status: b.status }))
-    .concat(SHARED.filter(t => (t.vendor === id || t.guide === id) && t.status !== 'Cancelled').map(t => ({ code: t.id, date: t.date, ses: t.ses, status: t.status })));
-  const L = PAYOUT_LINES.filter(l => l.vendor === id), unpaid = L.filter(l => !l.paid).reduce((a, l) => a + l.amount, 0);
-  const month = L.filter(l => l.paid && l.paidAt.slice(0, 7) === D(0).slice(0, 7)).reduce((a, l) => a + l.amount, 0);
-  openDrawer(`<div class="dh"><div><b style="font-size:19px">${esc(v.name)}</b><div class="small muted">${v.type} · <span class="stars">★</span> ${v.rating} · ${v.jobs} jobs</div></div><button class="x" aria-label="Close">×</button></div>
-  <div class="db"><dl class="dl"><dt>Phone</dt><dd><a href="tel:${v.phone.replace(/\s/g, '')}">${esc(v.phone)}</a></dd><dt>Email</dt><dd>${esc(v.email)}</dd>${v.plate ? `<dt>Vehicle</dt><dd>${esc(v.plate)} · ${v.seats} seats</dd>` : ''}<dt>Area</dt><dd>${esc(v.area)}</dd></dl>
-  <div class="sec-t">Upcoming jobs</div>${jobs.filter(j => parseIso(j.date) >= TODAY).sort((a, b) => a.date.localeCompare(b.date)).map(j => `<div class="doc"><div class="ic">${esc(SESS[j.ses].short[0])}</div><span><b class="mono">${j.code}</b> · ${shortDate(j.date)} ${esc(SESS[j.ses].short)}</span>${badge(j.status)}</div>`).join('') || '<p class="small muted">None</p>'}
-  <div class="sec-t">Payouts</div><dl class="dl"><dt>Paid this month</dt><dd>${fmt(month)}</dd><dt>Unpaid</dt><dd>${fmt(unpaid)}</dd></dl></div>
-  <div class="df"><button class="btn" id="ps">${v.status === 'Active' ? 'Pause partner' : 'Re-activate'}</button><a class="btn" href="/admin/payments?tab=payouts">${unpaid ? 'Pay ' + fmt(unpaid) : 'Payments'}</a></div>`);
-  $('#ps').onclick = async e => { if (await act(() => POST(`/api/admin/partners/${id}/${v.status === 'Active' ? 'pause' : 'resume'}`), v.status === 'Active' ? 'Partner paused · they won\'t get new jobs' : 'Partner re-activated', e.target)) { list(); vendor(id) } };
+  const wa = n => { let d = String(n || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '94' + d.slice(1); return d };
+  const jobs = BOOKINGS.filter(b => (b.vendor === id || b.guide === id) && b.status !== 'Cancelled').map(b => ({ code: b.code, date: b.date, ses: b.ses, status: b.status, href: '/admin/bookings?open=' + b.code, what: esc(b.name) }))
+    .concat(SHARED.filter(t => (t.vendor === id || t.guide === id || t.mealSupplier === id) && t.status !== 'Cancelled').map(t => ({ code: t.id, date: t.date, ses: t.ses, status: t.status, href: '/admin/shared?open=' + t.id, what: 'Shared jeep' })));
+  const up = jobs.filter(j => parseIso(j.date) >= TODAY).sort((a, b) => a.date.localeCompare(b.date)), past = jobs.filter(j => parseIso(j.date) < TODAY).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const L = PAYOUT_LINES.filter(l => l.vendor === id), unpaid = L.filter(l => !l.paid), owed = unpaid.reduce((a, l) => a + l.amount, 0);
+  const month = L.filter(l => l.paid && l.paidAt && l.paidAt.slice(0, 7) === D(0).slice(0, 7)).reduce((a, l) => a + l.amount, 0), total = L.filter(l => l.paid).reduce((a, l) => a + l.amount, 0);
+  const hist = PAYOUTS.filter(p => p.vendor === id).slice(0, 6), b = v.bank || {}, init = v.name.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
+  const row = (l, val) => val ? `<dt>${l}</dt><dd>${val}</dd>` : '';
+  const sec = (t, body, hint) => `<section class="vs"><h4>${t}${hint ? `<span>${hint}</span>` : ''}</h4>${body}</section>`;
+  const type = v.type;
+  let body;
+  if (editing) {
+    const f = (idn, l, val, ph = '') => `<div class="field"><label for="${idn}">${l}</label><input class="inp" id="${idn}" value="${esc(val || '')}" placeholder="${ph}"></div>`;
+    body = `<div class="g2f">${f('e_phone', 'Mobile', v.phone)}${f('e_area', 'Area', v.area)}</div><div class="g2f">${f('e_nic', 'NIC', v.nic)}${type === 'Jeep + driver' ? f('e_plate', 'Vehicle number plate', v.plate) : f('e_lic', type === 'Tracker / guide' ? 'Guide licence no.' : 'Business / kitchen reg.', v.lic)}</div>
+      ${type === 'Jeep + driver' ? `<div class="g2f">${f('e_model', 'Vehicle model', v.model)}${f('e_seats', 'Seats', v.seats || '')}</div>${f('e_lic', 'Driving licence no.', v.lic)}` : ''}
+      <h4 class="vh4">Bank account for payouts</h4><div class="g2f">${f('e_bank', 'Bank', b.name, 'e.g. Commercial Bank')}${f('e_branch', 'Branch', b.branch)}</div><div class="g2f">${f('e_accname', 'Account name', b.accountName)}${f('e_acc', 'Account number', b.accountNo)}</div>`;
+  } else {
+    body = `<div class="vkpis"><div class="${owed ? 'warn' : ''}"><span>Owed now</span><b>${fmt(owed)}</b></div><div><span>Paid this month</span><b>${fmt(month)}</b></div><div><span>Paid in total</span><b>${fmt(total)}</b></div><div><span>Jobs done</span><b>${v.jobs}</b></div></div>
+    ${sec('Bank details', bankBlockHTML(v, owed || null), 'for transfers')}
+    ${sec('Contact & profile', `<dl class="dl"><dt>Mobile</dt><dd><a href="tel:${esc(v.phone.replace(/\s/g, ''))}">${esc(v.phone) || '-'}</a></dd><dt>Email</dt><dd>${esc(v.email) || '-'}</dd>${row('NIC', esc(v.nic))}${row('Area', esc(v.area))}${row('Languages', esc(v.langs))}${row('Partner since', v.since ? nice(v.since) : '')}</dl>`)}
+    ${sec(type === 'Jeep + driver' ? 'Vehicle' : type === 'Tracker / guide' ? 'Guide licence' : 'Kitchen', `<dl class="dl">${type === 'Jeep + driver' ? `${row('Number plate', esc(v.plate))}${row('Model', esc(v.model))}${row('Year', esc(String(v.year || '')))}${row('Seats', v.seats ? String(v.seats) : '')}${row('Driving licence', esc(v.lic))}` : type === 'Tracker / guide' ? `${row('Licence no.', esc(v.lic))}${row('Experience', v.exp ? v.exp + ' years' : '')}` : `${row('Registration', esc(v.lic))}${row('Capacity', v.exp ? 'up to ' + v.exp + ' meal packs a day' : '')}`}${row('Default fee', v.defaultFee ? fmt(v.defaultFee) + ' per trip' : '')}</dl>`)}
+    ${v.docFiles.length ? sec('Documents', v.docFiles.map(d => `<div class="doc"><div class="ic">${d.mime === 'application/pdf' ? 'PDF' : 'IMG'}</div><span>${esc(d.kind)}<div class="tiny muted">${esc(d.name)}</div></span><a class="small" href="/api/admin/partners/documents/${d.id}" target="_blank" rel="noopener">View</a></div>`).join('')) : ''}
+    ${sec('Upcoming jobs', up.map(j => `<a class="doc" href="${j.href}"><div class="ic">${esc(SESS[j.ses].short[0])}</div><span><b class="mono">${j.code}</b> · ${shortDate(j.date)} ${esc(SESS[j.ses].short)}<div class="tiny muted">${j.what}</div></span>${badge(j.status)}</a>`).join('') || '<p class="small muted" style="margin:0">No upcoming jobs.</p>')}
+    ${past.length ? sec('Recent jobs', past.map(j => `<a class="doc" href="${j.href}"><div class="ic">${esc(SESS[j.ses].short[0])}</div><span><b class="mono">${j.code}</b> · ${shortDate(j.date)}</span>${badge(j.status)}</a>`).join('')) : ''}
+    ${sec('Payments', `${unpaid.length ? `<div class="tblw"><table class="t"><thead><tr><th>Trip</th><th>For</th><th class="num">Amount</th></tr></thead><tbody>${unpaid.map(l => `<tr><td class="mono">${esc(l.code)}<div class="tiny muted">${shortDate(l.date)}</div></td><td>${esc(l.role)}</td><td class="num">${fmt(l.amount)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted" style="margin:0 0 8px">Nothing owed.</p>'}${hist.length ? `<h5 class="vh5">Last payouts</h5>${hist.map(p => `<div class="doc"><div class="ic">✓</div><span>${shortDate(p.at)} · ${esc(p.method)}<div class="tiny muted mono">${esc(p.ref)}</div></span><b>${fmt(p.amount)}</b></div>`).join('')}` : ''}`)}`;
+  }
+  openModal(`<div class="vd"><div class="vdh"><span class="av vav">${esc(init)}</span><div class="vdt"><h2>${esc(v.name)}</h2><div class="small muted">${type} · <span class="stars">★</span> ${v.rating} · ${v.status === 'Active' ? '<span class="tag ok">Active</span>' : '<span class="tag warn">Paused</span>'}</div></div><button class="tpx" data-close aria-label="Close">×</button></div>
+    ${editing ? '' : `<div class="vqa"><a class="btn sm" href="tel:${esc(v.phone.replace(/\s/g, ''))}">📞 Call</a><a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/${wa(v.phone)}">💬 WhatsApp</a>${v.email ? `<a class="btn sm" href="mailto:${esc(v.email)}">✉ Email</a>` : ''}</div>`}
+    <div class="vdb">${body}</div>
+    <div class="vdf">${editing ? `<button class="btn" id="eCancel">Cancel</button><button class="btn primary" id="eSave">Save details</button>` : `<button class="btn" id="eEdit">Edit details</button><button class="btn" id="ps">${v.status === 'Active' ? 'Pause partner' : 'Re-activate'}</button><span class="sp"></span><a class="btn ${owed ? 'primary' : ''}" href="/admin/payments?tab=payouts">${owed ? 'Pay ' + fmt(owed) : 'Payments'}</a>`}</div></div>`);
+  $('#modal').classList.add('vdm'); wireCopy();
+  const x = $('#modal .tpx'); if (x) x.onclick = closeModal;
+  if (editing) {
+    $('#eCancel').onclick = () => vendor(id);
+    $('#eSave').onclick = async e => { if (await act(() => PUT(`/api/admin/partners/${id}`, { phone: $('#e_phone').value, area: $('#e_area').value, nic: $('#e_nic').value, plate: $('#e_plate') ? $('#e_plate').value : '', model: $('#e_model') ? $('#e_model').value : '', seats: $('#e_seats') ? $('#e_seats').value : '', lic: $('#e_lic') ? $('#e_lic').value : '', bankName: $('#e_bank').value, branch: $('#e_branch').value, accountName: $('#e_accname').value, accountNo: $('#e_acc').value }), 'Details saved', e.target)) { await reload(); list(); vendor(id) } };
+  } else {
+    $('#eEdit').onclick = () => vendor(id, true);
+    $('#ps').onclick = async e => { if (await act(() => POST(`/api/admin/partners/${id}/${v.status === 'Active' ? 'pause' : 'resume'}`), v.status === 'Active' ? 'Partner paused · they won\'t get new jobs' : 'Partner re-activated', e.target)) { await reload(); list(); vendor(id) } };
+  }
 }
 $('#type').onchange = list;
 function onDataChanged() { list() }

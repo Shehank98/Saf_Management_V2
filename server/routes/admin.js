@@ -165,6 +165,7 @@ r.delete('/gallery/:id', owner, U.wrap(async (req, res) => { await require('../s
 /* ---------------- Partners & payouts ---------------- */
 r.post('/partners/:id/approve', staff, U.wrap(async (req, res) => { await partners.approve(+req.params.id, req.body, who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/reject', staff, U.wrap(async (req, res) => { await partners.reject(+req.params.id, req.body.reason, who(req)); res.json({ ok: true }); }));
+r.put('/partners/:id', staff, U.wrap(async (req, res) => { await partners.updateDetails(+req.params.id, req.body || {}, who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/pause', staff, U.wrap(async (req, res) => { await partners.setStatus(+req.params.id, 'PAUSED', who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/resume', staff, U.wrap(async (req, res) => { await partners.setStatus(+req.params.id, 'ACTIVE', who(req)); res.json({ ok: true }); }));
 r.get('/partners/documents/:id', staff, U.wrap(async (req, res) => {

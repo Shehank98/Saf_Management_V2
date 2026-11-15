@@ -360,3 +360,12 @@ details.fold .fb>.sec-t:first-child{margin-top:0}
 .rg.sg{border-color:color-mix(in srgb,var(--warn) 60%,var(--line))}
 .runacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 @media (max-width:480px){.runacts{grid-template-columns:1fr}}
+
+/* bank details with copy buttons */
+.bankbox{border:1.5px solid color-mix(in srgb,var(--ok) 40%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--ok) 6%,var(--card));padding:10px 12px;margin:10px 0}
+.bkh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.bkr{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);min-width:0}
+.bkr>span{flex:0 0 118px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.bkr>b{flex:1;min-width:0;font-size:15.5px;overflow-wrap:anywhere}
+.bkr.tot b{font-size:18px;color:var(--ok)}
+@media (max-width:520px){.bkr{flex-wrap:wrap;gap:4px 8px}.bkr>span{flex:1 1 100%}}

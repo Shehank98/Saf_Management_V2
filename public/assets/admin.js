@@ -131,7 +131,7 @@ function adminShell({ active, title, actions = '', nav = ADMIN_NAV, who = null, 
 function openDrawer(html) { $('#drawer').innerHTML = html; $('#drawer').classList.add('open'); $('#scrim').classList.add('show'); const x = $('#drawer .x'); if (x) { x.onclick = closeDrawer; x.focus() } }
 function closeDrawer() { $('#drawer')?.classList.remove('open'); $('#scrim')?.classList.remove('show') }
 function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').classList.add('show'); $$('#modalBody [data-close]').forEach(b => b.onclick = closeModal) }
-function closeModal() { $('#modal')?.classList.remove('show', 'tpm') }
+function closeModal() { $('#modal')?.classList.remove('show', 'tpm', 'vdm') }
 const STATUS_CLS = { Request: 'warn', 'Deposit paid': 'info', Started: 'live', Confirmed: 'ok', Completed: '', Cancelled: 'bad', Open: 'warn', 'Payment links sent': 'info', Full: 'info' };
 const badge = s => `<span class="tag ${STATUS_CLS[s] ?? ''}">${esc(s)}</span>`;
 const vendorOpts = (type, sel) => `<option value="">${type === 'meals' ? '- Main meal supplier -' : '- Not assigned -'}</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : type === 'meals' ? v.type === 'Meal supplier' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
@@ -291,3 +291,15 @@ function startScanner(host, onCode) {
 
 /* Collapsible section for long drawers: the summary line is always visible, the details open on tap. */
 function fold(title, body, o = {}) { return `<details class="fold" ${o.open ? 'open' : ''}><summary><span class="ft">${title}</span>${o.hint ? `<span class="fh">${o.hint}</span>` : ''}<svg class="fc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fb">${body}</div></details>` }
+
+/* Bank details of a partner, with one-tap copy, so the office can make a transfer without opening anything else. */
+function bankBlockHTML(v, amount) {
+  const b = v.bank || {};
+  if (!b.accountNo && !b.name) return `<div class="note warn" style="margin:10px 0">No bank details saved for <b>${esc(v.name)}</b> yet. Ask them to add them in their partner profile, or add them in the Vendors page (Edit details).</div>`;
+  const row = (l, val, copy) => val ? `<div class="bkr"><span>${l}</span><b>${esc(val)}</b><button type="button" class="btn sm" data-copy="${esc(copy || val)}">Copy</button></div>` : '';
+  const all = [b.accountName, b.name, b.branch, b.accountNo].filter(Boolean).join('\n');
+  return `<div class="bankbox"><div class="bkh"><b>Transfer to this account</b><button type="button" class="btn sm" data-copy="${esc(all)}">Copy all</button></div>${row('Account name', b.accountName)}${row('Bank', b.name)}${row('Branch', b.branch)}${row('Account number', b.accountNo, String(b.accountNo || '').replace(/\s/g, ''))}${amount != null ? `<div class="bkr tot"><span>Amount to transfer</span><b>${fmt(amount)}</b><button type="button" class="btn sm" data-copy="${amount}">Copy</button></div>` : ''}</div>`;
+}
+function wireCopy() {
+  $$('[data-copy]').forEach(b => { if (b.dataset.w) return; b.dataset.w = 1; b.onclick = async () => { const t = b.dataset.copy; try { await navigator.clipboard.writeText(t) } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy') } catch (x) { } document.body.removeChild(ta) } const o = b.textContent; b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = o }, 1400) } });
+}

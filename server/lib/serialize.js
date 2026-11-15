@@ -110,9 +110,15 @@ async function sharedTrips(db, where = 'TRUE', params = []) {
 
 async function vendors(db) {
   const rows = (await db.query(`SELECT p.*, (SELECT COUNT(*)::int FROM assignments a WHERE a.partner_id=p.id AND a.status='ACCEPTED') AS jobs FROM partners p WHERE status IN ('ACTIVE','PAUSED') ORDER BY name`)).rows;
+  const docs = rows.length ? (await db.query('SELECT id, partner_id, kind, file_name, mime FROM partner_documents WHERE partner_id = ANY($1) ORDER BY id', [rows.map(r => r.id)])).rows : [];
   return rows.map(p => ({
     id: String(p.id), name: p.name, type: TYPE_LABEL[p.type], plate: p.vehicle_plate || '', seats: p.seats || 0, phone: p.phone || '', rating: +p.rating, jobs: p.jobs,
     status: p.status === 'ACTIVE' ? 'Active' : 'Paused', area: p.area || '', email: p.email, defaultFee: p.default_fee,
+    // everything the office needs to pay and contact a partner
+    nic: p.nic || '', model: p.vehicle_model || '', year: p.vehicle_year || '', lic: p.licence_no || '', exp: p.years_experience || '', langs: (p.languages || []).join(', '),
+    since: p.approved_at ? U.dateOf(p.approved_at) : '', joined: U.dateOf(p.created_at),
+    bank: { name: p.bank_name || '', branch: p.branch || '', accountName: p.account_name || '', accountNo: p.account_no || '' },
+    docFiles: docs.filter(d => d.partner_id === p.id).map(d => ({ id: d.id, kind: d.kind, name: d.file_name, mime: d.mime })),
   }));
 }
 

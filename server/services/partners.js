@@ -93,6 +93,21 @@ async function setStatus(id, status, actor) {
   return r.rows[0];
 }
 
+/** The office corrects or completes a partner's details (phone, area, vehicle, bank account). */
+async function updateDetails(id, b, actor) {
+  const cut = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+  const f = {
+    phone: cut(b.phone, 30), area: cut(b.area, 60), nic: cut(b.nic, 30), vehicle_plate: cut(b.plate, 20).toUpperCase(), vehicle_model: cut(b.model, 60), licence_no: cut(b.lic, 40),
+    bank_name: cut(b.bankName, 80), branch: cut(b.branch, 80), account_name: cut(b.accountName, 120), account_no: cut(b.accountNo, 40).replace(/[^\d\- ]/g, ''),
+  };
+  const seats = b.seats === '' || b.seats == null ? null : U.int(b.seats, 0);
+  const r = await query(`UPDATE partners SET phone=NULLIF($2,''), area=NULLIF($3,''), nic=NULLIF($4,''), vehicle_plate=NULLIF($5,''), vehicle_model=NULLIF($6,''), licence_no=NULLIF($7,''),
+      bank_name=NULLIF($8,''), branch=NULLIF($9,''), account_name=NULLIF($10,''), account_no=NULLIF($11,''), seats=COALESCE($12, seats)
+    WHERE id=$1 AND status IN ('ACTIVE','PAUSED') RETURNING id`, [id, f.phone, f.area, f.nic, f.vehicle_plate, f.vehicle_model, f.licence_no, f.bank_name, f.branch, f.account_name, f.account_no, seats]);
+  if (!r.rowCount) throw U.notFound('Partner not found');
+  await query('INSERT INTO activity_log(entity, entity_id, message, actor) VALUES($1,$2,$3,$4)', ['partner', String(id), 'Details updated by the office', actor]);
+}
+
 /** Email a one-time login link (always answers the same, so emails can't be probed). */
 async function requestMagicLink(email) {
   const p = (await query(`SELECT * FROM partners WHERE lower(email)=$1 AND status IN ('ACTIVE','PAUSED') LIMIT 1`, [String(email || '').trim().toLowerCase()])).rows[0];
@@ -111,4 +126,4 @@ async function consumeLoginToken(token) {
   return (await query(`SELECT * FROM partners WHERE id=$1 AND status IN ('ACTIVE','PAUSED')`, [r.rows[0].partner_id])).rows[0] || null;
 }
 
-module.exports = { TYPE_LABEL, TYPE_FROM_LABEL, DOC_KINDS, apply, approve, reject, setStatus, requestMagicLink, consumeLoginToken };
+module.exports = { TYPE_LABEL, TYPE_FROM_LABEL, DOC_KINDS, apply, approve, reject, setStatus, updateDetails, requestMagicLink, consumeLoginToken };
