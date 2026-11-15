@@ -667,3 +667,21 @@ test('photo gallery: owner uploads photos, site shows them instead of the bundle
   for (const id of ids) await admin('DELETE', `/api/admin/gallery/${id}`);
   assert.equal((await api('GET', '/api/gallery')).json.own, false, 'back to bundled photos');
 });
+
+test('reserving enough seats at once: guest is told the jeep is going ahead and must pay (not "nothing to pay yet")', async () => {
+  const cur = (await admin('GET', '/api/admin/data')).json.settings.shared;
+  assert.equal((await admin('PUT', '/api/admin/settings/shared', { seats: 6, minSeats: 2, payWindowH: 24, autoCancelH: 24, allowLater: true })).status, 200);
+  try {
+    const date = U.addDays(U.todayStr(), 16);
+    const id = (await api('POST', '/api/shared-trips/open', { date, ses: 'evening' })).json.id;
+    const before = (await emails('cust_shared_pay')).length;
+    const r = await api('POST', `/api/shared/${id}/seats`, { seats: [1, 2], name: 'Two Seats', phone: '771234567', email: 'two@x.lk', pay: 'later', token: 'tokenTWOTWOTWOTWOTWOTWO1' });
+    assert.equal(r.status, 201);
+    assert.equal(r.json.seatStatus, 'PAYMENT_PENDING'); assert.equal(r.json.status, 'LINKS_SENT');
+    assert.ok(r.json.deadline, 'pay-by time is returned'); assert.equal(r.json.total, 15000);
+    assert.equal((await emails('cust_shared_pay')).length, before + 1, 'payment link emailed immediately');
+    assert.equal((await emails('cust_shared_seat')).filter(e => e.to_addr === 'two@x.lk').length, 0, 'no "nothing to pay yet" email');
+  } finally {
+    await admin('PUT', '/api/admin/settings/shared', { seats: cur.seats, minSeats: cur.minSeats, payWindowH: cur.payWindowH, autoCancelH: cur.autoCancelH, allowLater: cur.allowLater, privateUpgrade: cur.privateUpgrade });
+  }
+});

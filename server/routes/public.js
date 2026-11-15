@@ -258,7 +258,7 @@ r.post('/shared/:id/seats', limits.booking, U.wrap(async (req, res) => {
   }
   const out = await shared.takeSeats(req.params.id, { ...body, provider: providerId });
   const base = await siteUrl();
-  const result = { code: out.code, k: out.k, seats: out.seats, total: out.total, status: out.status };
+  const result = { code: out.code, k: out.k, seats: out.seats, total: out.total, status: out.status, seatStatus: out.seatStatus, deadline: out.deadline, cur: out.trip.currency || 'LKR' };
   if (out.payment) {
     try {
       result.checkoutUrl = await paymentsSvc.launch(out.payment, {

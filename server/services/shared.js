@@ -285,7 +285,8 @@ async function takeSeats(tripId, raw, { admin = null } = {}) {
     if (!payNow && seats.find(s => s.code === code).status === 'RESERVED') { // otherwise the payment-link email already went out
       await notify.send(db, 'cust_shared_seat', T.cust_shared_seat({ trip: t, session, seats: seatsWanted, code, variant: 'reserved', name, payUrl: payUrl(base, t.id, code), minSeats: t.min_seats, payWindowH: t.pay_window_h }, c), { to: email, entity: 'trip', entityId: t.id });
     }
-    return { trip: t, code, total, payment, status: after.status, name, email, phone: `${cc}${phone}`, seats: seatsWanted };
+    const mine = seats.find(x => x.code === code);
+    return { trip: t, code, total, payment, status: after.status, seatStatus: mine ? mine.status : status, deadline: mine ? mine.pay_deadline : null, name, email, phone: `${cc}${phone}`, seats: seatsWanted };
   });
   out.k = secrets.sign(out.code);
   return out;
