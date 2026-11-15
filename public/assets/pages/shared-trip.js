@@ -1,4 +1,5 @@
 mount();
+const timeShort = t => { const m = String(t || '').match(/^(\d{1,2}:\d{2}) (AM|PM) - (\d{1,2}:\d{2}) (AM|PM)$/); return m && m[2] === m[4] ? `${m[1]} – ${m[3]} ${m[4]}` : String(t || '').replace(' - ', ' – ') };
 const TID = decodeURIComponent(location.pathname.split('/').pop()).toUpperCase();
 const payCode = P.get('pay'), doneCode = P.get('done'), KEY = P.get('k') || '';
 const online = CFG.providers && CFG.providers.length > 0;
@@ -40,7 +41,7 @@ function celebrate(o) {
     <div class="cel-art" aria-hidden="true"><div class="cel-sun"></div><div class="cel-hill h1"></div><div class="cel-hill h2"></div><div class="cel-jeep">${JEEP('#2f3a1c', 86, 54)}</div><div class="cel-badge">${o.state === 'unpaid' ? '!' : '✓'}</div></div>
     <div class="cel-body"><h1>${title}</h1><p class="muted">${sub}</p>
     <div class="stub"><div class="stub-l"><span class="eb">${esc(park || 'Shared safari')}</span><b>${esc(s.name || '')}</b><span>${nice(o.date)}</span>
-      <div class="stub-row"><div>Pickup<b>${esc(s.pickup || '-')}</b></div><div>Seat${o.seats.length > 1 ? 's' : ''}<b>${o.seats.join(', ')}</b></div><div>Safari<b>${esc(s.time || '')}</b></div></div></div>
+      <div class="stub-row"><div>Pickup<b>${esc(s.pickup || '-')}</b></div><div>Seat${o.seats.length > 1 ? 's' : ''}<b>${o.seats.join(', ')}</b></div><div class="wide">Safari time<b>${esc(timeShort(s.time || ''))}</b></div></div></div>
       <div class="stub-r"><span>Booking code</span><b class="mono">${esc(o.code)}</b></div></div>
     ${o.state !== 'unpaid' && start > new Date() ? `<div class="count" id="count" aria-live="off"></div>` : ''}
     <div class="acts">${o.state === 'unpaid' ? `<a class="btn primary big" href="/s/${esc(TID)}?pay=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}">Try paying again</a>`
@@ -111,10 +112,13 @@ async function pickSeats() {
   const binoP = () => f.bino && EXTRAS.bino ? EXTRAS.bino.price : 0, guideP = () => f.guide && EXTRAS.guide ? EXTRAS.guide.price : 0;
   const total = () => mine.size * trip.price + mealCount() * MEAL_PRICE + (mine.size ? binoP() + guideP() : 0);
 
+  const ico = d => `<svg class="fi" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const IC = { time: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'), pin: ico('<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'), tag: ico('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/>'), seat: ico('<path d="M7 4h7a2 2 0 0 1 2 2v7H7z"/><path d="M5 13h14v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>') };
   function head() {
     const need = minSeats - trip.paid, pend = taken.size - trip.paid;
-    return `<div class="thead fade"><div class="eb">${esc(park.name)} · Shared jeep ${trip.jeepNo || 1}</div><h1>${esc(s.name)} · ${nice(trip.date)}</h1>
-    <div class="facts"><div>Time<b>${s.time}</b></div><div>Pickup<b>${s.pickup}</b></div><div>Per seat<b>${fmt(trip.price)}</b></div><div>Seats left<b>${maxSeats - taken.size} of ${maxSeats}</b></div></div>
+    return `<div class="thead fade"><div class="eb">${esc(park.name)} · Shared jeep ${trip.jeepNo || 1}</div><h1>${esc(s.name)}</h1><div class="dline">${ico('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>')}${nice(trip.date)}</div>
+    <div class="facts2"><div class="f wide">${IC.time}<span>Safari time<b>${timeShort(s.time)}</b></span></div><div class="f">${IC.pin}<span>Pickup<b>${s.pickup}</b></span></div><div class="f">${IC.tag}<span>Per seat<b>${fmt(trip.price)}</b></span></div>
+    <div class="f wide seatsleft">${IC.seat}<span>Seats left<b>${maxSeats - taken.size} of ${maxSeats}</b></span><i class="dots" aria-hidden="true">${Array.from({ length: maxSeats }, (_, i) => `<u class="${i < trip.paid ? 'p' : i < taken.size ? 'h' : ''}"></u>`).join('')}</i></div></div>
     <div class="runs"><div class="meter" aria-hidden="true"><span style="width:${trip.paid / maxSeats * 100}%;background:var(--olive)"></span><span style="width:${pend / maxSeats * 100}%;background:#d9a441"></span></div>
     <span class="tag ${need <= 0 ? 'ok' : 'warn'}">${need <= 0 ? 'Safari is on' : `Runs at ${minSeats} paid seats · ${need} to go`}</span></div></div>
     <div class="road" aria-label="Step ${step + 1} of 4"><div class="road-line"><i style="width:${(step + .5) / 4 * 100}%"></i><span class="road-jeep" style="left:${(step + .5) / 4 * 100}%">${JEEP('#fff6e6', 30, 19)}</span></div>
