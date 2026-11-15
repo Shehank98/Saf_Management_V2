@@ -176,7 +176,14 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
     if (t.next_code === s0.code) await db.query(`UPDATE shared_trips SET next_code=NULL, next_at=NULL WHERE id=$1`, [t.id]);
     await activity.log(db, 'trip', t.id, `${s0.name} on board (seat ${seats.map(s => s.seat_no).join(', ')})${t.status === 'STARTED' ? '' : ' · pickup run'}`, actor.name);
     db.after(() => live.publish('shared', { id: t.id }));
-    return (await pickupRun(db, t.id));
+    let run = await pickupRun(db, t.id);
+    // The system keeps the run going: the closest guest still waiting becomes "next" and is told the driver is coming.
+    const nxt = t.status === 'STARTED' ? null : run.groups.find(g => !g.boarded);
+    if (nxt) {
+      const row = (await db.query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND code=$2 AND status='PAID' ORDER BY seat_no LIMIT 1`, [t.id, nxt.code])).rows[0];
+      if (row) { await markNext(db, t, row, actor, conf); run = await pickupRun(db, t.id); }
+    }
+    return run;
   });
   const left = boarded.groups.filter(g => !g.boarded).length;
   const running = t0.status === 'STARTED';
@@ -184,7 +191,34 @@ async function checkinShared(s0, { force, preview, actor, conf, today }) {
     info: { ...info(running ? U.hhmm(t0.started_at) : null, U.hhmm(new Date())), left, running, tripId: t0.id } };
 }
 
-/** Everything the driver needs for the pickup run of a shared jeep: groups, pins, who is on board, who is next. */
+/** Order a pickup run like a real driver would drive it: first the guest closest to where the driver is now,
+ *  then the closest to that pickup, and so on. Guests already on board stay at the top in the order they boarded. */
+function orderRun(groups, base, drv) {
+  const at = g => (g.lat != null && g.lng != null ? { lat: +g.lat, lng: +g.lng } : base ? { lat: +base.lat, lng: +base.lng } : null);
+  const dist = (a, b) => (a && b ? Math.round(U.haversineKm(a.lat, a.lng, b.lat, b.lng) * 10) / 10 : null);
+  const done = groups.filter(g => g.boarded).sort((a, b) => (a.boardedAt || 0) - (b.boardedAt || 0));
+  let left = groups.filter(g => !g.boarded);
+  const last = done[done.length - 1];
+  let ref = null, from = '';
+  if (last && at(last)) { ref = at(last); from = 'last'; } else if (drv) { ref = drv; from = 'you'; } else if (base) { ref = { lat: +base.lat, lng: +base.lng }; from = 'base'; }
+  const out = [];
+  if (!ref) { left.sort((a, b) => (b.km ?? -1) - (a.km ?? -1)); left.forEach(g => out.push({ ...g, leg: null, legFrom: '' })); }
+  else {
+    while (left.length) {
+      let best = 0, bd = Infinity;
+      left.forEach((g, i) => { const d = dist(ref, at(g)); if (d != null && d < bd) { bd = d; best = i; } });
+      const g = left.splice(best, 1)[0];
+      out.push({ ...g, leg: bd === Infinity ? null : bd, legFrom: out.length ? 'previous' : from });
+      ref = at(g) || ref;
+    }
+  }
+  const res = [...done.map(g => ({ ...g, leg: null, legFrom: '' })), ...out];
+  const firstLeft = res.find(g => !g.boarded);
+  res.forEach(g => { g.suggest = !!firstLeft && g.code === firstLeft.code; });
+  return res;
+}
+
+/** Everything the driver needs for the pickup run of a shared jeep: groups in driving order, pins, who is on board, who is next. */
 async function pickupRun(db, tripId) {
   const conf = await settings.load();
   const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1', [tripId])).rows[0];
@@ -193,15 +227,15 @@ async function pickupRun(db, tripId) {
   const seats = (await db.query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND status='PAID' ORDER BY seat_no`, [tripId])).rows;
   const by = new Map();
   for (const x of seats) {
-    if (!by.has(x.code)) by.set(x.code, { code: x.code, name: x.name, phone: `${x.phone_cc} ${x.phone}`.trim(), seats: [], hotel: x.hotel_name || '', lat: x.pickup_lat, lng: x.pickup_lng, km: x.pickup_km == null ? null : +x.pickup_km, boarded: true });
-    const g = by.get(x.code); g.seats.push(x.seat_no); if (!x.checked_in_at) g.boarded = false;
+    if (!by.has(x.code)) by.set(x.code, { code: x.code, name: x.name, phone: `${x.phone_cc} ${x.phone}`.trim(), seats: [], hotel: x.hotel_name || '', lat: x.pickup_lat, lng: x.pickup_lng, km: x.pickup_km == null ? null : +x.pickup_km, boarded: true, boardedAt: 0 });
+    const g = by.get(x.code); g.seats.push(x.seat_no); if (!x.checked_in_at) g.boarded = false; else g.boardedAt = Math.max(g.boardedAt, new Date(x.checked_in_at).getTime());
   }
-  const groups = [...by.values()].map(g => ({ ...g, people: g.seats.length, next: t.next_code === g.code }));
-  // Suggested order: nearest to the base first is not always best, so we just sort far → near from the base (finish close to the park).
-  groups.sort((a, b) => (b.km ?? -1) - (a.km ?? -1));
+  const base = L ? { lat: L.lat, lng: L.lng, name: L.name, office: L.office } : null;
+  const fresh = t.drv_at && t.drv_lat != null && Date.now() - new Date(t.drv_at).getTime() < 30 * 60e3;
+  const drv = fresh ? { lat: +t.drv_lat, lng: +t.drv_lng } : null;
+  const groups = orderRun([...by.values()].map(g => ({ ...g, people: g.seats.length, next: t.next_code === g.code })), base, drv);
   return { id: t.id, status: t.status, date: t.date, session: { name: s.name, short: s.short, pickup: s.pickup, time: s.time },
-    base: L ? { lat: L.lat, lng: L.lng, name: L.name, office: L.office } : null, groups, next: t.next_code,
-    started: t.status === 'STARTED', startedAt: t.started_at ? U.hhmm(t.started_at) : null };
+    base, groups, next: t.next_code, driver: drv, started: t.status === 'STARTED', startedAt: t.started_at ? U.hhmm(t.started_at) : null };
 }
 
 /** Driver authority for a shared trip (assigned driver, temporary link holder, or the office). */
@@ -215,6 +249,18 @@ async function runAuth(tripId, actor) {
   return { t, conf };
 }
 
+/** Mark a group as "next" and tell that guest the driver is on the way. */
+async function markNext(db, t, g0, actor, conf) {
+  await db.query(`UPDATE shared_trips SET next_code=$2, next_at=now() WHERE id=$1`, [t.id, g0.code]);
+  await activity.log(db, 'trip', t.id, `Driver on the way to ${g0.name}${g0.hotel_name ? ' (' + g0.hotel_name + ')' : ''}`, actor.name);
+  if (g0.email) {
+    const drv = await currentDriver('shared_trip_id', t.id);
+    const base = settings.baseUrl(conf), session = settings.sessionAt(conf, t.location_id, t.session_id);
+    await notify.send(db, 'cust_driver_next', T.cust_driver_next({ name: g0.name, driver: drv ? drv.name : '', plate: drv ? drv.plate : '', trackUrl: require('../lib/qr').ticketLink(base, g0.code), session, hotel: g0.hotel_name }, { conf, base }), { to: g0.email, entity: 'trip', entityId: t.id });
+  }
+  db.after(() => live.publish('shared', { id: t.id }));
+}
+
 /** Driver picks who to collect next: that guest is told the driver is on the way. */
 async function setNext(tripId, code, actor) {
   const { t, conf } = await runAuth(tripId, actor);
@@ -222,16 +268,7 @@ async function setNext(tripId, code, actor) {
   const g = (await query(`SELECT * FROM shared_seats WHERE trip_id=$1 AND code=$2 AND status='PAID' ORDER BY seat_no`, [t.id, U.normCode(code)])).rows;
   if (!g.length) throw U.notFound('Guest not found on this trip');
   if (g.every(x => x.checked_in_at)) throw U.conflict(`${g[0].name} is already on board.`);
-  await tx(async db => {
-    await db.query(`UPDATE shared_trips SET next_code=$2, next_at=now() WHERE id=$1`, [t.id, g[0].code]);
-    await activity.log(db, 'trip', t.id, `Driver on the way to ${g[0].name}${g[0].hotel_name ? ' (' + g[0].hotel_name + ')' : ''}`, actor.name);
-    if (g[0].email) {
-      const drv = await currentDriver('shared_trip_id', t.id);
-      const base = settings.baseUrl(conf), session = settings.sessionAt(conf, t.location_id, t.session_id);
-      await notify.send(db, 'cust_driver_next', T.cust_driver_next({ name: g[0].name, driver: drv ? drv.name : '', plate: drv ? drv.plate : '', trackUrl: require('../lib/qr').ticketLink(base, g[0].code), session, hotel: g[0].hotel_name }, { conf, base }), { to: g[0].email, entity: 'trip', entityId: t.id });
-    }
-    db.after(() => live.publish('shared', { id: t.id }));
-  });
+  await tx(async db => { await markNext(db, t, { ...g[0], code: g[0].code }, actor, conf); });
   return pickupRun({ query }, t.id);
 }
 
@@ -337,4 +374,4 @@ async function autoComplete() {
   return n;
 }
 
-module.exports = { checkin, finish, autoComplete, completeShared, pickupRun, setNext, driverLocation, startShared };
+module.exports = { orderRun, checkin, finish, autoComplete, completeShared, pickupRun, setNext, driverLocation, startShared };

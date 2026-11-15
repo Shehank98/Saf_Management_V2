@@ -215,18 +215,27 @@ function wireScanResult(r, rerun) {
 let _geo = null, _geoLast = 0;
 function pickupRunHTML(run, { canAct = true } = {}) {
   const done = run.groups.filter(g => g.boarded).length, n = run.groups.length;
-  const chip = g => g.boarded ? '<span class="tag ok">✓ On board</span>' : g.next ? '<span class="tag info">On the way</span>' : '<span class="tag">Waiting</span>';
-  return `<div class="panel run"><div class="ph"><h3>Pickup run · ${run.id}</h3><span class="small muted">${done} of ${n} group${n === 1 ? '' : 's'} on board</span></div><div class="pb">
-    ${run.started ? `<div class="note ok" style="margin-bottom:10px">The safari started at ${esc(run.startedAt || '')}.</div>` : ''}
+  const first = g => esc(String(g.name).split(' ')[0]);
+  const from = g => g.leg == null ? '' : `${g.leg} km ${g.legFrom === 'you' ? _t('from you') : g.legFrom === 'base' ? _t('from the office') : _t('from the last stop')}`;
+  const chip = g => g.boarded ? `<span class="tag ok">✓ ${_t('On board')}</span>` : g.next ? `<span class="tag info">🚙 ${_t('Driving there')}</span>` : g.suggest ? `<span class="tag warn">⭐ ${done ? _t('Next closest') : _t('Closest to you')}</span>` : `<span class="tag">${_t('Waiting')}</span>`;
+  const nxt = run.groups.find(g => g.next && !g.boarded), sug = run.groups.find(g => g.suggest && !g.boarded);
+  const hero = run.started || !canAct ? '' : nxt
+    ? `<div class="runhero go"><div class="rh1">${_t('Now driving to')}</div><div class="rh2">${esc(nxt.name)}</div><div class="rh3">${nxt.hotel ? esc(nxt.hotel) : _t('Meets at the office')}${from(nxt) ? ' · ' + from(nxt) : ''}</div><div class="rh4">${nxt.lat != null ? `<a class="btn primary big" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${nxt.lat},${nxt.lng}">🧭 ${_t('Directions')}</a>` : ''}<a class="btn big" href="tel:${esc(nxt.phone.replace(/\s/g, ''))}">📞 ${_t('Call')}</a></div></div>`
+    : sug ? `<div class="runhero"><div class="rh1">${done ? _t('Next closest guest') : _t('Closest guest to you')}</div><div class="rh2">${esc(sug.name)}</div><div class="rh3">${sug.hotel ? esc(sug.hotel) : _t('Meets at the office')}${from(sug) ? ' · ' + from(sug) : ''}</div><div class="rh4"><button class="btn primary big" data-next="${esc(sug.code)}">🚙 ${_t('Go to')} ${first(sug)}</button></div></div>` : '';
+  return `<div class="panel run"><div class="ph"><h3>${_t('Pick up the guests')} · ${run.id}</h3><span class="small muted">${done} / ${n} ${_t('on board')}</span></div><div class="pb">
+    ${run.started ? `<div class="note ok" style="margin-bottom:10px">${_t('The safari started at')} ${esc(run.startedAt || '')}.</div>` : ''}
+    ${hero}
+    ${!run.started && canAct && !run.driver && run.groups.some(g => !g.boarded) ? `<p class="tiny muted" id="geoNote" style="margin:0 0 10px">📍 ${_t('Turn on your phone location so we can find the closest guest.')}</p>` : ''}
     <div class="runmap" id="runMap"></div>
-    <div class="runlist">${run.groups.map((g, i) => `<div class="rg ${g.boarded ? 'on' : ''} ${g.next ? 'nx' : ''}"><span class="no">${i + 1}</span><div class="rt"><b>${esc(g.name)}</b> · ${ppl(g.people)} · seat ${g.seats.join(', ')}<div class="tiny muted">${g.hotel ? esc(g.hotel) + (g.km != null ? ` · ${g.km} km from base` : '') : 'Meets at the office'}</div><div style="margin-top:6px">${chip(g)}</div></div>
-      <div class="ra">${!g.boarded && !run.started && canAct && !g.next ? `<button class="btn sm primary" data-next="${esc(g.code)}">Pick up next</button>` : ''}${g.lat != null ? `<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g.lat},${g.lng}">Directions</a>` : ''}<a class="btn sm" href="tel:${esc(g.phone.replace(/\s/g, ''))}">Call</a></div></div>`).join('') || '<div class="empty">No paid guests yet</div>'}</div>
-    ${run.next && !run.started ? `<p class="tiny muted" id="geoNote" style="margin:10px 0 0">📍 Your location is shared with the guest you are driving to, so they can see you coming.</p>` : ''}
-    ${!run.started && canAct ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" id="runScan">Scan a ticket</button><button class="btn primary" id="runStart" style="flex:1" ${done ? '' : 'disabled'}>▶ Start the safari${done && done < n ? ` (${done}/${n} on board)` : ''}</button></div>` : ''}
+    <div class="runlist">${run.groups.map((g, i) => `<div class="rg ${g.boarded ? 'on' : ''} ${g.next ? 'nx' : ''} ${g.suggest && !g.next ? 'sg' : ''}"><span class="no">${g.boarded ? '✓' : i + 1}</span><div class="rt"><b>${esc(g.name)}</b> · ${g.people} ${g.people === 1 ? _t('person') : _t('people')} · ${_t('seat')} ${g.seats.join(', ')}<div class="tiny muted">${g.hotel ? esc(g.hotel) : _t('Meets at the office')}${from(g) && !g.boarded ? ' · <b>' + from(g) + '</b>' : ''}</div><div style="margin-top:6px">${chip(g)}</div></div>
+      <div class="ra">${!g.boarded && !run.started && canAct && !g.next && !(hero && g.suggest) ? `<button class="btn sm ${g.suggest ? 'primary' : ''}" data-next="${esc(g.code)}">${_t('Go here')}</button>` : ''}${g.lat != null ? `<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g.lat},${g.lng}">🧭 ${_t('Directions')}</a>` : ''}<a class="btn sm" href="tel:${esc(g.phone.replace(/\s/g, ''))}">📞 ${_t('Call')}</a></div></div>`).join('')}</div>
+    ${run.next && !run.started ? `<p class="tiny muted" id="geoNote2" style="margin:10px 0 0">📍 ${_t('The guest can see you coming on the map.')}</p>` : ''}
+    ${!run.started && canAct ? `<div class="runacts"><button class="btn big" id="runScan">📷 ${_t('Scan a ticket')}</button><button class="btn primary big" id="runStart" ${done ? '' : 'disabled'}>▶ ${_t('Start the safari')}${done && done < n ? ` (${done}/${n})` : ''}</button></div>` : ''}
   </div></div>`;
 }
 function wirePickupRun(run, api) {
-  $$('[data-next]').forEach(b => b.onclick = () => busy(b, async () => { await api.next(b.dataset.next); toast('Guest told you are on the way'); api.refresh() }));
+  window.onFirstFix = () => api.refresh && api.refresh();
+  $$('[data-next]').forEach(b => b.onclick = () => busy(b, async () => { await api.next(b.dataset.next); toast(_t('The guest knows you are coming')); api.refresh() }));
   const sc = $('#runScan'); if (sc) sc.onclick = () => api.scan();
   const st = $('#runStart'); if (st) st.onclick = () => busy(st, async () => {
     try { await api.start(false) } catch (e) { if (e.data && e.data.canForce && confirm(e.message)) await api.start(true); else throw e }
@@ -245,12 +254,15 @@ function wirePickupRun(run, api) {
     setTimeout(() => map.invalidateSize(), 200);
   } else if (el) el.remove();
   // share the driver's position while driving to the next guest
-  if (run.next && !run.started && api.location) startGeo(api.location); else stopGeo();
+  if (!run.started && api.location) startGeo(api.location, !!run.driver); else stopGeo();
 }
-function startGeo(send) {
+function startGeo(send, known) {
   if (_geo != null || !navigator.geolocation) return;
-  _geo = navigator.geolocation.watchPosition(p => { if (Date.now() - _geoLast < 15000) return; _geoLast = Date.now(); send(p.coords.latitude, p.coords.longitude).catch(() => { }) },
-    () => { const n = $('#geoNote'); if (n) n.textContent = '⚠ Location is off, so the guest cannot see you coming. They still got a message that you are on the way.' }, { enableHighAccuracy: true, maximumAge: 10000 });
+  let first = true;
+  _geo = navigator.geolocation.watchPosition(p => {
+    if (!first && Date.now() - _geoLast < 15000) return; _geoLast = Date.now();
+    send(p.coords.latitude, p.coords.longitude).then(() => { if (first && !known && typeof window.onFirstFix === 'function') window.onFirstFix(); first = false }).catch(() => { });
+  }, () => { const n = $('#geoNote') || $('#geoNote2'); if (n) n.textContent = '⚠ ' + _t('Location is off. Please turn it on so we can find the closest guest.') }, { enableHighAccuracy: true, maximumAge: 10000 });
 }
 function stopGeo() { if (_geo != null && navigator.geolocation) navigator.geolocation.clearWatch(_geo); _geo = null }
 

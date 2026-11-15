@@ -575,7 +575,10 @@ test('shared pickup run: scan boards a guest, driver picks the next one (guest s
   assert.equal(tkA.pickup.onBoard, true); assert.equal(tkA.pickup.pos, null, 'only the next guest sees the driver');
   await api('POST', '/api/checkin', { code: 'YWS-GB00X' }, pc);
   const run = (await api('GET', `/api/partner/trips/${tid}/run`, null, pc)).json;
-  assert.equal(run.groups.filter(g => g.boarded).length, 2); assert.equal(run.next, null);
+  assert.equal(run.groups.filter(g => g.boarded).length, 2);
+  assert.equal(run.next, 'YWS-GC00X', 'after a guest boards, the system moves on to the closest guest still waiting');
+  assert.equal(run.groups[run.groups.length - 1].code, 'YWS-GC00X'); assert.equal(run.groups[run.groups.length - 1].suggest, true);
+  assert.ok((await emails('cust_driver_next')).some(e => e.to_addr === 'cara@x.lk'), 'Cara is told the driver is coming');
   const s1 = await api('POST', `/api/partner/trips/${tid}/start`, {}, pc);
   assert.equal(s1.status, 409); assert.equal(s1.json.canForce, true); assert.match(s1.json.error, /Cara/);
   const s2 = await api('POST', `/api/partner/trips/${tid}/start`, { force: true }, pc);

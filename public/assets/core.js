@@ -65,6 +65,8 @@ async function api(method, url, body) {
 const GET = u => api('GET', u), POST = (u, b) => api('POST', u, b || {}), PUT = (u, b) => api('PUT', u, b || {}), DEL = u => api('DELETE', u);
 
 /* ---------- Small shared UI ---------- */
+/* Translator for the partner pages: returns the text in the chosen language, or the English text when there is no translation. */
+const _t = s => (window.I18N && window.I18N.t(s)) || s;
 const JEEP = (c = '#5b6b3a', w = 38, h = 24) => `<svg viewBox="0 0 40 24" width="${w}" height="${h}" aria-hidden="true"><path d="M2 10 L8 10 L11 3 L29 3 L32 10 L39 11 L39 18 L1 18 Z" fill="${c}"/><rect x="12.5" y="5" width="7" height="4.5" rx="1" fill="#cfe6ee"/><rect x="21" y="5" width="7" height="4.5" rx="1" fill="#cfe6ee"/><circle cx="9" cy="19" r="4" fill="#2b1a0e"/><circle cx="31" cy="19" r="4" fill="#2b1a0e"/><circle cx="9" cy="19" r="1.6" fill="#8b7355"/><circle cx="31" cy="19" r="1.6" fill="#8b7355"/></svg>`;
 const THEME_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>';
 function applyTheme(t) { try { if (t) document.documentElement.dataset.theme = t } catch (e) { } }
