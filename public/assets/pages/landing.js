@@ -129,7 +129,7 @@ function included() {
   ];
   if (EXTRAS.meals) items.push(`Optional meal pack (${fmt(EXTRAS.meals.price)} per seat): veg, vegan, halal and more`);
   $('#inclList').innerHTML = items.map(t => `<li>${esc(t)}</li>`).join('');
-  $('#pickupKm').textContent = l ? l.radiusKm : CFG.radiusKm;
+  const pk = $('#pickupKm'); if (pk) pk.textContent = l ? l.radiusKm : CFG.radiusKm;
 }
 
 /* ---------- demo seat map (how it works) ---------- */

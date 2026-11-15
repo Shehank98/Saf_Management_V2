@@ -67,6 +67,7 @@ const ICONS = {
   set: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   home: '<path d="M3 11l9-8 9 8v10H3z"/>', jobs: '<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/>', cal: '<path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"/>',
   money: '<circle cx="12" cy="12" r="9"/><path d="M15 9a3 3 0 0 0-3-1.5c-2 0-3 1-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3.5 3.5 0 0 1-3.2-1.6M12 6v1.5M12 16.5V18"/>',
+  out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', app: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
 };
 const ic = (k, sz = 18) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] || ''}</svg>`;
@@ -93,23 +94,34 @@ function adminShell({ active, title, actions = '', nav = ADMIN_NAV, who = null, 
   _nav = nav;
   const content = $('#content');
   const name = who ? who[1] : (ME ? ME.name : 'Staff'), ini = who ? who[0] : name.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
+  const role = sub === 'Admin' ? (ME && ME.role === 'OWNER' ? 'Owner' : 'Staff') : 'Partner';
   const href = h => ROUTES[h] || h;
-  const side = `<nav class="side" id="side" aria-label="${sub} menu"><a class="logo" href="${href(nav[0][0])}"><span class="mk">${JEEP('#fff6e6', 24, 16)}</span><span class="lb">${esc(BRAND)}</span></a>
-    <div class="sep"><span class="lb">${sub}</span></div>${nav.map(([h, l, i, c]) => { const n = c ? c() : 0; return `<a class="nv ${h === active ? 'on' : ''}" href="${href(h)}" title="${l.replace(/&amp;/g, '&')}">${ic(i)}<span class="lb">${l}</span>${n ? `<span class="ct">${n}</span>` : ''}</a>` }).join('')}
-    ${sub === 'Admin' ? `<div class="sep"><span class="lb">More</span></div><a class="nv" href="/" target="_blank" rel="noopener" title="Customer site">${ic('home')}<span class="lb">Customer site ↗</span></a><a class="nv" href="/partner" target="_blank" rel="noopener" title="Partner portal">${ic('user')}<span class="lb">Partner portal ↗</span></a><a class="nv install-link" href="#" id="instLink" hidden title="Install this app">${ic('app')}<span class="lb">Install this app</span></a>` : '<a class="nv install-link" href="#" id="instLink" hidden>' + ic('app') + '<span class="lb">Install this app</span></a>'}
-    <button class="collapse-btn" id="collapse" type="button" aria-label="Collapse menu" title="Collapse menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg><span class="lb">Collapse</span></button>
-    <div class="me"><span class="av" title="${esc(name)}">${esc(ini)}</span><div class="lb"><b>${esc(name)}</b><div class="tiny" style="color:#8d7d64"><a href="#" id="logout" style="color:#cdbfa5">Log out</a></div></div></div></nav>`;
-  const head = `<header class="ahead"><button class="menu-btn" id="mb" aria-label="Open menu">☰</button><h1>${title}</h1>${actions}<button class="lnk" data-theme-toggle aria-label="Switch theme">${THEME_ICON}</button></header>`;
+  const chev = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  const side = `<nav class="side" id="side" aria-label="${sub} menu"><div class="sidein">
+    <a class="logo" href="${href(nav[0][0])}"><span class="mk">${JEEP('#fff6e6', 24, 16)}</span><span class="lb">${esc(BRAND)}</span></a>
+    <div class="navlinks" id="navlinks">${nav.map(([h, l, i, c]) => { const n = c ? c() : 0; return `<a class="nv ${h === active ? 'on' : ''}" href="${href(h)}" title="${l.replace(/&amp;/g, '&')}" ${h === active ? 'aria-current="page"' : ''}>${ic(i)}<span class="lb">${l}</span>${n ? `<span class="ct">${n}</span>` : ''}</a>` }).join('')}</div>
+    <div class="navr">
+      <button class="iconb" data-theme-toggle aria-label="Switch light or dark theme" title="Light / dark">${THEME_ICON}</button>
+      <div class="umenu" id="umenu"><button class="me" id="meBtn" type="button" aria-haspopup="menu" aria-expanded="false"><span class="av" title="${esc(name)}">${esc(ini)}</span><span class="who"><b>${esc(name)}</b><small>${role}</small></span>${chev}</button>
+        <div class="udrop" role="menu">
+          ${sub === 'Admin' ? `<a role="menuitem" href="/" target="_blank" rel="noopener">${ic('home')}<span>Customer site</span><i>↗</i></a><a role="menuitem" href="/partner" target="_blank" rel="noopener">${ic('user')}<span>Partner portal</span><i>↗</i></a>` : ''}
+          <a role="menuitem" href="#" id="instLink" hidden>${ic('app')}<span>Install this app</span></a>
+          <button role="menuitem" type="button" id="logout">${ic('out')}<span>Log out</span></button>
+        </div></div>
+    </div></div></nav>`;
+  const head = `<header class="ahead"><h1>${title}</h1><div class="ahead-actions">${actions}</div></header>`;
   const wrap = document.createElement('div'); wrap.className = 'app'; wrap.innerHTML = side + `<div class="mainc">${head}</div>`;
   content.parentNode.insertBefore(wrap, content); wrap.querySelector('.mainc').appendChild(content); content.classList.add('content');
-  const app = wrap, setCollapsed = c => { app.classList.toggle('collapsed', c); try { localStorage.setItem('yws-side', c ? '1' : '') } catch (e) { } $('#collapse').setAttribute('aria-label', c ? 'Expand menu' : 'Collapse menu') };
-  try { if (localStorage.getItem('yws-side')) setCollapsed(true) } catch (e) { }
-  $('#collapse').onclick = () => setCollapsed(!app.classList.contains('collapsed'));
-  $('#mb').onclick = e => { e.stopPropagation(); $('#side').classList.add('open') };
-  document.addEventListener('click', e => { const sd = $('#side'); if (sd.classList.contains('open') && !sd.contains(e.target)) sd.classList.remove('open') });
+  // account menu
+  const um = $('#umenu'), mb = $('#meBtn');
+  const setUm = o => { um.classList.toggle('open', o); mb.setAttribute('aria-expanded', o) };
+  mb.onclick = e => { e.stopPropagation(); setUm(!um.classList.contains('open')) };
+  document.addEventListener('click', e => { if (!um.contains(e.target)) setUm(false) });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { setUm(false); closeDrawer(); closeModal() } });
+  // keep the active tab visible in the scrolling nav on phones
+  const act = $('#navlinks a.on'); if (act && act.scrollIntoView) { const nl = $('#navlinks'); nl.scrollLeft = Math.max(0, act.offsetLeft - 16) }
   if (!$('#scrim')) document.body.insertAdjacentHTML('beforeend', '<div class="scrim" id="scrim"></div><aside class="drawer" id="drawer" aria-modal="true" role="dialog"></aside><div class="modal" id="modal"><div class="card" id="modalBody"></div></div>');
   $('#scrim').onclick = closeDrawer; $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal() };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeModal() } });
   $('#logout').onclick = async e => { e.preventDefault(); try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage('clear-data'); await POST(sub === 'Admin' ? '/api/admin/logout' : '/api/partner/logout') } catch (x) { } location.href = sub === 'Admin' ? '/admin/login' : '/partner' };
   const il = $('#instLink'); if (il && !document.documentElement.classList.contains('is-app')) { il.hidden = false; il.onclick = e => { e.preventDefault(); window.installApp && window.installApp() } }
   wireChrome();

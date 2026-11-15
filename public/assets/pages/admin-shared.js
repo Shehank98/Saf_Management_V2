@@ -95,4 +95,4 @@ function create() {
 }
 $('#newBtn').onclick = create;
 function onDataChanged() { list() }
-list(); if (P.get('open')) open(P.get('open')); else if (P.get('new')) create();
+list(); if (P.get('open')) open(P.get('open')); else if (P.get('run')) openRun(P.get('run')); else if (P.get('new')) create();

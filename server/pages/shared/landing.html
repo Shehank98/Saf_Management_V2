@@ -80,6 +80,21 @@ body{background:var(--paper);overflow-x:clip}
 @keyframes cue{60%{transform:translateY(12px);opacity:0}100%{opacity:0}}
 @media (max-width:900px){.heroin{grid-template-columns:1fr;gap:26px;padding-top:96px;padding-bottom:90px}.scrollcue{display:none}}
 @media (max-width:480px){.fhead{flex-direction:column;align-items:flex-start;gap:2px}.finder{padding:18px}}
+/* phones: compact hero (headline + finder fit one screen) */
+@media (max-width:700px){
+  .hero{min-height:0}
+  .heroin{padding-top:84px;padding-bottom:36px;gap:18px}
+  .eyebrow{font-size:11px;padding:6px 11px}
+  .hero h1{font-size:clamp(30px,9vw,38px);margin:12px 0 10px}
+  .lead{font-size:15px;line-height:1.5;margin:0}
+  .lead .more{display:none}
+  .chips{display:none}
+  .finder{padding:16px;gap:8px;border-radius:18px}
+  .finder .f{padding:7px 12px}
+  .btn.big{min-height:50px}
+  .fnote{display:none}
+  .scene{object-position:60% bottom}
+}
 /* scene animation */
 .sunrise{animation:sunrise 48s ease-in-out infinite;transform-box:fill-box}
 @keyframes sunrise{0%,100%{transform:translateY(80px)}50%{transform:translateY(-40px)}}
@@ -121,14 +136,6 @@ body{background:var(--paper);overflow-x:clip}
 .rv{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
 .rv.in{opacity:1;transform:none}.d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}}
-/* ---------- trust strip ---------- */
-.trust{position:relative;z-index:2;margin-top:-56px}
-.trustgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 20px 50px rgba(40,20,0,.12)}
-.ti{display:flex;gap:14px;padding:22px;background:var(--card)}
-.ti b{display:block;font-size:15px;margin-bottom:3px}.ti p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5}
-.tic{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--ochre) 12%,var(--card));color:var(--ochre)}
-@media (max-width:900px){.trustgrid{grid-template-columns:1fr 1fr}}
-@media (max-width:560px){.trust{margin-top:-36px}.trustgrid{grid-template-columns:1fr}}
 /* ---------- sections ---------- */
 .sec{padding:96px 0}
 .sec.alt{background:color-mix(in srgb,var(--sand) 55%,var(--paper))}
@@ -369,7 +376,7 @@ body{background:var(--paper);overflow-x:clip}
     <div class="herotext">
       <span class="eyebrow rv">Shared jeep safaris · Sri Lanka</span>
       <h1 class="rv d1">Wild Sri Lanka,<br><em>one seat at a time.</em></h1>
-      <p class="lead rv d2">Join a small group in an open 4×4 safari jeep. Pick your park and session, choose your exact seat, and get your QR e-ticket by email. Free hotel pickup near the park.</p>
+      <p class="lead rv d2">Join a small group in an open 4×4 safari jeep. <span class="more">Pick your park and session, choose your exact seat, and get your QR e-ticket by email. Free hotel pickup near the park.</span></p>
       <div class="chips rv d3"><span><i class="dot"></i>Live seat map</span><span><i class="dot"></i>Pay securely online</span><span><i class="dot"></i>Full refund if the jeep doesn't run</span></div>
     </div>
     <form class="finder rv d3" id="quick" aria-label="Find a shared safari">
@@ -381,17 +388,10 @@ body{background:var(--paper);overflow-x:clip}
       <p class="fnote">No payment needed to look. Seats are held for 15 minutes while you book.</p>
     </form>
   </div>
-  <a class="scrollcue" href="#trust" aria-label="Scroll down"><span></span></a>
+  <a class="scrollcue" href="#parks" aria-label="Scroll down"><span></span></a>
 </section>
 
-<section class="trust" id="trust">
-  <div class="wrap trustgrid">
-    <div class="ti rv"><span class="tic" data-icon="shield"></span><div><b>Secure online payment</b><p id="payText">Card payments on a secure page. Card details never touch our site.</p></div></div>
-    <div class="ti rv d1"><span class="tic" data-icon="pin"></span><div><b>Free hotel pickup</b><p>Within <span id="pickupKm">7</span> km of the park base. Drop a pin on your hotel.</p></div></div>
-    <div class="ti rv d2"><span class="tic" data-icon="ticket"></span><div><b>Instant QR e-ticket</b><p>Emailed to you. Works offline in the park.</p></div></div>
-    <div class="ti rv d3"><span class="tic" data-icon="refund"></span><div><b>Runs or full refund</b><p>A jeep runs with <span data-cfg="minSeats">4</span> paid seats. If it doesn't, you get every rupee back.</p></div></div>
-  </div>
-</section>
+
 
 <main>
 <section class="sec" id="parks">
