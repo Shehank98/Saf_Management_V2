@@ -183,7 +183,7 @@ async function pickSeats() {
       const ss = seatsSorted();
       h += `<div class="cols"><div class="card"><h2 style="font-size:20px;margin-bottom:12px">Your details</h2>
       <div class="field"><label for="fn">Full name</label><input class="inp" id="fn" autocomplete="name" value="${esc(f.name)}"></div>
-      <div class="field"><label for="fp">Mobile number</label><div class="phone"><select class="inp" id="fc">${['+94', '+44', '+49', '+33', '+91', '+1', '+61', '+81', '+39', '+31', '+86', '+7', '+46', '+41'].map(c => `<option ${c === f.cc ? 'selected' : ''}>${c}</option>`).join('')}</select><input class="inp" id="fp" inputmode="tel" autocomplete="tel-national" value="${esc(f.phone)}"></div></div>
+      <div class="field"><label for="fp">Mobile number</label><div class="phone"><select class="inp" id="fc" aria-label="Country code">${['+94', '+44', '+49', '+33', '+91', '+1', '+61', '+81', '+39', '+31', '+86', '+7', '+46', '+41'].map(c => `<option ${c === f.cc ? 'selected' : ''}>${c}</option>`).join('')}</select><input class="inp" id="fp" inputmode="tel" autocomplete="tel-national" value="${esc(f.phone)}"></div></div>
       <div class="field"><label for="fe">Email (your e-ticket goes here)</label><input class="inp" id="fe" type="email" autocomplete="email" value="${esc(f.email)}"></div>
       <div class="sec"><h3>Pickup</h3><div class="grid" style="gap:8px;grid-template-columns:1fr 1fr">
         <button type="button" class="opt ${f.pmode === 'hotel' ? 'on' : ''}" data-pm="hotel" style="padding:12px 40px 12px 14px"><span class="radio"></span><b>From my hotel</b><div class="tiny muted">Free within ${park.radiusKm} km</div></button>

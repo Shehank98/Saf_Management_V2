@@ -63,7 +63,14 @@ body{background:var(--paper);overflow-x:clip}
 .fhead .from{font-size:13px;color:#6b5a45}.fhead .from b{font:700 15px Inter,sans-serif;color:#b45f24}
 .finder .f{display:block;background:#fff;border:1px solid #eadcc4;border-radius:14px;padding:9px 14px;transition:border-color .2s,box-shadow .2s}
 .finder .f:focus-within{border-color:#c0682a;box-shadow:0 0 0 4px rgba(192,104,42,.15)}
-.finder .f span{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7a6852}
+.finder .f>span{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7a6852}
+.finder .fs-btn{border:0;background:transparent;font:600 16px Inter,sans-serif;color:#241a10;padding:4px 0;min-height:0;box-shadow:none!important;outline:none;text-transform:none;letter-spacing:0}
+.finder .fs-btn:focus-visible{outline:none}
+.finder .fs-val{display:block;font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;color:#241a10}
+.finder .f:has(.fs.open){border-color:#c0682a;box-shadow:0 0 0 4px rgba(192,104,42,.15)}
+.finder .fs-btn .fs-chev{color:#9a7a55}
+.finder .fs-list{left:-15px;right:-15px;top:calc(100% + 14px)}
+.finder .fs.up .fs-list{bottom:calc(100% + 14px)}
 .finder select,.finder input{width:100%;border:0;background:transparent;font:600 16px Inter,sans-serif;color:#241a10;padding:4px 0;outline:none}
 .btn.big{min-height:54px;font-size:16px;border-radius:14px}
 .btn.block{width:100%}
@@ -505,6 +512,7 @@ body{background:var(--paper);overflow-x:clip}
 <script defer src="/api/config.js"></script>
 <script defer src="/assets/core.js"></script>
 <script defer src="/assets/customer.js"></script>
+<script defer src="/assets/fancy-select.js"></script>
 <script defer src="/assets/pages/landing.js"></script>
 </body>
 </html>

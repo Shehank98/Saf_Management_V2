@@ -37,6 +37,8 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  // Map tiles (OpenStreetMap) and place search refuse requests without a Referer. Send only our domain to other sites, never the page path.
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   crossOriginResourcePolicy: { policy: 'same-origin' },
   hsts: config.isProd,
 }));
@@ -142,7 +144,7 @@ app.get('/gallery/:id', U.wrap(async (req, res) => {
   if (!img) return res.status(404).end();
   res.set({ 'Content-Type': img.mime, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(img.data);
 }));
-app.get('/drive/:token', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow').set('Referrer-Policy', 'no-referrer'); page('vendor/drive.html')(req, res); });
+app.get('/drive/:token', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow').set('Referrer-Policy', 'strict-origin'); page('vendor/drive.html')(req, res); });
 app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('vendor/portal.html')(req, res); });
 
 // Web app manifests (home-screen install). Generated so the app name follows the business name in Settings.
