@@ -203,10 +203,14 @@ async function pickSeats() {
       <div>${summary()}</div></div>`;
     }
     if (step === 2) {
+      // These seats (with the ones already booked) are enough for the jeep to run, so there is nothing to wait for: payment is needed now.
+      const goesAhead = online && (taken.size + mine.size) >= minSeats;
+      if (goesAhead) f.pay = 'card';
       const due = f.pay === 'card' ? total() : 0;
       h += `<div class="cols"><div><div class="grid" style="gap:10px">
       ${online ? `<button class="opt ${f.pay === 'card' ? 'on' : ''}" data-v="card"><span class="radio"></span><b>Pay now · ${fmt(total())}</b><p class="small muted" style="margin:4px 40px 0 0">Your seat is locked in. Full refund if the trip doesn't run.</p></button>` : ''}
-      ${trip.allowLater ? `<button class="opt ${f.pay === 'later' ? 'on' : ''}" data-v="later"><span class="radio"></span><b>Reserve now, pay later</b><p class="small muted" style="margin:4px 40px 0 0">Free hold. We email a payment link when ${minSeats} seats are reserved. Pay within ${trip.payWindowH} hours or the seat is released.</p></button>` : ''}</div>
+      ${goesAhead ? `<div class="note ok" style="margin:0"><b>Your safari is going ahead!</b> With ${mine.size === 1 ? 'this seat' : 'these seats'} the jeep has the ${minSeats} guests it needs, so please pay now to lock ${mine.size === 1 ? 'it' : 'them'} in.</div>` : ''}
+      ${trip.allowLater && !goesAhead ? `<button class="opt ${f.pay === 'later' ? 'on' : ''}" data-v="later"><span class="radio"></span><b>Reserve now, pay later</b><p class="small muted" style="margin:4px 40px 0 0">Free hold. We email a payment link when ${minSeats} seats are reserved. Pay within ${trip.payWindowH} hours or the seat is released.</p></button>` : ''}</div>
       ${f.pay === 'card' ? `<div class="card" style="margin-top:12px"><b style="display:block;margin-bottom:8px">How do you want to pay?</b>${CFG.providers.length > 1 ? `<div class="grid" style="gap:8px;margin-bottom:10px">${CFG.providers.map(x => `<button type="button" class="opt ${x.id === f.provider ? 'on' : ''}" data-p="${x.id}" style="padding:12px 44px 12px 14px"><span class="radio"></span><b>${esc(x.label)}</b></button>`).join('')}</div>` : ''}<p class="small muted" style="margin:0">You'll pay on a secure page run by <b>${esc((CFG.providers.find(x => x.id === f.provider) || {}).label || 'our payment partner')}</b>. Your card details never touch our website.</p></div>` : ''}
       <label class="chk"><input type="checkbox" id="ft" ${f.terms ? 'checked' : ''}><span>I agree to the shared safari terms and cancellation policy. <span class="muted">${esc(policyText())}</span></span></label></div>
       <div>${summary()}</div></div>`;

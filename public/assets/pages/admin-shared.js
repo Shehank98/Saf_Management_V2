@@ -2,7 +2,8 @@ adminShell({ active: 'shared.html', title: 'Shared trips', actions: `<button cla
 const noteEl = $('#content .note');
 noteEl.innerHTML = noteEl.innerHTML.replaceAll('${SETTINGS.minSeats}', CFG.minSeats).replaceAll('${SETTINGS.payWindowH}', CONF.shared.autoCancelH);
 const siteMsg = 'Hi! Here are our shared safari trips, pick a date and seats: ' + CFG.baseUrl + '/shared';
-noteEl.outerHTML = `<div id="folds">${fold('How shared trips work', `<p class="small" style="margin:0;line-height:1.6">${noteEl.innerHTML}</p>`, { hint: 'automatic jeeps' })}${fold('Shared trips website &amp; link', `<p class="small muted" style="margin:0 0 8px">Your booking site. Guests pick a park, a session and a date, then choose seats. A jeep opens automatically for the first guest and a new one when it fills up.</p><div class="lnkbox"><code>${CFG.baseUrl}/shared</code><button class="btn sm" id="cpSite">Copy</button></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(siteMsg)}">Share on WhatsApp</a><a class="btn sm" href="/shared" target="_blank" rel="noopener">Open ↗</a></div>`, { hint: CFG.baseUrl.replace(/^https?:\/\//, '') + '/shared' })}</div>`;
+noteEl.parentNode.removeChild(noteEl);
+$('#content').insertAdjacentHTML('beforeend', `<div id="folds">${fold('How shared trips work', `<p class="small" style="margin:0;line-height:1.6">${noteEl.innerHTML}</p>`, { hint: 'automatic jeeps' })}${fold('Shared trips website &amp; link', `<p class="small muted" style="margin:0 0 8px">Your booking site. Guests pick a park, a session and a date, then choose seats. A jeep opens automatically for the first guest and a new one when it fills up.</p><div class="lnkbox"><code>${CFG.baseUrl}/shared</code><button class="btn sm" id="cpSite">Copy</button></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(siteMsg)}">Share on WhatsApp</a><a class="btn sm" href="/shared" target="_blank" rel="noopener">Open ↗</a></div>`, { hint: CFG.baseUrl.replace(/^https?:\/\//, '') + '/shared' })}</div>`);
 $('#cpSite').onclick = () => { navigator.clipboard?.writeText(CFG.baseUrl + '/shared').catch(() => { }); toast('Link copied') };
 const paidOf = t => t.seats.filter(x => x.pay === 'Paid').length;
 function status(t) {
@@ -37,11 +38,23 @@ function list() {
   const rows = SHARED.filter(t => t.seats.length || !t.auto).filter(T.find(x => x[0] === tab)[2]).sort((a, b) => tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
   $('#trips').innerHTML = rows.map(t => {
     const p = paidOf(t), st = status(t), byN = {}; t.seats.forEach(x => byN[x.n] = x);
+    const live = t.seats.filter(x => x.pay !== 'Refunded'), pend = live.filter(x => x.pay !== 'Paid');
+    const got = live.filter(x => x.pay === 'Paid').reduce((a, x) => a + (x.amount || 0), 0), wait = pend.reduce((a, x) => a + (x.amount || 0), 0);
+    const bks = bookingsOf(t), first = n => esc(String(n).split(' ')[0]);
+    const who = bks.slice(0, 3).map(b => `${first(b.name)}${b.seatNos.length > 1 ? ' ×' + b.seatNos.length : ''}${b.paid ? '' : ' <i class="np">unpaid</i>'}`).join(', ') + (bks.length > 3 ? ` +${bks.length - 3} more` : '');
+    const meals = live.filter(x => x.meal).length, bino = live.some(x => x.bino);
+    const done = ['Cancelled', 'Completed'].includes(st);
+    const dl = t.deadline && !done && st !== 'Started' ? `${shortDate(t.deadline)} ${t.deadlineTime}` : '';
+    const todo = [];
+    if (!done && st !== 'Started') { if (!t.vendor) todo.push(['bad', 'Assign a jeep']); if (p < t.minSeats) todo.push(['warn', `Needs ${t.minSeats - p} more paid`]); if (pend.length) todo.push(['info', `${pend.length} unpaid`]); if (t.guideWanted && !t.guide) todo.push(['warn', 'Assign a guide']) }
     return `<button class="trip fade" data-id="${t.id}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="mono small muted">${t.id}</span>${badge(st)}</div>
-    <div class="dt">${shortDate(t.date)}</div><div class="small muted">${esc(locName(t.loc))} · ${esc(SESS[t.ses].name)} · ${gm(t.price, t)}/seat</div>${t.guideWanted ? `<div style="margin-top:4px"><span class="tag ${t.guide ? 'ok' : 'warn'}">🧭 Guide requested${t.guide ? ' · assigned' : ''}</span></div>` : ''}
+    <div class="dt">${shortDate(t.date)} <span class="when">${esc(SESS[t.ses].short)} · pickup ${SESS[t.ses].pickup}</span></div><div class="small muted">${esc(locName(t.loc))} · ${gm(t.price, t)}/seat</div>
     <div class="mini-seats">${Array.from({ length: t.seatsMax }, (_, i) => i + 1).map(n => `<i class="${byN[n] ? (byN[n].pay === 'Paid' ? 'p' : 'r') : ''}" title="Seat ${n}"></i>`).join('')}</div>
-    <div class="small"><b>${p}</b> paid · ${t.seats.length - p} reserved · ${t.seatsMax - t.seats.length} free ${p < t.minSeats && st !== 'Cancelled' ? `<span style="color:var(--warn)">· needs ${t.minSeats - p}</span>` : ''}</div>
-    <div class="small muted" style="margin-top:6px">Jeep: ${t.vendor ? esc(vendorName(t.vendor)) + stateNote(t.vendorState) : '<span style="color:var(--bad)">not assigned</span>'}</div></button>`;
+    <div class="small"><b>${p}</b> paid · ${pend.length} reserved · ${t.seatsMax - live.length} free</div>
+    ${live.length ? `<div class="tmoney"><span>Collected <b>${gm(got, t)}</b></span>${wait ? `<span>Waiting <b>${gm(wait, t)}</b></span>` : ''}</div><div class="small tguests">👥 ${who}</div>` : ''}
+    <div class="tinfo"><span>🚙 ${t.vendor ? esc(vendorName(t.vendor)) + stateNote(t.vendorState) : '<b class="bad">not assigned</b>'}</span>${t.guide ? `<span>🧭 ${esc(vendorName(t.guide))}</span>` : ''}${meals ? `<span>🍽 ${meals} meal${meals > 1 ? 's' : ''}</span>` : ''}${bino ? '<span>🔭 binoculars</span>' : ''}</div>
+    ${dl && p < t.minSeats ? `<div class="small muted" style="margin-top:4px">⏱ Auto-cancels ${dl} if under ${t.minSeats} paid</div>` : ''}
+    ${todo.length ? `<div class="ttodo">${todo.map(([c, l]) => `<span class="tag ${c}">${l}</span>`).join('')}</div>` : ''}</button>`;
   }).join('') || '<div class="empty">No trips here. Create one to get a shareable link.</div>';
   $$('.trip').forEach(b => b.onclick = () => open(b.dataset.id));
 }
