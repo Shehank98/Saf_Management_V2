@@ -25,7 +25,7 @@ app.use(helmet({
       'script-src': ["'self'", "'unsafe-inline'"],
       'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://fonts.gstatic.com'],
-      'img-src': ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org'],
+      'img-src': ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org', 'https://*.tile.openstreetmap.org'],
       'connect-src': ["'self'", 'https://nominatim.openstreetmap.org'],
       'media-src': ["'self'", 'blob:'],
       'worker-src': ["'self'"],
@@ -135,6 +135,12 @@ app.get('/partner/job/:aid/:action', U.wrap(async (req, res) => {
     await require('./lib/activity').log(c, a.booking_id ? 'booking' : 'trip', code, `${p.name} ${status === 'ACCEPTED' ? 'accepted' : 'declined'} the job (from email)`, p.name);
   });
   card(status === 'ACCEPTED' ? '✅' : '👍', status === 'ACCEPTED' ? 'Job accepted' : 'Job declined', status === 'ACCEPTED' ? 'Thank you! The office can see it now. Guest details are in your partner portal.' : 'No problem. The office will offer it to someone else.');
+}));
+// Owner-uploaded gallery photos (public, cached).
+app.get('/gallery/:id', U.wrap(async (req, res) => {
+  const img = await require('./services/gallery').image(req.params.id);
+  if (!img) return res.status(404).end();
+  res.set({ 'Content-Type': img.mime, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(img.data);
 }));
 app.get('/drive/:token', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow').set('Referrer-Policy', 'no-referrer'); page('vendor/drive.html')(req, res); });
 app.get(['/partner', '/partner/login'], (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('vendor/portal.html')(req, res); });

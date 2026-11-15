@@ -21,6 +21,51 @@ const TOKEN = (() => {
   return t;
 })();
 
+/* ----- The moment of booking: a celebration screen that tells guests exactly what happens next ----- */
+const pad2 = n => String(n).padStart(2, '0');
+const gcalLink = (o, s, park) => { const c = t => o.date.replace(/-/g, '') + 'T' + (t || '00:00').replace(':', '') + '00';
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Safari · ' + (s.name || 'Shared jeep') + (park ? ' · ' + park : ''))}&dates=${c(s.pickupRaw || s.start)}/${c(s.end)}&ctz=Asia%2FColombo&details=${encodeURIComponent(`Booking ${o.code}. Seat ${o.seats.join(', ')}. Pickup ${s.pickup || ''}. Your e-ticket: ${location.origin}/t/${o.code}?k=${o.k}`)}` };
+function celebrate(o) {
+  // o: { state: 'paid'|'reserved'|'unpaid', name, code, k, seats, date, ses, loc, ticketReady, email, minSeats, payWindowH }
+  const s = sesAt(o.loc, o.ses), park = (locOf(o.loc) || {}).name || '', first = String(o.name || '').split(' ')[0];
+  const start = new Date(`${o.date}T${s.pickupRaw || s.start || '06:00'}:00+05:30`);
+  const title = o.state === 'paid' ? `You're going on safari${first ? ', ' + esc(first) : ''}!` : o.state === 'reserved' ? `Your seat is reserved${first ? ', ' + esc(first) : ''}` : 'Payment not finished';
+  const sub = o.state === 'paid' ? (o.ticketReady ? 'Your jeep has enough travellers, so the safari is on. Your QR e-ticket is in your inbox.' : `Payment received. Your QR e-ticket is emailed as soon as the jeep reaches ${o.minSeats} paid seats.`)
+    : o.state === 'reserved' ? `Nothing to pay yet. When ${o.minSeats} seats are reserved we email you a payment link, and you have ${o.payWindowH} hours to pay.` : 'No money was taken. Your seats are still held for a short time, so you can try again.';
+  const next = o.state === 'paid' ? [['Now', o.ticketReady ? 'E-ticket emailed' : `E-ticket when ${o.minSeats} seats are paid`, 'Keep it on your phone. It works offline in the park.'], ['Day before', 'Pickup reminder', `We email you the pickup time (${esc(s.pickup || '')}) and your driver's details.`], ['Safari day', 'Watch your driver arrive', 'Your ticket shows when the jeep is on the way to you.']]
+    : o.state === 'reserved' ? [['Soon', 'Jeep fills up', `When ${o.minSeats} seats are reserved, everyone gets a payment link.`], [`Within ${o.payWindowH}h`, 'Pay to keep your seat', 'Pay securely by card from the email link.'], ['Then', 'E-ticket emailed', 'Your QR ticket arrives once the jeep is confirmed.']] : [];
+  const share = `${location.origin}/s/${TID}`, msg = `I booked a seat on a shared jeep safari${park ? ' at ' + park : ''} on ${nice(o.date)}. Join me on the same jeep: ${share}`;
+  frame(`<div class="cel fade ${o.state}">
+    <div class="cel-art" aria-hidden="true"><div class="cel-sun"></div><div class="cel-hill h1"></div><div class="cel-hill h2"></div><div class="cel-jeep">${JEEP('#2f3a1c', 86, 54)}</div><div class="cel-badge">${o.state === 'unpaid' ? '!' : '✓'}</div></div>
+    <div class="cel-body"><h1>${title}</h1><p class="muted">${sub}</p>
+    <div class="stub"><div class="stub-l"><span class="eb">${esc(park || 'Shared safari')}</span><b>${esc(s.name || '')}</b><span>${nice(o.date)}</span>
+      <div class="stub-row"><div>Pickup<b>${esc(s.pickup || '-')}</b></div><div>Seat${o.seats.length > 1 ? 's' : ''}<b>${o.seats.join(', ')}</b></div><div>Safari<b>${esc(s.time || '')}</b></div></div></div>
+      <div class="stub-r"><span>Booking code</span><b class="mono">${esc(o.code)}</b></div></div>
+    ${o.state !== 'unpaid' && start > new Date() ? `<div class="count" id="count" aria-live="off"></div>` : ''}
+    <div class="acts">${o.state === 'unpaid' ? `<a class="btn primary big" href="/s/${esc(TID)}?pay=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}">Try paying again</a>`
+      : `${o.state === 'paid' && o.ticketReady ? `<a class="btn primary big" href="/t/${encodeURIComponent(o.code)}?k=${encodeURIComponent(o.k)}">Open my e-ticket</a>` : o.state === 'reserved' ? `<a class="btn primary big" href="/s/${esc(TID)}?pay=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}">Pay now to lock it in</a>` : ''}
+      <a class="btn big" target="_blank" rel="noopener" href="${gcalLink(o, s, park)}">Add to calendar</a>`}</div>
+    ${next.length ? `<h3 class="nx-h">What happens next</h3><ol class="nxt">${next.map(([w, b, p]) => `<li><span class="w">${w}</span><div><b>${b}</b><p>${p}</p></div></li>`).join('')}</ol>` : ''}
+    ${o.state !== 'unpaid' ? `<div class="invite"><div><b>Travelling with friends?</b><p>Invite them to this same jeep. It also helps the jeep fill up faster.</p></div><div class="acts"><a class="btn ok" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Share on WhatsApp</a><button class="btn" id="shareBtn">Share link</button></div></div>` : ''}
+    ${o.email ? `<p class="tiny muted" style="text-align:center;margin-top:14px">A confirmation is on its way to <b>${esc(o.email)}</b>.</p>` : ''}</div></div>`);
+  const sb = $('#shareBtn'); if (sb) sb.onclick = async () => { try { if (navigator.share) await navigator.share({ title: 'Join my safari jeep', text: msg, url: share }); else { await navigator.clipboard.writeText(share); toast('Link copied') } } catch (e) { } };
+  const cd = $('#count');
+  if (cd) { const tick = () => { const ms = start - Date.now(); if (ms <= 0) { cd.remove(); return } const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60, x = Math.floor(ms / 1e3) % 60;
+    cd.innerHTML = `<span class="lbl">Your pickup is in</span>${[[d, 'days'], [h, 'hours'], [m, 'min'], [x, 'sec']].map(([v, l]) => `<div><b>${pad2(v)}</b><span>${l}</span></div>`).join('')}` }; tick(); setInterval(tick, 1000) }
+  if (o.state !== 'unpaid') confetti();
+}
+/* Falling leaves and petals in safari colours (skipped for reduced motion). */
+function confetti() {
+  if (reduceMotion()) return;
+  const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
+  const x = c.getContext('2d'), W = c.width = innerWidth * devicePixelRatio, H = c.height = innerHeight * devicePixelRatio, cols = ['#c0682a', '#e9a54f', '#5b6b3a', '#3f5a2e', '#f2d27a', '#a64b2a'];
+  const ps = Array.from({ length: 140 }, () => ({ x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35, vx: (Math.random() - .5) * 14 * devicePixelRatio, vy: (-Math.random() * 14 - 6) * devicePixelRatio, r: (4 + Math.random() * 6) * devicePixelRatio, a: Math.random() * 6, va: (Math.random() - .5) * .3, c: cols[Math.floor(Math.random() * cols.length)], leaf: Math.random() < .5 }));
+  let t = 0; (function f() { x.clearRect(0, 0, W, H); t++;
+    ps.forEach(p => { p.vy += .35 * devicePixelRatio; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va; x.save(); x.translate(p.x, p.y); x.rotate(p.a); x.fillStyle = p.c; x.globalAlpha = Math.max(0, 1 - t / 220);
+      if (p.leaf) { x.beginPath(); x.ellipse(0, 0, p.r, p.r * .45, 0, 0, 7); x.fill() } else x.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); x.restore() });
+    if (t < 220) requestAnimationFrame(f); else c.remove() })();
+}
+
 /* ----- Coming back from the payment page, or opening the "pay now" link from the email ----- */
 async function purchase() {
   try { return await GET(`/api/shared/${encodeURIComponent(TID)}/purchase?code=${encodeURIComponent(payCode || doneCode)}&k=${encodeURIComponent(KEY)}`) }
@@ -31,12 +76,7 @@ async function showDone(tries = 0) {
   if (p.cur) fmt = n => fmtCur(n, p.cur);
   if (p.error || p.gone) return frame(`<div class="card bad-link"><h2>We couldn't find that booking</h2><p class="muted">${esc(p.error || 'Those seats are no longer held.')}</p><a class="btn primary" href="/s/${esc(TID)}">Back to the trip</a></div>`);
   if (!p.paid && tries < 20) { frame(`<div class="card bad-link"><div class="spin" aria-hidden="true"></div><h1>Confirming your payment…</h1><p class="muted">This usually takes a few seconds.</p></div>`); return setTimeout(() => showDone(tries + 1), 2500) }
-  const s = SESS[p.ses];
-  frame(`<div class="card fade" style="text-align:center;padding:30px 20px"><div style="width:58px;height:58px;border-radius:50%;margin:0 auto 10px;display:grid;place-items:center;font-size:28px;color:#fff;background:${p.paid ? 'var(--leaf)' : 'var(--warn)'}">${p.paid ? '✓' : '!'}</div><h1>${p.paid ? 'Seat paid' : 'Payment not finished'}</h1>
-  <p class="muted" style="max-width:520px;margin:8px auto 0">${p.paid ? (p.ticketReady ? 'This jeep has enough paid seats, so the safari is on. Your QR e-ticket is on its way by email.' : `You'll get your e-ticket by email when the jeep reaches ${CFG.minSeats} paid seats.`) : `No money was taken. Your seats are held for a short time.`}</p>
-  <p style="margin-top:14px">Booking code <b class="mono">${esc(p.code)}</b> · Seat ${p.seats.join(', ')} · ${esc(s ? s.short : '')} ${shortDate(p.date)}</p>
-  ${p.paid && p.ticketReady ? `<a class="btn primary" href="/t/${encodeURIComponent(p.code)}?k=${encodeURIComponent(p.k)}">Open e-ticket</a>` : ''}
-  ${!p.paid ? `<a class="btn primary" href="/s/${esc(TID)}?pay=${encodeURIComponent(p.code)}&k=${encodeURIComponent(p.k)}">Try paying again</a>` : ''}</div>`);
+  celebrate({ state: p.paid ? 'paid' : 'unpaid', name: p.name, code: p.code, k: p.k, seats: p.seats, date: p.date, ses: p.ses, loc: p.loc, ticketReady: p.ticketReady, minSeats: p.minSeats || CFG.minSeats, payWindowH: p.payWindowH || CFG.payWindowH });
 }
 async function showPayLink() {
   const p = await purchase();
@@ -76,7 +116,8 @@ async function pickSeats() {
     <div class="facts"><div>Time<b>${s.time}</b></div><div>Pickup<b>${s.pickup}</b></div><div>Per seat<b>${fmt(trip.price)}</b></div><div>Seats left<b>${maxSeats - taken.size} of ${maxSeats}</b></div></div>
     <div class="runs"><div class="meter" aria-hidden="true"><span style="width:${trip.paid / maxSeats * 100}%;background:var(--olive)"></span><span style="width:${pend / maxSeats * 100}%;background:#d9a441"></span></div>
     <span class="tag ${need <= 0 ? 'ok' : 'warn'}">${need <= 0 ? 'Safari is on' : `Runs at ${minSeats} paid seats · ${need} to go`}</span></div></div>
-    <div class="stp">${['Seats', 'Details & extras', 'Payment'].map((l, i) => `<span class="${i < step ? 'done' : i === step ? 'on' : ''}">${l}</span>`).join('')}</div>`;
+    <div class="road" aria-label="Step ${step + 1} of 4"><div class="road-line"><i style="width:${(step + .5) / 4 * 100}%"></i><span class="road-jeep" style="left:${(step + .5) / 4 * 100}%">${JEEP('#fff6e6', 30, 19)}</span></div>
+    <div class="road-steps">${['Seats', 'Details', 'Payment', 'E-ticket'].map((l, i) => `<span class="${i < step ? 'done' : i === step ? 'on' : ''}">${i < step ? '✓ ' : ''}${l}</span>`).join('')}</div></div>`;
   }
   function summary() {
     const ss = seatsSorted();
@@ -173,6 +214,7 @@ async function pickSeats() {
       if (on) mine.set(n, Date.now() + trip.holdMin * 60000); else mine.delete(n);
       const ok = await hold(n, on);
       if (ok && navigator.vibrate) navigator.vibrate(15);
+      if (ok && on) toast(`Seat ${n} is yours for ${trip.holdMin} minutes`);
       render();
     });
     if (step === 1) {
@@ -241,10 +283,7 @@ async function pickSeats() {
       const hotel = f.pmode === 'hotel';
       const r = await POST(`/api/shared/${encodeURIComponent(TID)}/seats`, { seats: seatsSorted(), token: TOKEN, name: f.name, cc: f.cc, phone: f.phone, email: f.email, hotel: hotel ? f.hotel : '', lat: hotel ? f.lat : null, lng: hotel ? f.lng : null, meals, bino: f.bino, guide: f.guide, pay: f.pay, provider: f.pay === 'card' ? f.provider : undefined });
       if (r.checkoutUrl) { location.href = r.checkoutUrl; return }
-      frame(`<div class="card fade" style="text-align:center;padding:30px 20px"><div style="width:58px;height:58px;border-radius:50%;margin:0 auto 10px;display:grid;place-items:center;font-size:28px;color:#fff;background:var(--leaf)">✓</div><h1>Seat reserved</h1>
-      <p class="muted" style="max-width:520px;margin:8px auto 0">We'll email you a payment link when ${minSeats} seats are reserved. You'll have ${trip.payWindowH} hours to pay. A confirmation is on its way to <b>${esc(f.email)}</b>.</p>
-      <p style="margin-top:14px">Booking code <b class="mono">${esc(r.code)}</b> · Seat ${r.seats.join(', ')}</p>
-      <a class="btn primary" href="/s/${esc(TID)}?pay=${encodeURIComponent(r.code)}&k=${encodeURIComponent(r.k)}">Pay now to lock it in</a></div>`);
+      celebrate({ state: 'reserved', name: f.name, code: r.code, k: r.k, seats: r.seats, date: trip.date, ses: trip.ses, loc: trip.loc, email: f.email, minSeats, payWindowH: trip.payWindowH });
     } catch (e) {
       b.disabled = false;
       if (e.status === 409 && e.data && e.data.taken) { taken = new Set(e.data.taken); locked = new Set(e.data.locked || []); [...mine.keys()].forEach(n => { if (taken.has(n) || locked.has(n)) mine.delete(n) }); step = 0 }

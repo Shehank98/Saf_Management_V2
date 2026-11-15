@@ -289,7 +289,7 @@ r.get('/shared/:id/purchase', limits.poll, U.wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store').json({
     code, name: fresh.name, seats: fresh.seats.map(s => s.n), amount: fresh.amount, cur: fresh.cur, paid: fresh.alreadyPaid, deadline: fresh.deadline,
     ses: fresh.trip.session_id, date: fresh.trip.date, tripStatus: fresh.trip.status, ticketReady: fresh.alreadyPaid && ['CONFIRMED', 'FULL', 'STARTED'].includes(fresh.trip.status),
-    k: secrets.sign(code), mealPrice: conf.extras.meals ? conf.extras.meals.price : 0,
+    k: secrets.sign(code), mealPrice: conf.extras.meals ? conf.extras.meals.price : 0, loc: fresh.trip.location_id, minSeats: fresh.trip.min_seats, payWindowH: fresh.trip.pay_window_h,
   });
 }));
 
@@ -305,6 +305,9 @@ r.post('/shared/:id/pay', limits.booking, U.wrap(async (req, res) => {
   });
   res.json({ checkoutUrl: url });
 }));
+
+/* ---------------- Home-page photo gallery ---------------- */
+r.get('/gallery', limits.poll, U.wrap(async (req, res) => res.set('Cache-Control', 'public, max-age=300').json(await require('../services/gallery').list())));
 
 /* ---------------- Temporary driver link (one trip, no account) ---------------- */
 async function driveLink(req) {

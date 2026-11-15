@@ -86,6 +86,57 @@ main.wrap{padding:20px 16px 130px;max-width:1040px}
 .how{padding-left:18px;margin:8px 0 0;line-height:1.75}
 .mono{font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}
 .spin{width:38px;height:38px;margin:0 auto 12px;border-radius:50%;border:4px solid var(--sand);border-top-color:var(--ochre);animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+
+/* journey road */
+.road{margin:18px 0 16px}
+.road-line{position:relative;height:30px;margin:0 6%}
+.road-line::before{content:"";position:absolute;left:0;right:0;top:14px;height:3px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--line) 0 10px,transparent 10px 16px)}
+.road-line i{position:absolute;left:0;top:14px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--olive),var(--ochre));animation:roadFill .9s cubic-bezier(.3,.7,.3,1) both}
+@keyframes roadFill{from{width:0}}
+.road-jeep{position:absolute;top:0;transform:translateX(-50%);width:44px;height:30px;border-radius:10px;background:var(--ochre);display:grid;place-items:center;box-shadow:0 6px 14px rgba(150,70,20,.3);animation:roadDrive .9s cubic-bezier(.3,.7,.3,1) both}
+@keyframes roadDrive{from{margin-left:-12%;opacity:.4}}
+.road-steps{display:grid;grid-template-columns:repeat(4,1fr);margin-top:6px;text-align:center}
+.road-steps span{font-size:12.5px;font-weight:700;color:var(--muted)}.road-steps span.on{color:var(--ink)}.road-steps span.done{color:var(--olive)}
+/* celebration */
+.cel{background:var(--card);border:1px solid var(--line);border-radius:24px;overflow:hidden;box-shadow:0 30px 70px rgba(60,30,10,.14);max-width:680px;margin:0 auto}
+.cel-art{position:relative;height:170px;overflow:hidden;background:linear-gradient(180deg,#f7c77e,#ef9a5e)}
+.cel.unpaid .cel-art{background:linear-gradient(180deg,#e6d4b8,#d8b48a)}
+.cel-sun{position:absolute;left:50%;top:40px;width:120px;height:120px;margin-left:-60px;border-radius:50%;background:radial-gradient(circle,#fff7d6 0 30%,#ffd98a 31% 45%,rgba(255,217,138,0) 70%);animation:celSun 2.2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes celSun{from{transform:translateY(90px)}}
+.cel-hill{position:absolute;left:-10%;right:-10%;border-radius:50% 50% 0 0}
+.cel-hill.h1{bottom:-40px;height:110px;background:#8b6c42;opacity:.75}
+.cel-hill.h2{bottom:-60px;height:110px;background:#4f5a2c}
+.cel-jeep{position:absolute;bottom:22px;left:50%;margin-left:-43px;animation:celDrive 1.6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes celDrive{from{transform:translateX(-420px)}to{transform:translateX(-110px)}}
+.cel-jeep{animation-fill-mode:forwards}
+.cel-badge{position:absolute;right:calc(50% - 150px);bottom:40px;width:64px;height:64px;border-radius:50%;background:var(--leaf);color:#fff;font:800 30px Inter,sans-serif;display:grid;place-items:center;box-shadow:0 0 0 6px rgba(255,255,255,.55);animation:celPop .7s 1.2s cubic-bezier(.3,1.7,.5,1) both}
+.cel.unpaid .cel-badge{background:var(--warn)}
+@keyframes celPop{from{transform:scale(0)}}
+.cel-body{padding:24px 24px 26px}
+.cel-body h1{font-size:clamp(24px,4vw,32px);text-align:center}
+.cel-body>p.muted{text-align:center;max-width:520px;margin:8px auto 0;line-height:1.6}
+.stub{display:grid;grid-template-columns:1fr auto;margin:20px 0 6px;border:1.5px dashed var(--line);border-radius:18px;background:var(--paper);position:relative}
+.stub::before,.stub::after{content:"";position:absolute;right:135px;width:22px;height:22px;border-radius:50%;background:var(--card);border:1.5px dashed var(--line)}
+.stub::before{top:-12px}.stub::after{bottom:-12px}
+.stub-l{padding:16px 18px;display:grid;gap:2px}.stub-l .eb{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ochre)}.stub-l>b{font:700 19px Fraunces,Georgia,serif}.stub-l>span:not(.eb){color:var(--muted);font-size:14px}
+.stub-row{display:grid;grid-template-columns:repeat(3,auto);gap:16px;margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.stub-row b{display:block;color:var(--ink);font-size:14px;letter-spacing:0;text-transform:none}
+.stub-r{width:146px;border-left:1.5px dashed var(--line);display:grid;place-content:center;text-align:center;padding:12px;gap:4px}.stub-r span{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}.stub-r b{font-size:16px}
+@media (max-width:520px){.stub{grid-template-columns:1fr}.stub-r{width:auto;border-left:0;border-top:1.5px dashed var(--line)}.stub::before,.stub::after{display:none}.stub-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.count{display:flex;align-items:center;justify-content:center;gap:8px;margin:16px 0 4px;flex-wrap:wrap}
+.count .lbl{width:100%;text-align:center;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.count div{min-width:64px;padding:8px 6px;border-radius:12px;background:var(--sand);text-align:center}.count b{display:block;font:700 24px Fraunces,Georgia,serif;font-variant-numeric:tabular-nums}.count span{font-size:11px;color:var(--muted);font-weight:700}
+.cel .acts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.cel .btn.big{min-height:50px;padding:12px 22px}
+.nx-h{font-size:17px;margin:24px 0 10px}
+.nxt{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.nxt li{display:grid;grid-template-columns:96px 1fr;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.nxt .w{font-size:12px;font-weight:800;color:var(--ochre);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}.nxt b{font-size:15px}.nxt p{margin:2px 0 0;font-size:13.5px;color:var(--muted)}
+.invite{margin-top:18px;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--olive) 10%,var(--card));display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.invite p{margin:2px 0 0;font-size:13.5px;color:var(--muted)}.invite .acts{margin:0}
+.cel .btn.ok{background:#25a244;border-color:#25a244;color:#fff}
+@media (max-width:520px){.nxt li{grid-template-columns:1fr;gap:2px}.invite .acts{width:100%}.invite .acts .btn{flex:1}}
+.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:200}
+@media (prefers-reduced-motion:reduce){.cel *{animation:none!important}}
 </style>
 </head>
 <body>

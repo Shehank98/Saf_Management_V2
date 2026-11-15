@@ -641,3 +641,29 @@ test('partner applications without documents: meal supplier and tracker get thei
   const scan = await api('POST', '/api/checkin', { code: 'YWS-ML01X', preview: true }, await login('tracker@x.lk'));
   assert.equal(scan.json.kind, 'bad');
 });
+
+test('photo gallery: owner uploads photos, site shows them instead of the bundled ones, hide and delete work', async () => {
+  const before = (await api('GET', '/api/gallery')).json;
+  assert.equal(before.own, false, 'bundled photos until the owner adds some');
+  // smallest valid JPEG
+  const jpg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==', 'base64');
+  const fd = new FormData();
+  fd.append('photos', new Blob([jpg], { type: 'image/jpeg' }), 'leopard.jpg');
+  fd.append('photos', new Blob([jpg], { type: 'image/jpeg' }), 'elephant.jpg');
+  fd.append('title', 'Leopard at dawn'); fd.append('credit', 'Office team');
+  const up = await fetch(base + '/api/admin/gallery', { method: 'POST', headers: { Cookie: adminCookie }, body: fd });
+  assert.equal(up.status, 201);
+  const ids = (await up.json()).ids; assert.equal(ids.length, 2);
+  const bad = new FormData(); bad.append('photos', new Blob(['hello'], { type: 'text/plain' }), 'x.txt');
+  assert.equal((await fetch(base + '/api/admin/gallery', { method: 'POST', headers: { Cookie: adminCookie }, body: bad })).status, 400, 'only images');
+  const site = (await api('GET', '/api/gallery')).json;
+  assert.equal(site.own, true); assert.equal(site.photos.length, 2); assert.equal(site.photos[0].title, 'Leopard at dawn');
+  const img = await fetch(base + site.photos[0].src); assert.equal(img.status, 200); assert.equal(img.headers.get('content-type'), 'image/jpeg');
+  assert.equal((await admin('PUT', `/api/admin/gallery/${ids[1]}`, { move: 'up' })).status, 200);
+  assert.equal((await api('GET', '/api/gallery')).json.photos[0].src, `/gallery/${ids[1]}`, 'reordered');
+  await admin('PUT', `/api/admin/gallery/${ids[0]}`, { active: false });
+  assert.equal((await api('GET', '/api/gallery')).json.photos.length, 1, 'hidden photo not shown');
+  assert.equal((await fetch(base + `/gallery/${ids[0]}`)).status, 404);
+  for (const id of ids) await admin('DELETE', `/api/admin/gallery/${id}`);
+  assert.equal((await api('GET', '/api/gallery')).json.own, false, 'back to bundled photos');
+});

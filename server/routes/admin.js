@@ -137,6 +137,18 @@ r.post('/jobs/temp-driver', staff, U.wrap(async (req, res) => {
 }));
 r.post('/jobs/temp-driver/:id/revoke', staff, U.wrap(async (req, res) => { await require('../services/tempDrivers').revoke(req.params.id, { name: who(req) }); res.json({ ok: true }); }));
 
+/* ---------------- Photo gallery (home page) ---------------- */
+const galleryUpload = require('multer')({ storage: require('multer').memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 12 } });
+r.get('/gallery', staff, U.wrap(async (req, res) => res.json(await require('../services/gallery').adminList())));
+r.post('/gallery', owner, galleryUpload.array('photos', 12), U.wrap(async (req, res) => {
+  const g = require('../services/gallery'); const ids = [];
+  for (const f of req.files || []) ids.push(await g.add(f, { title: req.body.title, credit: req.body.credit }));
+  if (!ids.length) throw U.bad('Choose at least one photo.');
+  res.status(201).json({ ids });
+}));
+r.put('/gallery/:id', owner, U.wrap(async (req, res) => { await require('../services/gallery').update(req.params.id, req.body || {}); res.json({ ok: true }); }));
+r.delete('/gallery/:id', owner, U.wrap(async (req, res) => { await require('../services/gallery').remove(req.params.id); res.json({ ok: true }); }));
+
 /* ---------------- Partners & payouts ---------------- */
 r.post('/partners/:id/approve', staff, U.wrap(async (req, res) => { await partners.approve(+req.params.id, req.body, who(req)); res.json({ ok: true }); }));
 r.post('/partners/:id/reject', staff, U.wrap(async (req, res) => { await partners.reject(+req.params.id, req.body.reason, who(req)); res.json({ ok: true }); }));

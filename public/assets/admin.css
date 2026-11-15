@@ -278,3 +278,10 @@ table.t tbody tr:hover{background:var(--sand)}
 .rg.on{opacity:.75}.rg.on .no{background:var(--ok-bg);color:var(--ok)}
 .rg.nx{border:2px solid var(--info);box-shadow:0 0 0 3px color-mix(in srgb,var(--info) 15%,transparent)}.rg.nx .no{background:var(--info);color:#fff}
 .rg .ra{grid-column:2;display:flex;gap:6px;flex-wrap:wrap}
+
+/* settings: photo gallery */
+.glgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.glitem{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}.glitem.off{opacity:.5}
+.glitem img{width:100%;aspect-ratio:3/2;object-fit:cover;display:block}
+.glmeta{padding:10px;display:grid;gap:6px}.glmeta .inp{min-height:36px;padding:6px 10px;font-size:13px}
+.glacts{display:flex;gap:6px;flex-wrap:wrap}

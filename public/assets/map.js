@@ -5,7 +5,7 @@ const inSriLanka = (lat, lng) => lat >= SL.bounds[0][0] && lat <= SL.bounds[1][0
 /** A map that cannot be dragged away from Sri Lanka. */
 function slMap(el, { center, zoom = 12 } = {}) {
   const map = L.map(el, { scrollWheelZoom: false, tap: true, minZoom: 7, maxBounds: L.latLngBounds(SL.bounds).pad(0.05), maxBoundsViscosity: 1 });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }).addTo(map);
   map.setView(center || SL.center, center ? zoom : 8);
   return map;
 }

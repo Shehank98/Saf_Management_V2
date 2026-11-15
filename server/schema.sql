@@ -443,3 +443,17 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS payments_money ON payments;
 CREATE TRIGGER payments_money BEFORE INSERT ON payments FOR EACH ROW EXECUTE FUNCTION yws_money_payment();
+
+-- Photo gallery on the home page. Owners upload their own safari photos in Settings > Photo gallery.
+CREATE TABLE IF NOT EXISTS gallery_photos (
+  id         serial PRIMARY KEY,
+  title      text NOT NULL DEFAULT '',
+  credit     text NOT NULL DEFAULT '',
+  credit_url text,
+  license    text,
+  mime       text NOT NULL,
+  data       bytea NOT NULL,
+  sort       int NOT NULL DEFAULT 0,
+  active     boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);

@@ -155,6 +155,33 @@ body{background:var(--paper);overflow-x:clip}
 .ssbody h3{font-size:21px}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}.kv div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.kv b{display:block;font-size:15px;letter-spacing:0;text-transform:none;color:var(--ink);margin-top:2px}
 .best{font-size:14px;color:var(--muted);margin:0}.best b{color:var(--ink)}
+
+/* gallery */
+.galgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:190px;grid-auto-flow:dense;gap:12px}
+.gi{position:relative;overflow:hidden;border-radius:16px;cursor:zoom-in;background:var(--sand);border:0;padding:0}
+.gi.big{grid-column:span 2;grid-row:span 2}.gi.wide{grid-column:span 2}
+.gi img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .7s cubic-bezier(.2,.7,.2,1),filter .4s;filter:saturate(1.02)}
+.gi:hover img,.gi:focus-visible img{transform:scale(1.06);filter:saturate(1.12)}
+.gi::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(15,10,5,.65));opacity:.85;transition:opacity .3s}
+.gi .cap{position:absolute;left:14px;right:14px;bottom:12px;z-index:1;color:#fff6e8;text-align:left;font-weight:700;font-size:14px;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+.gi .cap small{display:block;font-weight:500;font-size:11px;opacity:.8;margin-top:2px}
+.galnote{text-align:center;font-size:12px;color:var(--muted);margin:16px 0 0}
+.galnote a{color:inherit}
+@media (max-width:900px){.galgrid{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:160px}}
+@media (max-width:520px){.galgrid{grid-auto-rows:130px;gap:8px}.gi.big{grid-column:span 2;grid-row:span 2}.gi.wide{grid-column:span 2}.gi .cap{font-size:12.5px;left:10px;bottom:8px}}
+/* lightbox */
+.lb{position:fixed;inset:0;z-index:120;background:rgba(12,8,4,.94);display:flex;align-items:center;justify-content:center;padding:20px;animation:lbIn .25s ease}
+.lb[hidden]{display:none}
+@keyframes lbIn{from{opacity:0}}
+.lb figure{margin:0;max-width:min(1200px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center}
+.lb img{max-width:100%;max-height:calc(100vh - 140px);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:lbImg .35s cubic-bezier(.2,.7,.2,1)}
+@keyframes lbImg{from{transform:scale(.96);opacity:0}}
+.lb figcaption{color:#efe3cf;text-align:center;margin-top:14px;font-size:14px;display:grid;gap:3px}
+.lb figcaption b{font-size:16px;color:#fff6e8}.lbi{font-size:12px;opacity:.65}.lbi a{color:inherit}
+.lbx,.lbn{position:absolute;border:0;background:rgba(255,255,255,.12);color:#fff;border-radius:50%;width:48px;height:48px;font-size:28px;line-height:1;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(6px)}
+.lbx{top:16px;right:16px}.lbp{left:16px;top:50%;margin-top:-24px}.lbnx{right:16px;top:50%;margin-top:-24px}
+.lbx:hover,.lbn:hover{background:rgba(255,255,255,.22)}
+@media (max-width:600px){.lbn{width:40px;height:40px;font-size:24px;top:auto;bottom:20px;margin:0}.lbp{left:calc(50% - 50px)}.lbnx{right:calc(50% - 50px)}.lb img{max-height:calc(100vh - 200px)}}
 /* how */
 .howwrap{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
 @media (max-width:900px){.howwrap{grid-template-columns:1fr}}
@@ -233,7 +260,7 @@ body{background:var(--paper);overflow-x:clip}
   <div class="wrap navrow">
     <a class="brand" href="/"><span class="mk"><svg viewBox="0 0 40 24" width="26" height="16" aria-hidden="true"><path d="M2 14 L6 9 L11 8 L13 3 L33 3 L35 8 L39 9 L39 18 L1 18 Z" fill="currentColor"/><circle cx="10" cy="19" r="4" fill="currentColor"/><circle cx="31" cy="19" r="4" fill="currentColor"/></svg></span><span data-cfg="brand">Safaris</span></a>
     <nav class="links" id="links" aria-label="Main">
-      <a href="#parks">Parks</a><a href="#sessions">Sessions</a><a href="#how">How it works</a><a href="#day">Your day</a><a href="#faq">FAQ</a>
+      <a href="#parks">Parks</a><a href="#sessions">Sessions</a><a href="#gallery">Gallery</a><a href="#how">How it works</a><a href="#day">Your day</a><a href="#faq">FAQ</a>
     </nav>
     <div class="navcta"><button class="iconbtn" data-theme-toggle aria-label="Switch light or dark theme"></button><a class="btn primary sm" href="/shared">Book a seat</a><button class="iconbtn menu" id="menuBtn" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div>
   </div>
@@ -373,6 +400,21 @@ body{background:var(--paper);overflow-x:clip}
     <div class="sessgrid" id="sessGrid"></div>
   </div>
 </section>
+
+<section class="sec gal" id="gallery" hidden>
+  <div class="wrap">
+    <div class="sh rv"><span class="kicker">Gallery</span><h2>Moments from the wild</h2><p>Real moments from Sri Lanka's national parks. Tap a photo to see it full screen.</p></div>
+    <div class="galgrid" id="galGrid"></div>
+    <p class="galnote" id="galNote"></p>
+  </div>
+</section>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
+  <button class="lbx" id="lbX" aria-label="Close">×</button>
+  <button class="lbn lbp" id="lbP" aria-label="Previous photo">‹</button>
+  <figure><img id="lbImg" alt=""><figcaption><b id="lbT"></b><span id="lbC"></span><span class="lbi" id="lbI"></span></figcaption></figure>
+  <button class="lbn lbnx" id="lbN" aria-label="Next photo">›</button>
+</div>
 
 <section class="sec" id="how">
   <div class="wrap howwrap">

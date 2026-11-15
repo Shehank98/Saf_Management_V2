@@ -162,6 +162,33 @@ if (!reduceMotion()) {
   document.addEventListener('visibilitychange', () => { try { document.hidden ? scene.pauseAnimations() : scene.unpauseAnimations() } catch (x) { } });
 } else { try { scene.pauseAnimations() } catch (x) { } }
 
+
+/* ---------- gallery + lightbox ---------- */
+(async function gallery() {
+  let g; try { g = await GET('/api/gallery') } catch (e) { return }
+  const ph = (g.photos || []).slice(0, 12); if (!ph.length) return;
+  $('#gallery').hidden = false;
+  const shape = i => (i === 0 ? 'big' : i % 5 === 3 ? 'wide' : '');
+  $('#galGrid').innerHTML = ph.map((p, i) => `<button type="button" class="gi rv ${shape(i)}" data-i="${i}" aria-label="Open photo: ${esc(p.title || 'safari photo')}"><img src="${esc(p.thumb || p.src)}" alt="${esc(p.title || 'Safari photo')}" loading="lazy" decoding="async">${p.title ? `<span class="cap">${esc(p.title)}${p.credit ? `<small>Photo: ${esc(p.credit)}</small>` : ''}</span>` : ''}</button>`).join('');
+  $('#galNote').innerHTML = g.own ? '' : 'Photos from Wikimedia Commons, used under their Creative Commons licences. Tap a photo for the photographer and licence.';
+  observe();
+  let cur = 0, sx = null;
+  const lb = $('#lb'), show = i => {
+    cur = (i + ph.length) % ph.length; const p = ph[cur];
+    $('#lbImg').src = p.src; $('#lbImg').alt = p.title || 'Safari photo';
+    $('#lbT').textContent = p.title || '';
+    $('#lbC').textContent = p.credit ? 'Photo: ' + p.credit : '';
+    $('#lbI').innerHTML = p.license ? `${p.creditUrl ? `<a href="${esc(p.creditUrl)}" target="_blank" rel="noopener">${esc(p.license)} · source</a>` : esc(p.license)} · ${cur + 1} / ${ph.length}` : `${cur + 1} / ${ph.length}`;
+  };
+  const open = i => { show(i); lb.hidden = false; document.body.style.overflow = 'hidden'; $('#lbX').focus() };
+  const close = () => { lb.hidden = true; document.body.style.overflow = ''; const b = $(`.gi[data-i="${cur}"]`); if (b) b.focus() };
+  $$('.gi').forEach(b => b.onclick = () => open(+b.dataset.i));
+  $('#lbX').onclick = close; $('#lbP').onclick = () => show(cur - 1); $('#lbN').onclick = () => show(cur + 1);
+  lb.onclick = e => { if (e.target === lb) close() };
+  addEventListener('keydown', e => { if (lb.hidden) return; if (e.key === 'Escape') close(); if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1) });
+  lb.addEventListener('touchstart', e => { sx = e.touches[0].clientX }, { passive: true });
+  lb.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(cur + (dx < 0 ? 1 : -1)); sx = null });
+})();
 motes(hero, 16);
 parks(); pick(loc);
 requestAnimationFrame(() => $$('.hero .rv').forEach(el => el.classList.add('in')));

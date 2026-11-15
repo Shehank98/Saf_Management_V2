@@ -125,6 +125,32 @@ const SECTIONS = {
     setTimeout(() => map.invalidateSize(), 200);
   }],
 
+  gallery: ['Photo gallery', () => `<h3>Photo gallery</h3><p class="small muted" style="margin-bottom:12px">Photos shown in the gallery on your home page. Use your own safari photos (your jeeps, real sightings, happy guests). Until you add some, the site shows free-licence photos of Yala with credits.</p>
+  ${RO ? '' : `<div class="card" style="padding:14px;margin-bottom:14px"><div class="g2f"><div class="field"><label for="gl_title">Caption (optional)</label><input class="inp" id="gl_title" placeholder="Leopard at dawn, Block 1"></div><div class="field"><label for="gl_credit">Photo by (optional)</label><input class="inp" id="gl_credit" placeholder="Your name or the guest's name"></div></div>
+  <label class="btn primary" style="cursor:pointer">Upload photos<input type="file" id="gl_files" accept="image/jpeg,image/png,image/webp" multiple hidden></label><span class="tiny muted" style="margin-left:8px">JPG, PNG or WebP, up to 8 MB each. Landscape photos look best.</span></div>`}
+  <div id="gl_list"><p class="small muted">Loading…</p></div>`, () => ({}), 'gallery',
+  async () => {
+    const draw = async () => {
+      let d; try { d = await GET('/api/admin/gallery') } catch (e) { $('#gl_list').innerHTML = `<p class="small" style="color:var(--bad)">${esc(e.message)}</p>`; return }
+      $('#gl_list').innerHTML = d.photos.length ? `<div class="glgrid">${d.photos.map((ph, i) => `<div class="glitem ${ph.active ? '' : 'off'}"><img src="${ph.src}" alt="${esc(ph.title)}" loading="lazy"><div class="glmeta"><input class="inp" data-t="${ph.id}" value="${esc(ph.title)}" placeholder="Caption" ${dis}><input class="inp" data-c="${ph.id}" value="${esc(ph.credit)}" placeholder="Photo by" ${dis}>
+        ${RO ? '' : `<div class="glacts"><button class="btn sm" data-up="${ph.id}" ${i ? '' : 'disabled'} title="Move earlier">↑</button><button class="btn sm" data-dn="${ph.id}" ${i < d.photos.length - 1 ? '' : 'disabled'} title="Move later">↓</button><button class="btn sm" data-tg="${ph.id}" data-on="${ph.active ? 1 : 0}">${ph.active ? 'Hide' : 'Show'}</button><button class="btn sm danger" data-del="${ph.id}">Delete</button></div>`}</div></div>`).join('')}</div>`
+        : `<div class="empty">No photos of your own yet. The home page is showing ${d.bundled} free-licence photos.</div>`;
+      $$('[data-up]').forEach(b => b.onclick = () => act(() => PUT(`/api/admin/gallery/${b.dataset.up}`, { move: 'up' })).then(draw));
+      $$('[data-dn]').forEach(b => b.onclick = () => act(() => PUT(`/api/admin/gallery/${b.dataset.dn}`, { move: 'down' })).then(draw));
+      $$('[data-tg]').forEach(b => b.onclick = () => act(() => PUT(`/api/admin/gallery/${b.dataset.tg}`, { active: b.dataset.on !== '1' }), 'Updated').then(draw));
+      $$('[data-del]').forEach(b => b.onclick = () => { if (confirm('Delete this photo?')) act(() => DEL(`/api/admin/gallery/${b.dataset.del}`), 'Photo deleted').then(draw) });
+      $$('[data-t],[data-c]').forEach(i => i.onchange = () => act(() => PUT(`/api/admin/gallery/${i.dataset.t || i.dataset.c}`, i.dataset.t ? { title: i.value } : { credit: i.value }), 'Saved'));
+    };
+    const fi = $('#gl_files');
+    if (fi) fi.onchange = async () => {
+      if (!fi.files.length) return;
+      const n = fi.files.length;
+      const fd = new FormData(); [...fi.files].forEach(x => fd.append('photos', x)); fd.append('title', $('#gl_title').value); fd.append('credit', $('#gl_credit').value);
+      try { toast('Uploading…'); await api('POST', '/api/admin/gallery', fd); toast(`${n} photo${n > 1 ? 's' : ''} added`); fi.value = ''; draw() } catch (e) { toastErr(e) }
+    };
+    draw();
+  }],
+
   team: ['Team', () => `<h3>Team</h3><p class="small muted" style="margin-bottom:10px">People who can log in to this admin panel. Staff can manage bookings and check-ins. Only owners can change prices and settings.</p>
   ${IS_OWNER ? `<table class="t"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead><tbody>${TEAM.map(u => `<tr><td><b>${esc(u.name)}</b>${u.id === ME.id ? ' <span class="tiny muted">(you)</span>' : ''}${u.active ? '' : ' <span class="tag bad">off</span>'}</td><td class="small">${esc(u.email)}</td><td><select class="inp tr" data-u="${u.id}" style="min-height:34px;padding:4px 8px" ${u.id === ME.id ? 'disabled' : ''}><option value="STAFF" ${u.role === 'STAFF' ? 'selected' : ''}>Staff</option><option value="OWNER" ${u.role === 'OWNER' ? 'selected' : ''}>Owner</option></select></td><td style="white-space:nowrap"><button class="btn sm" data-pw="${u.id}">Reset password</button>${u.id === ME.id ? '' : ` <button class="btn sm" data-act="${u.id}" data-on="${u.active ? 1 : 0}">${u.active ? 'Turn off' : 'Turn on'}</button>`}</td></tr>`).join('')}</tbody></table>
   <div class="sec-t">Add a person</div><div class="g2f"><div class="field"><label>Name</label><input class="inp" id="t_name"></div><div class="field"><label>Email</label><input class="inp" id="t_email" type="email"></div><div class="field"><label>Temporary password (8+ characters)</label><input class="inp" id="t_pw" type="text" autocomplete="off"></div><div class="field"><label>Role</label><select class="inp" id="t_role"><option value="STAFF">Staff</option><option value="OWNER">Owner</option></select></div></div><button class="btn sm primary" id="t_add">Add person</button>
@@ -150,7 +176,7 @@ function render() {
     $$('#pane input,#pane select').forEach(i => i.addEventListener('input', () => dirty = true));
   }
   if (sec[4]) sec[4]();
-  const hasSave = (cur !== 'team' && !RO) || (cur === 'team' && IS_OWNER);
+  const hasSave = (cur !== 'team' && cur !== 'gallery' && !RO) || (cur === 'team' && IS_OWNER);
   $('.savebar').style.display = hasSave ? '' : 'none';
 }
 $('#save').onclick = async e => {
