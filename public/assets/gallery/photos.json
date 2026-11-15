@@ -1,0 +1,90 @@
+[
+ {
+  "src": "/assets/gallery/01.jpg",
+  "thumb": "/assets/gallery/01-s.jpg",
+  "title": "An elephant family at the water",
+  "credit": "C.J.Hatton",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Sri_Lankan_Elephants_in_Yala_National_Park.jpg"
+ },
+ {
+  "src": "/assets/gallery/02.jpg",
+  "thumb": "/assets/gallery/02-s.jpg",
+  "title": "A leopard waking up",
+  "credit": "Manelka Jayasundara",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Leopard_at_Yala_National_Park.jpg"
+ },
+ {
+  "src": "/assets/gallery/03.jpg",
+  "thumb": "/assets/gallery/03-s.jpg",
+  "title": "A baby elephant",
+  "credit": "C.J.Hatton",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Baby_Sri_Lankan_Elephant_at_Yala_National_Park.jpg"
+ },
+ {
+  "src": "/assets/gallery/04.jpg",
+  "thumb": "/assets/gallery/04-s.jpg",
+  "title": "Blue-tailed bee-eater",
+  "credit": "Charles J. Sharp",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Blue-tailed_bee-eater_(Merops_philippinus)_Yala.jpg"
+ },
+ {
+  "src": "/assets/gallery/05.jpg",
+  "thumb": "/assets/gallery/05-s.jpg",
+  "title": "Sunset over Yala",
+  "credit": "Pramod Thilanka",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Yala_forest.jpg"
+ },
+ {
+  "src": "/assets/gallery/06.jpg",
+  "thumb": "/assets/gallery/06-s.jpg",
+  "title": "On the road into the park",
+  "credit": "Shafne",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Jeep_safari_inside_Yala_National_Park.jpg"
+ },
+ {
+  "src": "/assets/gallery/07.jpg",
+  "thumb": "/assets/gallery/07-s.jpg",
+  "title": "Mugger crocodile on the bank",
+  "credit": "Schnobby",
+  "license": "CC BY-SA 3.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Crocodile_in_Yala_National_Park_1.jpg"
+ },
+ {
+  "src": "/assets/gallery/08.jpg",
+  "thumb": "/assets/gallery/08-s.jpg",
+  "title": "A peacock at sunset",
+  "credit": "Sachin Kaveesha Fernando",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Peacock_at_Yala_National_Park.jpg"
+ },
+ {
+  "src": "/assets/gallery/09.jpg",
+  "thumb": "/assets/gallery/09-s.jpg",
+  "title": "Safari jeeps in the park",
+  "credit": "Balou46",
+  "license": "CC BY-SA 3.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:LK-yala-jeeps.jpg"
+ },
+ {
+  "src": "/assets/gallery/10.jpg",
+  "thumb": "/assets/gallery/10-s.jpg",
+  "title": "Green bee-eater",
+  "credit": "Eli Solidum",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Asian_Green_Bee-eater_at_Yala_National_Park,_Sri_Lanka_1.jpg"
+ },
+ {
+  "src": "/assets/gallery/11.jpg",
+  "thumb": "/assets/gallery/11-s.jpg",
+  "title": "Spot the leopard",
+  "credit": "Eli Solidum",
+  "license": "CC BY-SA 4.0",
+  "creditUrl": "https://commons.wikimedia.org/wiki/File:Sri_Lankan_Leopard_At_Yala_National_Park.jpg"
+ }
+]

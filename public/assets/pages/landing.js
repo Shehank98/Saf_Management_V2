@@ -170,10 +170,11 @@ if (!reduceMotion()) {
   $('#gallery').hidden = false;
   const shape = i => (i === 0 ? 'big' : i % 5 === 3 ? 'wide' : '');
   $('#galGrid').innerHTML = ph.map((p, i) => `<button type="button" class="gi rv ${shape(i)}" data-i="${i}" aria-label="Open photo: ${esc(p.title || 'safari photo')}"><img src="${esc(p.thumb || p.src)}" alt="${esc(p.title || 'Safari photo')}" loading="lazy" decoding="async">${p.title ? `<span class="cap">${esc(p.title)}${p.credit ? `<small>Photo: ${esc(p.credit)}</small>` : ''}</span>` : ''}</button>`).join('');
-  $('#galNote').innerHTML = g.own ? '' : 'Photos from Wikimedia Commons, used under their Creative Commons licences. Tap a photo for the photographer and licence.';
+  $('#galNote').innerHTML = g.own ? '' : 'Photos from Wikimedia Commons, used under their Creative Commons licences (resized for the web). Tap a photo for the photographer, licence and source.';
   observe();
   let cur = 0, sx = null;
-  const lb = $('#lb'), show = i => {
+  const lb = $('#lb'); document.body.appendChild(lb); // fixed overlay must not sit inside an animated (transformed) container
+  const show = i => {
     cur = (i + ph.length) % ph.length; const p = ph[cur];
     $('#lbImg').src = p.src; $('#lbImg').alt = p.title || 'Safari photo';
     $('#lbT').textContent = p.title || '';
