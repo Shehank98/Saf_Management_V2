@@ -9,11 +9,20 @@ const when=t=>['Upcoming','Cancelled'].includes(t.status)?(t.bookedOn||t.date):t
 const counted=t=>['Completed','Started','Cancelled','Upcoming'].includes(t.status);
 const done=()=>allTrips().filter(t=>counted(t)&&inRange(when(t)));
 const received=()=>CUSTOMER_PAYMENTS.filter(r=>inRange(r.d)&&!r.pendingRefund).reduce((a,r)=>a+r.amt,0);
+const refundsOut=()=>CUSTOMER_PAYMENTS.filter(r=>inRange(r.d)&&r.amt<0&&!r.pendingRefund).reduce((a,r)=>a-r.amt,0);
+const paidOut=()=>payoutLines().filter(l=>l.paid&&l.paidAt&&inRange(l.paidAt)).reduce((a,l)=>a+l.amount,0);
+const toCollect=()=>BOOKINGS.filter(b=>['Confirmed','Deposit paid','Request','Started'].includes(b.status)).reduce((a,b)=>a+Math.max(0,b.total-b.paid)*(b.fx||1),0);
+function flowPanel(){const inn=received(),ref=refundsOut(),out=paidOut(),left=inn-out;const owed=payoutLines().filter(l=>!l.paid).reduce((a,l)=>a+l.amount,0),coll=toCollect();
+  return `<div class="panel flow"><div class="ph"><h3>Where the money is</h3><span class="small muted">${RANGES.find(r=>r[0]===range)[1]}</span></div><div class="pb"><div class="flowrow">
+  <button class="fstep in" data-go="incoming"><span class="fl">Came in</span><b>${fmt(inn)}</b><span class="tiny">from guests${ref?` (refunds ${fmt(ref)} already taken off)`:''} · tap for details</span></button><span class="farr">−</span>
+  <button class="fstep out" data-go="payouts"><span class="fl">Went out</span><b>${fmt(out)}</b><span class="tiny">paid to partners · tap for details</span></button><span class="farr">=</span>
+  <div class="fstep left ${left<0?'neg':''}"><span class="fl">Cash left</span><b>${fmt(left)}</b><span class="tiny">money in the business</span></div></div>
+  <div class="flowsoon"><span>Still to come in: <b>${fmt(coll)}</b> <span class="muted">guests pay at pickup</span></span><span>Still to pay out: <b>${fmt(owed)}</b> <span class="muted">owed to partners</span></span></div></div></div>`}
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'-';
 const k=n=>n>=1e6?(n/1e6).toFixed(1)+'M':Math.round(n/1000)+'k';
 function countUp(el,to,f=fmt){const t0=performance.now();const step=t=>{const p=Math.min(1,(t-t0)/900),e=1-Math.pow(1-p,3);el.textContent=f(to*e);if(p<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
 function shell(){
-  $('#tabs').innerHTML=[['overview','Overview'],['trips','Profit per trip'],['payouts','Partner payouts'],['incoming','Customer payments']].map(([k,l])=>`<button data-k="${k}" class="${k===tab?'on':''}">${l}</button>`).join('');
+  $('#tabs').innerHTML=[['overview','Overview'],['incoming','Money in · guests'],['payouts','Money out · partners'],['trips','Profit per trip']].map(([k,l])=>`<button data-k="${k}" class="${k===tab?'on':''}">${l}</button>`).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.k;render()});
   $('#range').innerHTML=RANGES.map(([k,l])=>`<button data-r="${k}" class="${k===range?'on':''}">${l}</button>`).join('');
   $$('#range button').forEach(b=>b.onclick=()=>{range=b.dataset.r;render()});
@@ -23,10 +32,11 @@ function render(){shell();({overview,trips,payouts,incoming})[tab]()}
 /* ---------- Overview ---------- */
 function overview(){
   const T=done(),rev=T.reduce((a,t)=>a+t.revenue,0),cost=T.reduce((a,t)=>a+t.cost.total,0),prof=rev-cost,owed=payoutLines().filter(l=>!l.paid).reduce((a,l)=>a+l.amount,0);
-  $('#pane').innerHTML=`<div class="kpis"><div class="kpi"><div class="l">Money received</div><div class="v" id="k0"></div><div class="d muted">card, cash and bank, after refunds</div></div><div class="kpi"><div class="l">Sales</div><div class="v" id="k1"></div><div class="d muted">${T.filter(t=>t.status!=='Upcoming').length} run · ${T.filter(t=>t.status==='Upcoming').length} upcoming</div></div><div class="kpi"><div class="l">Partner costs</div><div class="v" id="k2"></div><div class="d muted">jeeps, trackers, meals</div></div><div class="kpi hero"><div class="l">Profit</div><div class="v" id="k3"></div><div class="d muted">margin ${pct(prof,rev)}${T.some(t=>t.est)?' · upcoming costs estimated':''}</div></div><div class="kpi"><div class="l">Still owed to partners</div><div class="v" id="k4"></div><div class="d"><a href="#" id="gopay">Pay partners →</a></div></div></div>
+  $('#pane').innerHTML=flowPanel()+`<div class="kpis" style="margin-top:14px"><div class="kpi"><div class="l">Money received</div><div class="v" id="k0"></div><div class="d muted">card, cash and bank, after refunds</div></div><div class="kpi"><div class="l">Sales</div><div class="v" id="k1"></div><div class="d muted">${T.filter(t=>t.status!=='Upcoming').length} run · ${T.filter(t=>t.status==='Upcoming').length} upcoming</div></div><div class="kpi"><div class="l">Partner costs</div><div class="v" id="k2"></div><div class="d muted">jeeps, trackers, meals</div></div><div class="kpi hero"><div class="l">Profit</div><div class="v" id="k3"></div><div class="d muted">margin ${pct(prof,rev)}${T.some(t=>t.est)?' · upcoming costs estimated':''}</div></div><div class="kpi"><div class="l">Still owed to partners</div><div class="v" id="k4"></div><div class="d"><a href="#" id="gopay">Pay partners →</a></div></div></div>
   <div class="two"><div class="panel"><div class="ph"><h3>Revenue split by week</h3><span class="small muted">bar height = revenue</span></div><div class="pb"><div class="legend"><span><i style="background:var(--c-profit)"></i>Profit</span><span><i style="background:var(--c-cost)"></i>Partner costs</span></div><div class="chart" id="chart"></div><div class="xaxis" id="xaxis"></div></div></div>
   <div class="panel"><div class="ph"><h3>Profit by session</h3></div><div class="pb" id="bySes"></div><div class="ph" style="border-top:1px solid var(--line)"><h3>Private vs shared</h3></div><div class="pb" id="byKind"></div></div></div>`;
   countUp($('#k0'),received());countUp($('#k1'),rev);countUp($('#k2'),cost);countUp($('#k3'),prof);countUp($('#k4'),owed);
+  $$('[data-go]').forEach(b=>b.onclick=()=>{tab=b.dataset.go;render()});
   $('#gopay').onclick=e=>{e.preventDefault();tab='payouts';render()};
   // weekly buckets (8 weeks ending today)
   const W=Array.from({length:8},(_,i)=>{const end=addDays(TODAY,-(7*(7-i))),start=addDays(end,-6);const ts=allTrips().filter(t=>counted(t)&&parseIso(when(t))>=start&&parseIso(when(t))<=end);const r=ts.reduce((a,t)=>a+t.revenue,0),c=ts.reduce((a,t)=>a+t.cost.total,0);return{start,end,r,c,p:r-c,n:ts.length}});
@@ -87,6 +97,19 @@ function incoming(){
 }
 $('#csv').onclick=()=>{const T=done();const head='date,trip,type,session,guests,revenue,jeep_cost,tracker_cost,meals_other_cost,profit\n';const body=T.map(t=>[t.date,t.code,t.kind,t.ses,t.guests,t.revenue,t.cost.jeep,t.cost.guide,t.cost.meals+t.cost.cam,t.profit].join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([head+body],{type:'text/csv'}));a.download=`trips-profit-${range}.csv`;a.click();toast('CSV downloaded')};
+const ymd=d=>{const x=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return x.toISOString().slice(0,10)};
+$('#pdf').onclick=()=>{
+  const now=new Date(TODAY),y=now.getFullYear(),m=now.getMonth();
+  const P=[['This month',new Date(y,m,1),now],['Last month',new Date(y,m-1,1),new Date(y,m,0)],['Last 30 days',addDays(now,-29),now],['Last 3 months',new Date(y,m-2,1),now],['This year',new Date(y,0,1),now]];
+  openModal(`<h3>Download money flow report (PDF)</h3><p class="small muted">Pick the period. The report shows money in from guests, money out to partners, profit per trip, what is still owed both ways, and every payment line.</p>
+  <div class="chips2" id="pp">${P.map((p,i)=>`<button class="btn sm ${i===0?'on':''}" data-i="${i}">${p[0]}</button>`).join('')}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px"><div class="field"><label for="rf">From</label><input class="inp" id="rf" type="date" value="${ymd(P[0][1])}"></div><div class="field"><label for="rt">To</label><input class="inp" id="rt" type="date" value="${ymd(P[0][2])}"></div></div>
+  <p class="tiny muted" id="rerr" style="color:var(--bad);min-height:16px"></p>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="rGo">Create PDF</button></div>`);
+  $$('#pp button').forEach(b=>b.onclick=()=>{const p=P[+b.dataset.i];$('#rf').value=ymd(p[1]);$('#rt').value=ymd(p[2]);$$('#pp button').forEach(x=>x.classList.toggle('on',x===b))});
+  $('#rGo').onclick=async e=>{const f=$('#rf').value,t=$('#rt').value;if(!f||!t)return $('#rerr').textContent='Choose both dates.';if(f>t)return $('#rerr').textContent='The start date must be before the end date.';$('#rerr').textContent='';
+    await busy(e.target,async()=>{try{const r=await fetch(`/api/admin/reports/money-flow?from=${f}&to=${t}&format=pdf`,{credentials:'same-origin'});if(!r.ok){let m='Could not create the report';try{m=(await r.json()).error||m}catch(_){}throw new Error(m)}
+      const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=`money-flow-${f}-to-${t}.pdf`;document.body.appendChild(a);a.click();document.body.removeChild(a);closeModal();toast('PDF downloaded')}catch(x){$('#rerr').textContent=x.message}})}};
 render();
 
 function onDataChanged(){render()}

@@ -176,8 +176,8 @@ async function pickSeats() {
     let h = head();
     if (msg) h += `<div class="note bad" style="margin-bottom:12px">${esc(msg)}</div>`;
     if (step === 0) {
-      h += `<div class="cols"><div class="card"><h2 style="font-size:20px">Choose your seats</h2><p class="small muted" style="margin:4px 0 6px">One seat per person. A seat you pick is locked to you for ${trip.holdMin} minutes, so nobody else can take it while you book.</p>${seatMap()}</div>
-      <div>${summary()}<div class="card" style="margin-top:14px"><h3 style="font-size:16px">How shared jeeps work</h3><ol class="small how">${online ? '<li>Pick seats and pay now' + (trip.allowLater ? ', or reserve for free' : '') + '.</li>' : '<li>Pick seats and reserve them for free.</li>'}<li>When ${minSeats} seats are reserved, anyone who hasn't paid gets a payment link (${trip.payWindowH} hours to pay).</li><li>Once ${minSeats} seats are paid, the safari is on and your QR e-ticket is emailed.</li><li>Not enough people? Full refund.</li></ol></div></div></div>`;
+      h += `<div class="cols"><div class="card"><h2 style="font-size:20px">Choose your seats</h2><p class="small muted" style="margin:4px 0 6px">Tap a seat to hold it for ${trip.holdMin} min.</p>${seatMap()}</div>
+      <div>${summary()}<details class="card more" style="margin-top:14px"><summary>How shared jeeps work</summary><ol class="small how">${online ? '<li>Pick seats and pay now' + (trip.allowLater ? ', or reserve for free' : '') + '.</li>' : '<li>Pick seats and reserve them for free.</li>'}<li>When ${minSeats} seats are reserved, anyone who hasn't paid gets a payment link (${trip.payWindowH} hours to pay).</li><li>Once ${minSeats} seats are paid, the safari is on and your QR e-ticket is emailed.</li><li>Not enough people? Full refund.</li></ol><p class="tiny muted" style="margin:8px 0 0">A seat you pick is locked to you for ${trip.holdMin} minutes while you book. One seat per person.</p></details></div></div>`;
       $('#nx').textContent = mine.size ? 'Continue' : 'Pick a seat'; $('#nx').disabled = !mine.size;
     }
     if (step === 1) {

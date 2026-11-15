@@ -276,3 +276,6 @@ function startScanner(host, onCode) {
     : Promise.reject(new Error('This browser cannot use the camera.'));
   return { ready, stop() { stop = true; if (stream) stream.getTracks().forEach(t => t.stop()); video.remove() } };
 }
+
+/* Collapsible section for long drawers: the summary line is always visible, the details open on tap. */
+function fold(title, body, o = {}) { return `<details class="fold" ${o.open ? 'open' : ''}><summary><span class="ft">${title}</span>${o.hint ? `<span class="fh">${o.hint}</span>` : ''}<svg class="fc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fb">${body}</div></details>` }

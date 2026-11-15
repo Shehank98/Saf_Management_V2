@@ -337,3 +337,15 @@ table.t tbody tr:hover{background:color-mix(in srgb,var(--sand) 55%,var(--card))
 .lnkbox{display:flex;gap:8px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:6px 6px 6px 12px}.lnkbox code{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .savebar{position:sticky;bottom:12px}
 @media (max-width:600px){.kpi .v{font-size:22px}.panel .ph,.panel .pb{padding:14px}table.t th,table.t td{padding:10px}}
+
+/* Collapsible drawer sections */
+details.fold{border:1px solid var(--line);border-radius:12px;background:var(--paper);margin-top:10px;overflow:hidden}
+details.fold>summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none;font-weight:700;font-size:14px;min-height:46px;-webkit-tap-highlight-color:transparent}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary .ft{flex:1}
+details.fold>summary .fh{font-size:12px;font-weight:600;color:var(--muted);max-width:50%;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.fold>summary .fc{flex:none;transition:transform .2s;color:var(--muted)}
+details.fold[open]>summary .fc{transform:rotate(180deg)}
+details.fold[open]>summary{border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--olive) 6%,var(--paper))}
+details.fold .fb{padding:12px 14px 14px}
+details.fold .fb>.sec-t:first-child{margin-top:0}

@@ -137,6 +137,13 @@ main.wrap{padding:20px 16px 130px;max-width:1040px}
 @media (max-width:520px){.nxt li{grid-template-columns:1fr;gap:2px}.invite .acts{width:100%}.invite .acts .btn{flex:1}}
 .confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:200}
 @media (prefers-reduced-motion:reduce){.cel *{animation:none!important}}
+details.more>summary{cursor:pointer;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;min-height:32px}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::after{content:'';width:9px;height:9px;border-right:2.5px solid var(--muted);border-bottom:2.5px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+details.more[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+details.more[open]>summary{margin-bottom:8px}
+@media (max-width:640px){.thead h1{font-size:24px}.thead .facts{grid-template-columns:repeat(4,1fr);gap:6px}.thead .facts div{padding:8px 6px;font-size:10.5px}.thead .facts b{font-size:13px}}
+@media (max-width:640px){.vehicle{padding:40px 16px 16px;border-radius:36px 36px 18px 18px}.vehicle .row{gap:8px;margin-top:8px}.vehicle .cab{margin-bottom:6px;padding-bottom:8px}.seat{height:52px}.seat b{font-size:17px}}
 </style>
 </head>
 <body>

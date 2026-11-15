@@ -7,11 +7,11 @@ function sesSeg() {
   $$('#sesSeg button').forEach(b => b.onclick = () => { ses = b.dataset.k; setP('ses', ses); sesSeg(); refresh() });
 }
 function cell(d) {
-  const ds = iso(d), a = days[ds] || { closed: true }; let lab = '', cls = '', dis = a.closed, bars = '';
+  const ds = iso(d), a = days[ds] || { closed: true }; let lab = '', cls = '', st = '', dis = a.closed, bars = '';
   if (a.closed) lab = a.reason === 'Park closed' ? 'Closed' : '';
-  else if (a.jeeps === 0) { lab = 'Sold out'; cls = 'bad'; dis = true }
-  else { lab = `${a.jeeps} free`; cls = a.jeeps === 1 ? 'warn' : 'ok'; bars = '<span class="jp">' + '<i></i>'.repeat(Math.min(a.jeeps, 6)) + '</span>' }
-  return `<button class="day ${ds === sel ? 'sel' : ''}" data-d="${ds}" ${dis ? 'disabled' : ''} aria-label="${nice(ds)} ${lab}"><span class="n">${d.getDate()}</span>${bars}<span class="s ${cls}">${lab}</span></button>`;
+  else if (a.jeeps === 0) { lab = 'Sold out'; cls = 'bad'; st = 'st-full'; dis = true }
+  else { lab = `${a.jeeps} free`; cls = a.jeeps === 1 ? 'warn' : 'ok'; st = a.jeeps === 1 ? 'st-few' : 'st-on'; bars = '<span class="jp">' + '<i></i>'.repeat(Math.min(a.jeeps, 6)) + '</span>' }
+  return `<button class="day ${st} ${ds === iso(TODAY) ? 'today' : ''} ${ds === sel ? 'sel' : ''}" data-d="${ds}" ${dis ? 'disabled' : ''} aria-label="${nice(ds)} ${lab}"><span class="n">${d.getDate()}</span>${bars}<span class="s ${cls}">${lab}</span></button>`;
 }
 function render() {
   $('#mon').textContent = view.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });

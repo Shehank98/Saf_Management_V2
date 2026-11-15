@@ -58,11 +58,23 @@ table.t tfoot td{font-weight:800;border-top:2px solid var(--line);background:var
 .chk span:nth-child(2){flex:1}
 .paid-anim{animation:stamp .5s cubic-bezier(.3,1.6,.5,1)}
 @keyframes stamp{0%{transform:scale(1.6) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+.flowrow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+.fstep{flex:1 1 180px;text-align:left;border:1.5px solid var(--line);border-radius:14px;background:var(--paper);padding:14px 16px;display:flex;flex-direction:column;gap:2px;font:inherit;color:inherit}
+button.fstep{cursor:pointer;transition:transform .15s,border-color .15s}button.fstep:hover{transform:translateY(-2px)}
+.fstep .fl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fstep b{font-size:24px;line-height:1.2}
+.fstep.in{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}.fstep.in b{color:var(--ok)}
+.fstep.out{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+.fstep.left{background:color-mix(in srgb,var(--olive) 10%,var(--paper))}.fstep.left.neg b{color:var(--bad)}
+.farr{align-self:center;font-size:26px;font-weight:800;color:var(--muted)}
+.flowsoon{display:flex;gap:8px 24px;flex-wrap:wrap;margin-top:12px;font-size:14px}
+.chips2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chips2 .btn.on{background:var(--ink);color:var(--paper)}
+@media (max-width:700px){.farr{display:none}.fstep{flex-basis:100%}.fstep b{font-size:21px}}
 </style>
 </head>
 <body>
 <main id="content">
-  <div class="bar-top"><div class="tabs2" id="tabs"></div><div class="toolbar"><div class="seg" id="range"></div><button class="btn sm" id="csv">⬇ Export CSV</button></div></div>
+  <div class="bar-top"><div class="tabs2" id="tabs"></div><div class="toolbar"><div class="seg" id="range"></div><button class="btn sm primary" id="pdf">⬇ PDF report</button><button class="btn sm" id="csv">⬇ CSV</button></div></div>
   <div id="pane"></div>
 </main>
 <div class="tip" id="tip" role="tooltip"></div>

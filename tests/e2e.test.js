@@ -685,3 +685,17 @@ test('reserving enough seats at once: guest is told the jeep is going ahead and 
     await admin('PUT', '/api/admin/settings/shared', { seats: cur.seats, minSeats: cur.minSeats, payWindowH: cur.payWindowH, autoCancelH: cur.autoCancelH, allowLater: cur.allowLater, privateUpgrade: cur.privateUpgrade });
   }
 });
+
+test('money-flow report: needs staff login and a valid period, returns JSON and a real PDF', async () => {
+  const anon = await fetch(base + '/api/admin/reports/money-flow?from=2026-01-01&to=2026-01-31');
+  assert.equal(anon.status, 401, 'staff only');
+  const get = (q) => fetch(base + '/api/admin/reports/money-flow?' + q, { headers: { Cookie: adminCookie } });
+  assert.equal((await get('from=2026-02-01&to=2026-01-01')).status, 400, 'start after end');
+  assert.equal((await get('from=nope&to=2026-01-01')).status, 400, 'bad date');
+  assert.equal((await get('from=2020-01-01&to=2023-01-01')).status, 400, 'period too long');
+  const ok = await (await get(`from=${U.addDays(U.todayStr(), -30)}&to=${U.todayStr()}`)).json();
+  assert.ok(ok.cash && ok.profit && Array.isArray(ok.trips), 'summary shape');
+  const pdf = await get(`from=${U.addDays(U.todayStr(), -30)}&to=${U.todayStr()}&format=pdf`);
+  assert.equal(pdf.status, 200); assert.match(pdf.headers.get('content-type'), /application\/pdf/);
+  const buf = Buffer.from(await pdf.arrayBuffer()); assert.equal(buf.slice(0, 4).toString(), '%PDF'); assert.ok(buf.length > 2000);
+});

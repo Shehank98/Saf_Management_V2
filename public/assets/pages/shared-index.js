@@ -14,7 +14,7 @@ function locSeg() {
 }
 const maxMonth = new Date(TODAY.getFullYear(), TODAY.getMonth() + (CFG.maxAheadMonths || 4) + 1, 1);
 function sesSeg() {
-  $('#sesSeg').innerHTML = Object.entries(SES()).map(([k, s]) => `<button data-k="${k}" class="${k === ses ? 'on' : ''}">${esc(s.short)}</button>`).join('');
+  $('#sesSeg').innerHTML = Object.entries(SES()).map(([k, s]) => `<button data-k="${k}" class="${k === ses ? 'on' : ''}">${esc(s.short)}${s.time ? `<small>${esc(s.time)}</small>` : ''}</button>`).join('');
   $$('#sesSeg button').forEach(b => b.onclick = () => { ses = b.dataset.k; sel = null; sesSeg(); keepUrl(); refresh() });
 }
 function render() {
@@ -23,13 +23,14 @@ function render() {
   let h = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('') + '<div></div>'.repeat(first);
   for (let i = 1; i <= n; i++) {
     const ds = iso(new Date(view.getFullYear(), view.getMonth(), i)), a = days[ds];
-    let lab = '', cls = '';
+    let lab = '', cls = '', st = '';
     if (a) {
       const live = a.trips.filter(t => !t.full), on = live.filter(t => t.ready).sort((x, y) => x.free - y.free)[0], part = live.filter(t => !t.ready && t.held > 0).sort((x, y) => x.free - y.free)[0];
       lab = a.state === 'full' ? 'Full' : on ? `On · ${on.free} left` : part ? `${part.free} seats left` : `${a.seatsMax} seats`;
       cls = a.state === 'full' ? 'bad' : on ? 'ok' : part ? 'warn' : 'ok';
+      st = a.state === 'full' ? 'st-full' : on ? 'st-on' : part ? 'st-few' : '';
     }
-    h += `<button class="day ${ds === sel ? 'sel' : ''}" data-d="${ds}" ${a ? '' : 'disabled'}><span class="n">${i}</span><span class="s ${cls}">${lab}</span></button>`;
+    h += `<button class="day ${st} ${ds === iso(TODAY) ? 'today' : ''} ${ds === sel ? 'sel' : ''}" data-d="${ds}" ${a ? '' : 'disabled'}><span class="n">${i}</span><span class="s ${cls}">${lab}</span></button>`;
   }
   $('#cal').innerHTML = h;
   $('#prev').disabled = view <= new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);

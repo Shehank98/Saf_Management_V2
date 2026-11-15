@@ -84,6 +84,19 @@ r.get('/data.js', U.wrap(async (req, res) => {
   res.send('window.ADMIN_DATA=' + JSON.stringify(await adminData(req)).replace(/</g, '\\u003c') + ';');
 }));
 
+/* Money-flow report for any period, as JSON or a PDF download. */
+r.get('/reports/money-flow', staff, U.wrap(async (req, res) => {
+  const ok = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && !isNaN(Date.parse(d));
+  const from = String(req.query.from || ''), to = String(req.query.to || '');
+  if (!ok(from) || !ok(to)) throw new U.HttpError(400, 'Choose a start and an end date.');
+  if (from > to) throw new U.HttpError(400, 'The start date must be before the end date.');
+  if ((Date.parse(to) - Date.parse(from)) / 864e5 > 800) throw new U.HttpError(400, 'Please choose a period of up to 2 years.');
+  const rep = require('../services/report'), data = await rep.collect(from, to);
+  if (req.query.format !== 'pdf') return res.json(data);
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="money-flow-${from}-to-${to}.pdf"`, 'Cache-Control': 'no-store' });
+  rep.pdf(data).pipe(res);
+}));
+
 r.get('/activity', staff, U.wrap(async (req, res) => {
   const rows = (await query(`SELECT message, actor, created_at FROM activity_log WHERE entity=$1 AND entity_id=$2 ORDER BY id`, [String(req.query.entity), String(req.query.id)])).rows;
   res.json(rows.map(x => ({ d: U.dateOf(x.created_at), t: U.hhmm(x.created_at), msg: x.message, actor: x.actor })));
