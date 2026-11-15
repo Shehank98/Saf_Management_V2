@@ -52,26 +52,22 @@ function list() {
   $$('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.k; list() });
   const pool = all.filter(dateOk).filter(t => F.loc === 'all' || t.loc === F.loc);
   const cnt = fn => pool.filter(fn).length;
-  const sesItems = [['all', 'Any session', cnt(() => true)], ...ORDER.filter(k => SESS[k]).map(k => [k, SESS[k].short, cnt(t => t.ses === k)])];
+  const sesOpts = [['all', `Any session (${pool.length})`], ...ORDER.filter(k => SESS[k]).map(k => [k, `${SESS[k].short} (${cnt(t => t.ses === k)})`])];
   const stPool = pool.filter(t => F.ses === 'all' || t.ses === F.ses);
-  const stItems = STF.map(([k, l]) => [k, l, stPool.filter(t => stOk(t, k)).length]);
-  const dateItems = [['all', 'Any date'], ['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'Next 7 days']];
-  $('#filters').innerHTML = `<div class="frow"><span class="fl">Date</span><div class="chips">${chips(dateItems, F.date, 'fd')}<label class="chip pick ${F.date === 'pick' ? 'on' : ''}"><span>${F.date === 'pick' && F.pick ? shortDate(F.pick) : 'Pick a date'}</span><input type="date" id="fpick" value="${F.pick}" aria-label="Pick a date"></label></div></div>
-    <div class="frow"><span class="fl">Session</span><div class="chips">${chips(sesItems, F.ses, 'fs')}</div></div>
-    <div class="frow"><span class="fl">Show</span><div class="chips">${chips(stItems, F.st, 'ft')}</div></div>
-    ${LOCS.length > 1 ? `<div class="frow"><span class="fl">Park</span><div class="chips">${chips([['all', 'All parks'], ...LOCS.map(l => [l.id, esc(l.name)])], F.loc, 'fl2')}</div></div>` : ''}`;
-  $$('[data-fd]').forEach(b => b.onclick = () => { F.date = b.dataset.fd; F.pick = ''; saveF(); list() });
-  $$('[data-fs]').forEach(b => b.onclick = () => { F.ses = b.dataset.fs; saveF(); list() });
-  $$('[data-ft]').forEach(b => b.onclick = () => { F.st = b.dataset.ft; saveF(); list() });
-  $$('[data-fl2]').forEach(b => b.onclick = () => { F.loc = b.dataset.fl2; saveF(); list() });
-  $('#fpick').onchange = e => { F.pick = e.target.value; F.date = F.pick ? 'pick' : 'all'; saveF(); list() };
+  const stOpts = STF.map(([k, l]) => [k, `${l} (${stPool.filter(t => stOk(t, k)).length})`]);
+  const dateOpts = [['all', 'Any date'], ['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'Next 7 days'], ['pick', F.pick ? 'On ' + shortDate(F.pick) : 'Pick a date…']];
+  const sel = (id, label, opts, cur) => `<label class="fsel"><span>${label}</span><select id="${id}">${opts.map(([k, l]) => `<option value="${esc(k)}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+  const filtered = F.date !== 'all' || F.ses !== 'all' || F.st !== 'all' || F.loc !== 'all';
+  $('#filters').innerHTML = `<div class="fbar">${sel('fd', 'Date', dateOpts, F.date)}${F.date === 'pick' ? `<label class="fsel"><span>Day</span><input type="date" id="fpick" value="${F.pick}"></label>` : ''}${sel('fs', 'Session', sesOpts, F.ses)}${sel('ft', 'Show', stOpts, F.st)}${LOCS.length > 1 ? sel('fl2', 'Park', [['all', 'All parks'], ...LOCS.map(l => [l.id, esc(l.name)])], F.loc) : ''}${filtered ? '<button type="button" class="btn sm" id="clrF">Clear</button>' : ''}</div>`;
+  $('#fd').onchange = e => { F.date = e.target.value; if (F.date !== 'pick') F.pick = ''; saveF(); list() };
+  $('#fs').onchange = e => { F.ses = e.target.value; saveF(); list() };
+  $('#ft').onchange = e => { F.st = e.target.value; saveF(); list() };
+  if ($('#fl2')) $('#fl2').onchange = e => { F.loc = e.target.value; saveF(); list() };
+  if ($('#fpick')) $('#fpick').onchange = e => { F.pick = e.target.value; if (!F.pick) F.date = 'all'; saveF(); list() };
+  if ($('#clrF')) $('#clrF').onclick = () => { F = { ...DEF }; saveF(); list() };
   const rows = pool.filter(t => F.ses === 'all' || t.ses === F.ses).filter(t => stOk(t, F.st))
     .sort((a, b) => (tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)) || sesRank(a) - sesRank(b) || a.id.localeCompare(b.id));
-  const groups = []; rows.forEach(t => { const g = groups[groups.length - 1]; if (g && g.d === t.date) g.t.push(t); else groups.push({ d: t.date, t: [t] }) });
-  const filtered = F.date !== 'all' || F.ses !== 'all' || F.st !== 'all' || F.loc !== 'all';
-  $('#trips').innerHTML = groups.map(g => `<section class="dgrp"><h3>${tripDay(g.d)}<small>${g.t.length} trip${g.t.length > 1 ? 's' : ''} · ${g.t.reduce((a, t) => a + paidOf(t), 0)} paid seats</small></h3><div class="trips">${g.t.map(card).join('')}</div></section>`).join('')
-    || `<div class="empty">${filtered ? 'No trips match these filters. <a href="#" id="clrF">Clear filters</a>' : 'No trips here. Create one to get a shareable link.'}</div>`;
-  const c = $('#clrF'); if (c) c.onclick = e => { e.preventDefault(); F = { ...DEF }; saveF(); list() };
+  $('#trips').innerHTML = rows.length ? `<div class="trips">${rows.map(card).join('')}</div>` : `<div class="empty">${filtered ? 'No trips match these filters.' : 'No trips here. Create one to get a shareable link.'}</div>`;
   $$('.tc').forEach(b => b.onclick = () => openTrip(b.dataset.id));
 }
 function todoOf(t) {
@@ -86,16 +82,23 @@ function todoOf(t) {
 function card(t) {
   const p = paidOf(t), st = status(t), byN = {}; t.seats.forEach(x => byN[x.n] = x);
   const live = t.seats.filter(x => x.pay !== 'Refunded'), got = live.filter(x => x.pay === 'Paid').reduce((a, x) => a + (x.amount || 0), 0), s = SESS[t.ses];
-  const todo = todoOf(t).slice(0, 2);
-  return `<button class="tc s-${esc(t.ses)}" data-id="${t.id}"><div class="tc1"><b>${esc(s.short)}</b><span class="tm">${esc(s.pickup)}</span>${badge(st)}</div>
-    <div class="tc2"><span class="pips">${Array.from({ length: t.seatsMax }, (_, i) => i + 1).map(n => `<i class="${byN[n] ? (byN[n].pay === 'Paid' ? 'p' : 'r') : ''}"></i>`).join('')}</span><span class="small"><b>${p}</b>/${t.seatsMax} paid</span><span class="mono tiny muted">${t.id}</span></div>
+  const todo = todoOf(t).slice(0, 2), when = t.date === D(0) ? 'Today' : t.date === D(1) ? 'Tomorrow' : '';
+  return `<button class="tc s-${esc(t.ses)}" data-id="${t.id}"><div class="tc1"><b>${shortDate(t.date)}</b>${when ? `<span class="tdy">${when}</span>` : ''}${badge(st)}</div>
+    <div class="tc1b"><span>${esc(s.short)} · ${esc(s.pickup)}</span><span class="mono tiny muted">${t.id}</span></div>
+    <div class="tc2"><span class="pips">${Array.from({ length: t.seatsMax }, (_, i) => i + 1).map(n => `<i class="${byN[n] ? (byN[n].pay === 'Paid' ? 'p' : 'r') : ''}"></i>`).join('')}</span><span class="small"><b>${p}</b>/${t.seatsMax} paid</span></div>
     <div class="tc3"><span class="${t.vendor ? '' : 'nojeep'}">🚙 ${t.vendor ? esc(vendorName(t.vendor)) : 'No jeep yet'}</span>${got ? `<b class="got">${gm(got, t)}</b>` : ''}</div>
     ${todo.length ? `<div class="ttodo">${todo.map(([c, l]) => `<span class="tag ${c}">${l}</span>`).join('')}</div>` : ''}</button>`;
 }
 
 /* ================= Trip popup: everything about one trip, in tabs ================= */
 let TP = { id: null, tab: 'overview', focus: null, addSeat: null };
-const TABS = [['overview', 'Overview'], ['guests', 'Guests'], ['money', 'Money'], ['team', 'Team'], ['pickup', 'Pickup run'], ['share', 'Share & log']];
+const ico2 = d => `<svg class="ti" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const TABS = [['overview', 'Overview', ico2('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>')],
+  ['guests', 'Guests', ico2('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c2.6 0 4.5 1.8 4.5 4.5"/>')],
+  ['money', 'Money', ico2('<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-1-1.5-1.6-2.8-1.6-1.6 0-2.7.8-2.7 2 0 1.2 1 1.7 2.7 2.1 1.7.4 2.7.9 2.7 2.1 0 1.2-1.1 2-2.7 2-1.3 0-2.4-.6-2.9-1.7M12 6v1.6M12 16.4V18"/>')],
+  ['team', 'Team', ico2('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v6.5M4.2 15.5l5.6-2M19.8 15.5l-5.6-2"/>')],
+  ['pickup', 'Pickup', ico2('<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>')],
+  ['share', 'Share', ico2('<circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M8.3 10.8l7.4-3.6M8.3 13.2l7.4 3.6"/>')]];
 const tripOf = id => SHARED.find(x => x.id === id);
 async function refreshTrip(keep = {}) { await reload(); list(); if (TP.id && tripOf(TP.id)) openTrip(TP.id, keep.tab || TP.tab, keep) }
 function openTrip(id, tabName = 'overview', o = {}) {
@@ -106,9 +109,10 @@ function openTrip(id, tabName = 'overview', o = {}) {
   const todo = todoOf(t), badgeFor = k => k === 'guests' ? live.length : k === 'money' && wait ? '!' : k === 'team' && !t.vendor && !isDone(t) ? '!' : '';
   openModal(`<div class="tp"><div class="tph s-${esc(t.ses)}"><div class="tph1"><div><div class="tpid"><span class="mono">${t.id}</span> ${badge(st)}</div><h2>${nice(t.date)}</h2><div class="tpsub">${esc(s.name)} · ${esc(s.time)} · pickup ${esc(s.pickup)} · ${esc(locName(t.loc))}</div></div><button class="tpx" data-close aria-label="Close">×</button></div>
     <div class="tpstats"><div><b>${p}<small>/${t.minSeats}</small></b><span>paid to run</span></div><div><b>${live.length}<small>/${t.seatsMax}</small></b><span>seats taken</span></div><div class="ok"><b>${gm(got, t)}</b><span>collected</span></div><div class="${wait ? 'warn' : ''}"><b>${gm(wait, t)}</b><span>still to pay</span></div></div></div>
-    <nav class="tptabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-t="${k}" class="${k === tabName ? 'on' : ''}" aria-selected="${k === tabName}">${l}${badgeFor(k) !== '' ? `<i class="bd ${badgeFor(k) === '!' ? 'w' : ''}">${badgeFor(k)}</i>` : ''}</button>`).join('')}</nav>
+    <nav class="tptabs" role="tablist">${TABS.map(([k, l, ic]) => `<button type="button" role="tab" data-t="${k}" class="${k === tabName ? 'on' : ''}" aria-selected="${k === tabName}">${ic}<span class="tl">${l}</span>${badgeFor(k) !== '' ? `<i class="bd ${badgeFor(k) === '!' ? 'w' : ''}">${badgeFor(k)}</i>` : ''}</button>`).join('')}</nav>
     <div class="tpbody" id="tpBody"></div>
     <div class="tpfoot" id="tpFoot"></div></div>`);
+  $('#modal').classList.add('tpm');
   $$('#modalBody [data-t]').forEach(b => b.onclick = () => switchTab(b.dataset.t));
   const x = $('#modalBody .tpx'); if (x) x.onclick = closeModal;
   drawTab(t); drawFoot(t);
@@ -218,7 +222,7 @@ function drawFoot(t, confirming) {
   const p = paidOf(t);
   if (confirming) { el.innerHTML = `<div class="cxq"><b>Cancel ${t.id}?</b><span class="small">All ${t.seats.length} guests are emailed and ${p} paid seat${p === 1 ? '' : 's'} (${gm(p * t.price, t)}) are refunded in full.</span></div><button class="btn" id="cxBack">Keep trip</button><button class="btn danger solid" id="cxYes">Yes, cancel trip</button>`;
     $('#cxBack').onclick = () => drawFoot(t); $('#cxYes').onclick = async e => { if (await act(() => POST(`/api/admin/shared/${t.id}/cancel`), 'Trip cancelled · guests emailed · refunds started', e.target)) { await reload(); list(); closeModal() } }; return }
-  el.innerHTML = `<button class="btn" id="remind" ${pendOf(t).length ? '' : 'disabled'}>Send payment reminders</button><button class="btn danger" id="cx">Cancel trip</button><span class="sp"></span><button class="btn" data-close>Close</button>`;
+  el.innerHTML = `<button class="btn" id="remind" ${pendOf(t).length ? '' : 'disabled'}>Send reminders</button><button class="btn danger" id="cx">Cancel trip</button><span class="sp"></span><button class="btn" data-close>Close</button>`;
   $$('#tpFoot [data-close]').forEach(b => b.onclick = closeModal);
   $('#remind').onclick = e => act(async () => POST(`/api/admin/shared/${t.id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, e.target);
   $('#cx').onclick = () => drawFoot(t, true);

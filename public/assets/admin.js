@@ -131,7 +131,7 @@ function adminShell({ active, title, actions = '', nav = ADMIN_NAV, who = null, 
 function openDrawer(html) { $('#drawer').innerHTML = html; $('#drawer').classList.add('open'); $('#scrim').classList.add('show'); const x = $('#drawer .x'); if (x) { x.onclick = closeDrawer; x.focus() } }
 function closeDrawer() { $('#drawer')?.classList.remove('open'); $('#scrim')?.classList.remove('show') }
 function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').classList.add('show'); $$('#modalBody [data-close]').forEach(b => b.onclick = closeModal) }
-function closeModal() { $('#modal')?.classList.remove('show') }
+function closeModal() { $('#modal')?.classList.remove('show', 'tpm') }
 const STATUS_CLS = { Request: 'warn', 'Deposit paid': 'info', Started: 'live', Confirmed: 'ok', Completed: '', Cancelled: 'bad', Open: 'warn', 'Payment links sent': 'info', Full: 'info' };
 const badge = s => `<span class="tag ${STATUS_CLS[s] ?? ''}">${esc(s)}</span>`;
 const vendorOpts = (type, sel) => `<option value="">${type === 'meals' ? '- Main meal supplier -' : '- Not assigned -'}</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : type === 'meals' ? v.type === 'Meal supplier' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
