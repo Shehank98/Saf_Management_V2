@@ -129,6 +129,42 @@ details.gb>summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cu
   .tpstats{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0}.tpstats>div{padding:7px 8px}.tpstats b{font-size:14px}.tpstats b small{font-size:11px}.tpstats span{font-size:9.5px;letter-spacing:.02em}
   .tpfoot{padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));gap:6px}.tpfoot .btn{flex:1 1 0;padding-inline:8px;min-height:44px;font-size:13.5px}.tpfoot .sp{display:none}
 }
+
+/* slim popup header: more room for the details underneath */
+.tph{padding:10px 18px 0}
+.tph1{align-items:center}
+.tpid{font-size:12px;gap:6px}
+.tph h2{font-size:20px;margin:1px 0 0;line-height:1.2}
+.tpsub{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 110px)}
+.tpx{width:34px;height:34px;font-size:20px}
+.tpstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:8px 0 0;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.tpstats>div{background:none;border:0;border-radius:0;padding:6px 8px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.tpstats>div+div{border-left:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.tpstats b{font-size:15px;line-height:1.2}.tpstats b small{font-size:11.5px}
+.tpstats span{font-size:10px;letter-spacing:.03em}
+.tptabs{padding:4px 10px;gap:2px}
+.tptabs button{min-height:38px;padding:6px 8px;font-size:13.5px}
+.tpbody{padding:14px 18px}
+.tpfoot{padding:8px 18px calc(8px + env(safe-area-inset-bottom,0px))}
+.tpfoot .btn{min-height:40px}
+@media (max-width:700px){
+  .tph{padding:8px 12px 0}
+  .tph h2{font-size:17px}
+  .tpid{font-size:11.5px}
+  .tpsub{font-size:11.5px;max-width:calc(100vw - 90px)}
+  .tpx{width:32px;height:32px;font-size:19px}
+  .tpstats{margin:6px -12px 0;grid-template-columns:repeat(4,minmax(0,1fr))}
+  .tpstats>div{display:grid;gap:0;padding:5px 6px;text-align:center;justify-items:center}
+  .tpstats b{font-size:13px}.tpstats b small{font-size:10.5px}
+  .tpstats span{font-size:8.5px;line-height:1.15;letter-spacing:.02em}
+  .tptabs{padding:2px 4px;gap:0}
+  .tptabs button{min-height:44px;padding:4px 1px 3px;gap:1px;font-size:10.5px;border-radius:10px}
+  .tptabs .ti{width:18px;height:18px}
+  .tptabs .bd{top:0;min-width:16px;height:16px;font-size:9.5px;right:calc(50% - 20px)}
+  .tpbody{padding:12px}
+  .tpfoot{padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));gap:6px}
+  .tpfoot .btn{min-height:40px;font-size:13px;padding-inline:6px}
+}
 </style>
 </head>
 <body>
