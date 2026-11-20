@@ -104,9 +104,29 @@ app.get(['/book/*', '/booking'], U.wrap(async (req, res, next) => {
 const site = {
   '/book/session': 'customer/01-session.html', '/book/date': 'customer/02-date.html', '/book/group': 'customer/03-group.html',
   '/book/pickup': 'customer/04-pickup-extras.html', '/book/checkout': 'customer/05-checkout.html', '/book/done/:code': 'customer/06-confirmation.html',
-  '/t/:code': 'customer/ticket.html', '/booking': 'customer/my-booking.html', '/s/:id': 'shared/trip.html', '/partners/apply': 'vendor/register.html', '/shared': 'shared/index.html',
+  '/t/:code': 'customer/ticket.html', '/booking': 'customer/my-booking.html', '/s/:id': 'shared/trip.html', '/partners/apply': 'vendor/register.html',
 };
 for (const [route, file] of Object.entries(site)) app.get(route, (req, res, next) => { if (route.startsWith('/t/') || route.startsWith('/s/')) res.set('X-Robots-Tag', 'noindex'); next(); }, page(file));
+
+/* The "choose your date" page. With ?loc=yala it belongs to that one park: its own title, text and search data, and no park switch. */
+const seo = require('./lib/seo');
+app.get('/shared', U.wrap(async (req, res) => {
+  const conf = await settings.load(), want = String(req.query.loc || '').toLowerCase();
+  const parks = seo.openParks(conf), park = parks.find(l => l.id === want);
+  if (want && !park) return res.redirect(302, '/shared' + (parks.length === 1 ? '?loc=' + encodeURIComponent(parks[0].id) : ''));
+  let html = renderPage('shared/index.html');
+  if (park) {
+    const x = seo.parkSeo(conf, park, settings.baseUrl(conf));
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${U.esc(x.title)}</title>`).replace('<!--SEO_HEAD-->', x.head).replace('<!--SEO_BODY-->', x.body)
+      .replace('<!--LOCKED_ATTR-->', ' hidden').replace('<!--PARKLINE_ATTR-->', '').replace('<!--PARKLINE-->', U.esc(park.name));
+  } else {
+    html = html.replace('<!--SEO_HEAD-->', `<meta name="description" content="Choose a safari date and book your seat on a shared jeep.">`).replace('<!--SEO_BODY-->', '')
+      .replace('<!--LOCKED_ATTR-->', '').replace('<!--PARKLINE_ATTR-->', ' hidden').replace('<!--PARKLINE-->', '');
+  }
+  res.set('Cache-Control', 'no-cache').type('html').send(html);
+}));
+app.get('/parks/:id', (req, res) => res.redirect(301, '/shared?loc=' + encodeURIComponent(String(req.params.id).toLowerCase())));
+app.get('/sitemap.xml', U.wrap(async (req, res) => { const conf = await settings.load(); res.type('application/xml').set('Cache-Control', 'public, max-age=900').send(seo.sitemap(conf, settings.baseUrl(conf))); }));
 
 app.get('/admin/login', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('admin/login.html')(req, res); });
 const admin = { '/admin': 'dashboard', '/admin/bookings': 'private', '/admin/shared': 'shared', '/admin/payments': 'payments', '/admin/partners': 'vendors', '/admin/check-in': 'checkin', '/admin/settings': 'settings' };
@@ -169,7 +189,7 @@ app.get('/manifest.webmanifest', manifest('site'));
 app.get('/admin.webmanifest', manifest('admin'));
 app.get('/partner.webmanifest', manifest('partner'));
 
-app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\nDisallow: /drive/\n'));
+app.get('/robots.txt', U.wrap(async (req, res) => { const conf = await settings.load(); res.type('text/plain').send(`User-agent: *\nDisallow: /admin\nDisallow: /partner\nDisallow: /t/\nDisallow: /s/\nDisallow: /api/\nDisallow: /pay/\nDisallow: /drive/\n\nSitemap: ${settings.baseUrl(conf)}/sitemap.xml\n`); }));
 
 // ---------- Static assets (CSS, JS, icons, manifest, service worker) ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), {

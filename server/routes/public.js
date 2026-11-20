@@ -258,7 +258,7 @@ r.post('/shared/:id/seats', limits.booking, U.wrap(async (req, res) => {
   }
   const out = await shared.takeSeats(req.params.id, { ...body, provider: providerId });
   const base = await siteUrl();
-  const result = { code: out.code, k: out.k, seats: out.seats, total: out.total, status: out.status, seatStatus: out.seatStatus, deadline: out.deadline, cur: out.trip.currency || 'LKR' };
+  const result = { code: out.code, k: out.k, seats: out.seats, total: out.total, status: out.status, seatStatus: out.seatStatus, deadline: out.deadline, solo: out.solo, cur: out.trip.currency || 'LKR' };
   if (out.payment) {
     try {
       result.checkoutUrl = await paymentsSvc.launch(out.payment, {
@@ -289,7 +289,7 @@ r.get('/shared/:id/purchase', limits.poll, U.wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store').json({
     code, name: fresh.name, seats: fresh.seats.map(s => s.n), amount: fresh.amount, cur: fresh.cur, paid: fresh.alreadyPaid, deadline: fresh.deadline,
     ses: fresh.trip.session_id, date: fresh.trip.date, tripStatus: fresh.trip.status, ticketReady: fresh.alreadyPaid && ['CONFIRMED', 'FULL', 'STARTED'].includes(fresh.trip.status),
-    k: secrets.sign(code), mealPrice: conf.extras.meals ? conf.extras.meals.price : 0, loc: fresh.trip.location_id, minSeats: fresh.trip.min_seats, payWindowH: fresh.trip.pay_window_h,
+    k: secrets.sign(code), solo: shared.soloOffer(fresh.trip, (await shared.activeSeats({ query }, fresh.trip.id)).length), mealPrice: conf.extras.meals ? conf.extras.meals.price : 0, loc: fresh.trip.location_id, minSeats: fresh.trip.min_seats, payWindowH: fresh.trip.pay_window_h,
   });
 }));
 

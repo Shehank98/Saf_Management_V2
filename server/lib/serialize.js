@@ -6,7 +6,7 @@ const U = require('./util');
 const secrets = require('./secrets');
 
 const TYPE_LABEL = { JEEP_DRIVER: 'Jeep + driver', GUIDE: 'Tracker / guide', MEAL_SUPPLIER: 'Meal supplier' };
-const ROLE_LABEL = { JEEP: 'Jeep + driver', GUIDE: 'Tracker', MEALS: 'Meals', CAMERA: 'Camera' };
+const ROLE_LABEL = { JEEP: 'Jeep + driver', GUIDE: 'Tracker', MEALS: 'Meals', CAMERA: 'Camera', OTHER: 'Other' };
 
 function uiStatus(b) {
   switch (b.status) {
@@ -142,8 +142,8 @@ async function trips(db, sinceDate, conf = null) {
   const costOf = code => {
     const ls = byCode[code] || [];
     const sum = r => ls.filter(l => l.role === r).reduce((a, l) => a + l.amount, 0);
-    const c = { jeep: sum('JEEP'), guide: sum('GUIDE'), meals: sum('MEALS'), cam: sum('CAMERA') };
-    c.total = c.jeep + c.guide + c.meals + c.cam;
+    const c = { jeep: sum('JEEP'), guide: sum('GUIDE'), meals: sum('MEALS'), cam: sum('CAMERA'), other: sum('OTHER') };
+    c.total = c.jeep + c.guide + c.meals + c.cam + c.other;
     const who = r => { const l = ls.find(x => x.role === r && x.partner_id); return l ? String(l.partner_id) : ''; };
     return { cost: c, vendor: who('JEEP'), guide: who('GUIDE'), mealsN: ls.filter(l => l.role === 'MEALS').reduce((a, l) => a + l.qty, 0) };
   };
@@ -157,7 +157,7 @@ async function trips(db, sinceDate, conf = null) {
   // Cancelled bookings where we kept part of the money (cancellation fee) are income with no trip cost.
   const kept = (await db.query(`SELECT * FROM bookings WHERE status IN ('CANCELLED','DECLINED') AND paid > refunded AND date >= $1`, [sinceDate])).rows;
   for (const b of kept) {
-    const revenue = Math.round((b.paid - b.refunded) * (+b.fx || 1)), zero = { jeep: 0, guide: 0, meals: 0, cam: 0, total: 0 };
+    const revenue = Math.round((b.paid - b.refunded) * (+b.fx || 1)), zero = { jeep: 0, guide: 0, meals: 0, cam: 0, other: 0, total: 0 };
     out.push({ code: b.code, kind: 'Private', date: b.date, ses: b.session_id, guests: b.guests, jeeps: 0, revenue, paid: b.paid, mealsN: 0, cam: 0, vendor: '', guide: '', name: b.lead_name + ' (cancelled, fee kept)', status: 'Cancelled', bookedOn: U.dateOf(b.cancelled_at || b.created_at), cost: zero, profit: revenue });
   }
   const ts = (await db.query(`SELECT t.*, COALESCE((SELECT ROUND(SUM(amount * fx)) FROM shared_seats s WHERE s.trip_id=t.id AND s.status='PAID'),0)::int AS revenue,
@@ -170,23 +170,25 @@ async function trips(db, sinceDate, conf = null) {
   if (conf) {
     const c = conf.costs, est = (ses, jeeps, guide, mealN, cam) => {
       const x = { jeep: jeeps * (c.jeepFee[ses] || 0), guide: guide ? jeeps * (c.guideFee[ses] || 0) : 0, meals: mealN * c.mealCost, cam: cam ? c.camCost : 0 };
-      x.total = x.jeep + x.guide + x.meals + x.cam; return x;
+      x.other = 0; x.total = x.jeep + x.guide + x.meals + x.cam; return x;
     };
     const ub = (await db.query(`SELECT b.*, (SELECT COUNT(*)::int FROM booking_meals m WHERE m.booking_id=b.id AND m.preference<>'NONE') AS meal_n,
         EXISTS (SELECT 1 FROM assignments a WHERE a.booking_id=b.id AND a.role='GUIDE' AND a.status<>'DECLINED') AS has_guide_partner
       FROM bookings b WHERE b.status IN ('CONFIRMED','REQUEST') AND b.created_at >= $1::date`, [sinceDate])).rows;
     for (const b of ub) {
-      const cost = est(b.session_id, b.jeeps, b.has_guide || b.has_guide_partner, b.has_meals ? b.meal_n : 0, b.has_cam);
+      const real = (byCode[b.code] || []).length ? costOf(b.code).cost : null;
+      const cost = real || est(b.session_id, b.jeeps, b.has_guide || b.has_guide_partner, b.has_meals ? b.meal_n : 0, b.has_cam);
       b.total = Math.round(b.total * (+b.fx || 1));
-      out.push({ code: b.code, kind: 'Private', date: b.date, bookedOn: U.dateOf(b.created_at), ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue: b.total, paid: Math.round(b.paid * (+b.fx || 1)), mealsN: b.meal_n, cam: b.has_cam ? 1 : 0, vendor: '', guide: '', name: b.lead_name, status: 'Upcoming', est: true, cost, profit: b.total - cost.total });
+      out.push({ code: b.code, kind: 'Private', date: b.date, bookedOn: U.dateOf(b.created_at), ses: b.session_id, guests: b.guests, jeeps: b.jeeps, revenue: b.total, paid: Math.round(b.paid * (+b.fx || 1)), mealsN: b.meal_n, cam: b.has_cam ? 1 : 0, vendor: '', guide: '', name: b.lead_name, status: 'Upcoming', est: !real, cost, profit: b.total - cost.total });
     }
     const ut = (await db.query(`SELECT t.*, COALESCE(ROUND(SUM(s.amount * s.fx)),0)::int AS revenue, COUNT(s.*)::int AS n, COUNT(*) FILTER (WHERE s.meals)::int AS meal_n, BOOL_OR(s.has_guide) AS guide,
         MIN(s.created_at) AS first_paid
       FROM shared_trips t JOIN shared_seats s ON s.trip_id=t.id AND s.status='PAID'
       WHERE t.status IN ('OPEN','LINKS_SENT','CONFIRMED','FULL') GROUP BY t.id HAVING MIN(s.created_at) >= $1::date`, [sinceDate])).rows;
     for (const t of ut) {
-      const cost = est(t.session_id, 1, t.guide, t.meal_n, false);
-      out.push({ code: t.id, kind: 'Shared', date: t.date, bookedOn: U.dateOf(t.first_paid), ses: t.session_id, guests: t.n, jeeps: 1, revenue: t.revenue, paid: t.revenue, mealsN: t.meal_n, cam: 0, vendor: '', guide: '', name: t.n + ' paid guests', status: 'Upcoming', est: true, cost, profit: t.revenue - cost.total });
+      const real = (byCode[t.id] || []).length ? costOf(t.id).cost : null;
+      const cost = real || est(t.session_id, 1, t.guide, t.meal_n, false);
+      out.push({ code: t.id, kind: 'Shared', date: t.date, bookedOn: U.dateOf(t.first_paid), ses: t.session_id, guests: t.n, jeeps: 1, revenue: t.revenue, paid: t.revenue, mealsN: t.meal_n, cam: 0, vendor: '', guide: '', name: t.n + ' paid guests', status: 'Upcoming', est: !real, cost, profit: t.revenue - cost.total });
     }
   }
   return out.sort((a, b) => b.date.localeCompare(a.date));

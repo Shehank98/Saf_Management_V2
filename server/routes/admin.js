@@ -126,6 +126,15 @@ r.post('/shared', staff, U.wrap(async (req, res) => { const t = await shared.cre
 r.post('/shared/:id/assign', staff, U.wrap(async (req, res) => { await shared.assignPartners(req.params.id, { jeep: req.body.jeep, guide: req.body.guide, meals: req.body.meals }, who(req)); res.json({ ok: true }); }));
 r.get('/shared/:id/run', staff, U.wrap(async (req, res) => res.json(await require('../services/trips').pickupRun({ query }, U.normCode(req.params.id)))));
 r.post('/shared/:id/start', staff, U.wrap(async (req, res) => res.json(await require('../services/trips').startShared(req.params.id, { kind: 'ADMIN', id: req.admin.id, name: who(req) }, { force: !!req.body.force }))));
+r.post('/shared/:id/complete', staff, U.wrap(async (req, res) => { await require('../services/trips').completeShared(U.normCode(req.params.id), who(req)); res.json({ ok: true }); }));
+/* What we pay for a trip, typed in by the office (while partners are not using the app). */
+r.get('/trips/:code/costs', staff, U.wrap(async (req, res) => {
+  const costs = require('../services/costs'), code = U.normCode(req.params.code);
+  const trip = await costs.tripFor({ query }, code); if (!trip) throw U.notFound('Trip not found');
+  const lines = (await query(`SELECT l.*, p.name AS pname, po.reference, po.method FROM payout_lines l LEFT JOIN partners p ON p.id=l.partner_id LEFT JOIN payouts po ON po.id=l.payout_id WHERE l.trip_code=$1 ORDER BY l.id`, [trip.code])).rows;
+  res.json({ code: trip.code, kind: trip.kind, lines: lines.map(l => ({ id: l.id, role: l.role, amount: l.amount, partner: l.partner_id ? String(l.partner_id) : '', partnerName: l.pname || '', note: l.note || '', paid: l.status === 'PAID', ref: l.reference || '', manual: !!l.manual })) });
+}));
+r.put('/trips/:code/costs', staff, U.wrap(async (req, res) => res.json({ ok: true, ...(await require('../services/costs').setCosts(req.params.code, (req.body || {}).lines, who(req))) })));
 r.post('/shared/:id/cancel', staff, U.wrap(async (req, res) => { await shared.cancelTrip(req.params.id, { actor: who(req), reason: 'cancelled by office' }); res.json({ ok: true }); }));
 r.post('/shared/:id/remind', staff, U.wrap(async (req, res) => res.json({ ok: true, sent: await shared.remind(req.params.id, who(req)) })));
 r.post('/shared/:id/seats/:n', staff, U.wrap(async (req, res) => { await shared.addGuest(req.params.id, req.params.n, req.body, who(req)); res.json({ ok: true }); }));

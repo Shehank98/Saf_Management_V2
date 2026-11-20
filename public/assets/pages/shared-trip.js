@@ -6,7 +6,7 @@ const online = CFG.providers && CFG.providers.length > 0;
 const MEAL_PRICE = EXTRAS.meals ? EXTRAS.meals.price : 0;
 const locOf = id => (CFG.locations || []).find(l => l.id === id) || null;
 const sesAt = (loc, ses) => { const l = locOf(loc); return { ...(SESS[ses] || {}), ...((l && l.sessions[ses]) || {}) } };
-const invalid = () => frame(`<div class="card bad-link"><h2>This link isn't valid</h2><p class="muted">It may have expired, or the trip is full or cancelled.</p><a class="btn primary" href="/shared">See open dates</a></div>`);
+const invalid = () => frame(`<div class="card bad-link"><h2>This link isn't valid</h2><p class="muted">It may have expired, or the trip is full or cancelled.</p><a class="btn primary" href="/shared${(() => { try { const l = sessionStorage.getItem('park'); return l ? '?loc=' + encodeURIComponent(l) : '' } catch (e) { return '' } })()}">See open dates</a></div>`);
 const frame = (inner) => { $('#root').innerHTML = inner; $('#bar') && $('#bar').remove() };
 const banner = (title, sub) => `<div class="thead fade"><div class="eb">${esc(sub)}</div><h1>${title}</h1></div>`;
 
@@ -26,6 +26,13 @@ const TOKEN = (() => {
 const pad2 = n => String(n).padStart(2, '0');
 const gcalLink = (o, s, park) => { const c = t => o.date.replace(/-/g, '') + 'T' + (t || '00:00').replace(':', '') + '00';
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Safari · ' + (s.name || 'Shared jeep') + (park ? ' · ' + park : ''))}&dates=${c(s.pickupRaw || s.start)}/${c(s.end)}&ctz=Asia%2FColombo&details=${encodeURIComponent(`Booking ${o.code}. Seat ${o.seats.join(', ')}. Pickup ${s.pickup || ''}. Your e-ticket: ${location.origin}/t/${o.code}?k=${o.k}`)}` };
+/* If too few guests join, a guest can still go by paying for the empty seats the jeep needs. */
+function soloNote(need, extra, cancelAt, cur) {
+  if (!need || need < 1) return '';
+  const by = cancelAt ? new Date(cancelAt).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Colombo' }) : '';
+  const f = n => cur ? fmtCur(n, cur) : fmt(n);
+  return `<div class="solo"><b>Not enough guests join? You can still go.</b><p>If we cannot find ${need === 1 ? 'one more guest' : need + ' more guests'}${by ? ' by <b>' + by + '</b>' : ''}, you can still take the safari. Pay <b>${f(extra)}</b> extra (${need} empty seat${need > 1 ? 's' : ''}) and it goes ahead anyway. We will contact you before then. Otherwise you get a full refund.</p></div>`;
+}
 function celebrate(o) {
   // o: { state: 'paid'|'reserved'|'unpaid', name, code, k, seats, date, ses, loc, ticketReady, email, minSeats, payWindowH }
   const s = sesAt(o.loc, o.ses), park = (locOf(o.loc) || {}).name || '', first = String(o.name || '').split(' ')[0];
@@ -43,6 +50,7 @@ function celebrate(o) {
     <div class="stub"><div class="stub-l"><span class="eb">${esc(park || 'Shared safari')}</span><b>${esc(s.name || '')}</b><span>${nice(o.date)}</span>
       <div class="stub-row"><div>Pickup<b>${esc(s.pickup || '-')}</b></div><div>Seat${o.seats.length > 1 ? 's' : ''}<b>${o.seats.join(', ')}</b></div><div class="wide">Safari time<b>${esc(timeShort(s.time || ''))}</b></div></div></div>
       <div class="stub-r"><span>Booking code</span><b class="mono">${esc(o.code)}</b></div></div>
+    ${o.state !== 'unpaid' && o.solo ? soloNote(o.solo.need, o.solo.extra, o.solo.cancelAt, o.solo.cur) : ''}
     ${o.state !== 'unpaid' && start > new Date() ? `<div class="count" id="count" aria-live="off"></div>` : ''}
     <div class="acts">${o.state === 'unpaid' ? `<a class="btn primary big" href="/s/${esc(TID)}?pay=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}">Try paying again</a>`
       : `${o.state === 'paid' && o.ticketReady ? `<a class="btn primary big" href="/t/${encodeURIComponent(o.code)}?k=${encodeURIComponent(o.k)}">Open my e-ticket</a>` : (o.state === 'reserved' || o.state === 'payup') ? `<a class="btn primary big" href="/s/${esc(TID)}?pay=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}">${o.state === 'payup' ? `Pay ${fmt(o.amount)} now` : 'Pay now to lock it in'}</a>` : ''}
@@ -78,7 +86,7 @@ async function showDone(tries = 0) {
   if (p.cur) fmt = n => fmtCur(n, p.cur);
   if (p.error || p.gone) return frame(`<div class="card bad-link"><h2>We couldn't find that booking</h2><p class="muted">${esc(p.error || 'Those seats are no longer held.')}</p><a class="btn primary" href="/s/${esc(TID)}">Back to the trip</a></div>`);
   if (!p.paid && tries < 20) { frame(`<div class="card bad-link"><div class="spin" aria-hidden="true"></div><h1>Confirming your payment…</h1><p class="muted">This usually takes a few seconds.</p></div>`); return setTimeout(() => showDone(tries + 1), 2500) }
-  celebrate({ state: p.paid ? 'paid' : 'unpaid', name: p.name, code: p.code, k: p.k, seats: p.seats, date: p.date, ses: p.ses, loc: p.loc, ticketReady: p.ticketReady, minSeats: p.minSeats || CFG.minSeats, payWindowH: p.payWindowH || CFG.payWindowH });
+  celebrate({ state: p.paid ? 'paid' : 'unpaid', name: p.name, code: p.code, k: p.k, seats: p.seats, date: p.date, ses: p.ses, loc: p.loc, ticketReady: p.ticketReady, solo: p.paid ? p.solo : null, minSeats: p.minSeats || CFG.minSeats, payWindowH: p.payWindowH || CFG.payWindowH });
 }
 async function showPayLink() {
   const p = await purchase();
@@ -99,6 +107,7 @@ async function showPayLink() {
 async function pickSeats() {
   let trip;
   try { trip = await GET(`/api/shared/${encodeURIComponent(TID)}?token=${encodeURIComponent(TOKEN)}`) } catch (e) { return invalid() }
+  try { sessionStorage.setItem('park', trip.loc) } catch (e) { }
   if (trip.full && trip.nextId) { location.replace('/s/' + trip.nextId); return }
   if (trip.cur) fmt = n => fmtCur(n, trip.cur); // a trip keeps the currency it was priced in
   if (!online && !trip.allowLater) return frame(`<div class="card bad-link"><h2>Booking opens soon</h2><p class="muted">Online payment is not switched on yet. Please contact us to book a seat.</p></div>`);
@@ -116,7 +125,7 @@ async function pickSeats() {
   const IC = { time: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'), pin: ico('<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'), tag: ico('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/>'), seat: ico('<path d="M7 4h7a2 2 0 0 1 2 2v7H7z"/><path d="M5 13h14v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>') };
   function head() {
     const need = minSeats - trip.paid, pend = taken.size - trip.paid;
-    return `<div class="thead fade"><div class="eb">${esc(park.name)} · Shared jeep ${trip.jeepNo || 1}</div><h1>${esc(s.name)}</h1><div class="dline">${ico('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>')}${nice(trip.date)}</div>
+    return `<div class="thead fade"><div class="ebrow"><div class="eb">${esc(park.name)} · Shared jeep ${trip.jeepNo || 1}</div>${step === 0 ? `<a class="chg" href="/shared?loc=${encodeURIComponent(trip.loc)}&ses=${encodeURIComponent(trip.ses)}&date=${trip.date}">Change date</a>` : ''}</div><h1>${esc(s.name)}</h1><div class="dline">${ico('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>')}${nice(trip.date)}</div>
     <div class="facts2"><div class="f wide">${IC.time}<span>Safari time<b>${timeShort(s.time)}</b></span></div><div class="f">${IC.pin}<span>Pickup<b>${s.pickup}</b></span></div><div class="f">${IC.tag}<span>Per seat<b>${fmt(trip.price)}</b></span></div>
     <div class="f wide seatsleft">${IC.seat}<span>Seats left<b>${maxSeats - taken.size} of ${maxSeats}</b></span><i class="dots" aria-hidden="true">${Array.from({ length: maxSeats }, (_, i) => `<u class="${i < trip.paid ? 'p' : i < taken.size ? 'h' : ''}"></u>`).join('')}</i></div></div>
     <div class="runs"><div class="meter" aria-hidden="true"><span style="width:${trip.paid / maxSeats * 100}%;background:var(--olive)"></span><span style="width:${pend / maxSeats * 100}%;background:#d9a441"></span></div>
@@ -212,6 +221,7 @@ async function pickSeats() {
       ${goesAhead ? `<div class="note ok" style="margin:0"><b>Your safari is going ahead!</b> With ${mine.size === 1 ? 'this seat' : 'these seats'} the jeep has the ${minSeats} guests it needs, so please pay now to lock ${mine.size === 1 ? 'it' : 'them'} in.</div>` : ''}
       ${trip.allowLater && !goesAhead ? `<button class="opt ${f.pay === 'later' ? 'on' : ''}" data-v="later"><span class="radio"></span><b>Reserve now, pay later</b><p class="small muted" style="margin:4px 40px 0 0">Free hold. We email a payment link when ${minSeats} seats are reserved. Pay within ${trip.payWindowH} hours or the seat is released.</p></button>` : ''}</div>
       ${f.pay === 'card' ? `<div class="card" style="margin-top:12px"><b style="display:block;margin-bottom:8px">How do you want to pay?</b>${CFG.providers.length > 1 ? `<div class="grid" style="gap:8px;margin-bottom:10px">${CFG.providers.map(x => `<button type="button" class="opt ${x.id === f.provider ? 'on' : ''}" data-p="${x.id}" style="padding:12px 44px 12px 14px"><span class="radio"></span><b>${esc(x.label)}</b></button>`).join('')}</div>` : ''}<p class="small muted" style="margin:0">You'll pay on a secure page run by <b>${esc((CFG.providers.find(x => x.id === f.provider) || {}).label || 'our payment partner')}</b>. Your card details never touch our website.</p></div>` : ''}
+      ${!goesAhead ? soloNote(Math.max(0, minSeats - (taken.size + mine.size)), Math.max(0, minSeats - (taken.size + mine.size)) * trip.price, trip.cancelAt) : ''}
       <label class="chk"><input type="checkbox" id="ft" ${f.terms ? 'checked' : ''}><span>I agree to the shared safari terms and cancellation policy. <span class="muted">${esc(policyText())}</span></span></label></div>
       <div>${summary()}</div></div>`;
       $('#nx').textContent = due ? `Pay ${fmt(due)}` : 'Reserve my seat';
@@ -292,7 +302,7 @@ async function pickSeats() {
       const hotel = f.pmode === 'hotel';
       const r = await POST(`/api/shared/${encodeURIComponent(TID)}/seats`, { seats: seatsSorted(), token: TOKEN, name: f.name, cc: f.cc, phone: f.phone, email: f.email, hotel: hotel ? f.hotel : '', lat: hotel ? f.lat : null, lng: hotel ? f.lng : null, meals, bino: f.bino, guide: f.guide, pay: f.pay, provider: f.pay === 'card' ? f.provider : undefined });
       if (r.checkoutUrl) { location.href = r.checkoutUrl; return }
-      celebrate({ state: r.seatStatus === 'PAYMENT_PENDING' ? 'payup' : 'reserved', amount: r.total, deadline: r.deadline, name: f.name, code: r.code, k: r.k, seats: r.seats, date: trip.date, ses: trip.ses, loc: trip.loc, email: f.email, minSeats, payWindowH: trip.payWindowH });
+      celebrate({ state: r.seatStatus === 'PAYMENT_PENDING' ? 'payup' : 'reserved', amount: r.total, deadline: r.deadline, name: f.name, code: r.code, k: r.k, seats: r.seats, date: trip.date, ses: trip.ses, loc: trip.loc, email: f.email, solo: r.solo, minSeats, payWindowH: trip.payWindowH });
     } catch (e) {
       b.disabled = false;
       if (e.status === 409 && e.data && e.data.taken) { taken = new Set(e.data.taken); locked = new Set(e.data.locked || []); [...mine.keys()].forEach(n => { if (taken.has(n) || locked.has(n)) mine.delete(n) }); step = 0 }

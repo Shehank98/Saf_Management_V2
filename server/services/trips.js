@@ -126,7 +126,8 @@ async function checkinPrivate(b0, { force, preview, actor, conf, today }) {
     if (guide) lines.push({ partner: guide.partner_id, role: 'GUIDE', qty: b.jeeps, amount: b.jeeps * (c.guideFee[b.session_id] || 0) });
     if (mealN) lines.push({ partner: mealPartner ? mealPartner.partner_id : await defaultMealSupplier(db), role: 'MEALS', qty: mealN, amount: mealN * c.mealCost });
     if (b.has_cam) lines.push({ partner: null, role: 'CAMERA', qty: 1, amount: c.camCost });
-    await insertLines(db, lines, { bookingId: b.id, code: b.code, date: b.date, sessionId: b.session_id });
+    // costs the office already typed in by hand win over the standard fees
+    if (!(await require('./costs').hasLines(db, b.code))) await insertLines(db, lines, { bookingId: b.id, code: b.code, date: b.date, sessionId: b.session_id });
     const r = await db.query(`UPDATE bookings SET status='STARTED', started_at=now(), started_by=$2 WHERE id=$1 RETURNING *`, [b.id, actor.name]);
     await activity.log(db, 'booking', b.code, `Trip started ${U.hhmm(r.rows[0].started_at)} (ticket scanned) · “safari started” email sent`, actor.name);
     const row = r.rows[0];
@@ -306,7 +307,7 @@ async function startShared(tripId, actor, { force = false } = {}) {
       const lines = [{ partner: jeep ? jeep.partner_id : null, role: 'JEEP', qty: 1, amount: c.jeepFee[t.session_id] || 0 }];
       if (guide) lines.push({ partner: guide.partner_id, role: 'GUIDE', qty: 1, amount: c.guideFee[t.session_id] || 0 });
       if (mealN) lines.push({ partner: mealPartner ? mealPartner.partner_id : await defaultMealSupplier(db), role: 'MEALS', qty: mealN, amount: mealN * c.mealCost });
-      await insertLines(db, lines, { tripId: t.id, code: t.id, date: t.date, sessionId: t.session_id });
+      if (!(await require('./costs').hasLines(db, t.id))) await insertLines(db, lines, { tripId: t.id, code: t.id, date: t.date, sessionId: t.session_id });
       await db.query(`UPDATE shared_trips SET status='STARTED', started_at=now(), started_by=$2 WHERE id=$1`, [t.id, actor.name]);
       await activity.log(db, 'trip', t.id, `Safari started (${onBoard.length} group${onBoard.length > 1 ? 's' : ''} on board${missing.length ? ', ' + missing.length + ' not picked up' : ''}) · guests emailed`, actor.name);
       startedNow = true;
@@ -349,8 +350,10 @@ async function finish({ code, actor }) {
 async function completeShared(id, actorName) {
   return tx(async db => {
     const t = (await db.query('SELECT * FROM shared_trips WHERE id=$1 FOR UPDATE', [id])).rows[0];
-    if (!['STARTED', 'CONFIRMED', 'FULL'].includes(t.status)) throw U.conflict('This trip is not running.');
+    if (!['STARTED', 'CONFIRMED', 'FULL', 'OPEN', 'LINKS_SENT'].includes(t.status)) throw U.conflict('This trip is not running.');
+    if (!(await db.query(`SELECT 1 FROM shared_seats WHERE trip_id=$1 AND status='PAID' LIMIT 1`, [id])).rowCount) throw U.conflict('No paid guests on this trip. Cancel it instead.');
     await db.query(`UPDATE shared_trips SET status='COMPLETED', completed_at=now() WHERE id=$1`, [id]);
+    await require('./costs').ensureDefaultLines(db, id);   // finished by hand: make sure the profit report has the partner costs
     await activity.log(db, 'trip', id, 'Completed · thank-you emails sent', actorName);
     db.after(async () => { await tx(c => notify.sharedThanks(c, t)); live.publish('shared', { id }); });
     return t;

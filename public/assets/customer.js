@@ -41,7 +41,7 @@ function requireStep(...keys) { if (keys.some(k => !P.get(k))) { go(keys.include
 const STEPS = [['01-session.html', 'Session'], ['02-date.html', 'Date'], ['03-group.html', 'Group'], ['04-pickup-extras.html', 'Pickup & extras'], ['05-checkout.html', 'Checkout']];
 function topbar() {
   return `<header class="top"><div class="wrap row"><a class="logo" href="/"><span class="mk">${JEEP('#fff6e6', 24, 16)}</span>${esc(BRAND)}</a>
-  <div class="links">${CFG.privateOn ? '<a class="lnk" href="/booking">My booking</a>' : '<a class="lnk" href="/shared">Book a seat</a>'}<button class="lnk" data-theme-toggle aria-label="Switch light or dark theme">${THEME_ICON}</button></div></div></header>`;
+  <div class="links">${CFG.privateOn ? '<a class="lnk" href="/booking">My booking</a>' : `<a class="lnk" href="/shared${(() => { try { const l = sessionStorage.getItem('park'); return l ? '?loc=' + encodeURIComponent(l) : '' } catch (e) { return '' } })()}">Book a seat</a>`}<button class="lnk" data-theme-toggle aria-label="Switch light or dark theme">${THEME_ICON}</button></div></div></header>`;
 }
 function stepper(cur) {
   return `<div class="wrap stepper"><div class="track"><div class="fill" style="width:0"></div><div class="car" style="left:0">${JEEP()}</div></div>

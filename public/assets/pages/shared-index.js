@@ -1,5 +1,9 @@
 mount();
-const LOCS = CFG.locations || [];
+const ALL_LOCS = CFG.locations || [];
+// A link with ?loc=yala belongs to that one park: only it is shown and nobody can switch to another park from here.
+const LOCKED = ALL_LOCS.some(l => l.id === P.get('loc'));
+try { if (LOCKED) sessionStorage.setItem('park', P.get('loc')) } catch (e) { }
+const LOCS = LOCKED ? ALL_LOCS.filter(l => l.id === P.get('loc')) : ALL_LOCS;
 let loc = (LOCS.find(l => l.id === P.get('loc')) || LOCS[0] || {}).id;
 const LOC = () => LOCS.find(l => l.id === loc) || LOCS[0] || { sessions: SESS, name: '' };
 const SES = () => Object.fromEntries(Object.entries(SESS).filter(([k]) => LOC().sessions[k]).map(([k, s]) => [k, { ...s, ...LOC().sessions[k] }]));
@@ -8,7 +12,7 @@ let view = sel ? new Date(parseIso(sel).getFullYear(), parseIso(sel).getMonth(),
 if (CFG.privateOn) $('#privLink').hidden = false;
 const keepUrl = () => { const q = new URLSearchParams({ loc, ses }); if (sel) q.set('date', sel); history.replaceState(null, '', '/shared?' + q) };
 function locSeg() {
-  $('#locWrap').hidden = LOCS.length < 2;
+  $('#locWrap').hidden = LOCKED || LOCS.length < 2;
   $('#locSeg').innerHTML = LOCS.map(l => `<button data-l="${esc(l.id)}" class="${l.id === loc ? 'on' : ''}">${esc(l.name)}</button>`).join('');
   $$('#locSeg button').forEach(b => b.onclick = () => { loc = b.dataset.l; if (!SES()[ses]) ses = Object.keys(SES())[0]; sel = null; locSeg(); sesSeg(); keepUrl(); refresh() });
 }

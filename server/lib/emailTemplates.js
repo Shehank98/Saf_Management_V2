@@ -267,7 +267,7 @@ function cust_cancelled(b, { refund, pct }, c) {
   };
 }
 
-function cust_shared_seat({ trip, session, seats, code, variant, name, payUrl, minSeats, payWindowH, ticketNow }, c) {
+function cust_shared_seat({ trip, session, seats, code, variant, name, payUrl, minSeats, payWindowH, ticketNow, solo }, c) {
   const paid = variant === 'paid';
   return {
     subject: paid ? `Payment received: shared safari ${shortDate(trip.date)}` : `Seat reserved: shared safari ${shortDate(trip.date)}`,
@@ -276,7 +276,8 @@ function cust_shared_seat({ trip, session, seats, code, variant, name, payUrl, m
       body: p(`Hi ${esc(name.split(' ')[0])}, ${paid ? 'we have received your payment' : 'your seat is on hold'} for the ${esc(session.name.toLowerCase())} on <b>${niceDate(trip.date)}</b>.`)
         + table([row('Booking code', esc(code)), row('Seats', seats.join(', ')), row('Pickup', esc(session.pickup))])
         + (paid ? callout(ticketNow ? '🎟️ This jeep has enough travellers, so your e-ticket is in a separate email.' : `Your e-ticket is emailed as soon as ${minSeats} seats are paid.`, 'info')
-          : callout(`We email a payment link as soon as ${minSeats} seats are booked. You will then have ${payWindowH} hours to pay.`, 'info') + btn(payUrl, '💳 Pay now to lock my seat')),
+          : callout(`We email a payment link as soon as ${minSeats} seats are booked. You will then have ${payWindowH} hours to pay.`, 'info') + btn(payUrl, '💳 Pay now to lock my seat'))
+        + (solo ? callout(`<b>If nobody else joins:</b> we are still looking for guests to share your jeep. If we cannot find anyone${solo.cancelAt ? ' by ' + new Date(solo.cancelAt).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Colombo' }) : ''}, you can still go. Pay <b>${fmtMoney(solo.extra, trip.currency)}</b> extra (${solo.need} empty seat${solo.need > 1 ? 's' : ''} × ${fmtMoney(solo.price, trip.currency)}) and the safari goes ahead anyway.${c && c.conf && c.conf.business && c.conf.business.phone ? ' Call us on ' + esc(c.conf.business.phone) + ' or reply to this email.' : ' Just reply to this email.'}`, 'info') : ''),
     }),
   };
 }

@@ -130,8 +130,8 @@ function adminShell({ active, title, actions = '', nav = ADMIN_NAV, who = null, 
 }
 function openDrawer(html) { $('#drawer').innerHTML = html; $('#drawer').classList.add('open'); $('#scrim').classList.add('show'); const x = $('#drawer .x'); if (x) { x.onclick = closeDrawer; x.focus() } }
 function closeDrawer() { $('#drawer')?.classList.remove('open'); $('#scrim')?.classList.remove('show') }
-function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').classList.add('show'); $$('#modalBody [data-close]').forEach(b => b.onclick = closeModal) }
-function closeModal() { $('#modal')?.classList.remove('show', 'tpm', 'vdm') }
+function openModal(html) { $('#modal').classList.remove('tpm', 'vdm', 'clm'); $('#modalBody').innerHTML = html; $('#modal').classList.add('show'); $$('#modalBody [data-close]').forEach(b => b.onclick = closeModal) }
+function closeModal() { $('#modal')?.classList.remove('show', 'tpm', 'vdm', 'clm') }
 const STATUS_CLS = { Request: 'warn', 'Deposit paid': 'info', Started: 'live', Confirmed: 'ok', Completed: '', Cancelled: 'bad', Open: 'warn', 'Payment links sent': 'info', Full: 'info' };
 const badge = s => `<span class="tag ${STATUS_CLS[s] ?? ''}">${esc(s)}</span>`;
 const vendorOpts = (type, sel) => `<option value="">${type === 'meals' ? '- Main meal supplier -' : '- Not assigned -'}</option>` + VENDORS.filter(v => v.status === 'Active' && (type === 'jeep' ? v.type === 'Jeep + driver' : type === 'meals' ? v.type === 'Meal supplier' : v.type === 'Tracker / guide')).map(v => `<option value="${v.id}" ${v.id === String(sel) ? 'selected' : ''}>${esc(v.name)}${v.plate ? ' · ' + esc(v.plate) : ''}</option>`).join('');
@@ -302,4 +302,34 @@ function bankBlockHTML(v, amount) {
 }
 function wireCopy() {
   $$('[data-copy]').forEach(b => { if (b.dataset.w) return; b.dataset.w = 1; b.onclick = async () => { const t = b.dataset.copy; try { await navigator.clipboard.writeText(t) } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy') } catch (x) { } document.body.removeChild(ta) } const o = b.textContent; b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = o }, 1400) } });
+}
+
+/* What we pay for a trip, typed in by the office. Used from the trip popup and from the profit page. */
+async function costEditor(code, done) {
+  let d; try { d = await GET(`/api/admin/trips/${encodeURIComponent(code)}/costs`) } catch (e) { return toastErr(e) }
+  const trip = SHARED.find(t => t.id === code) || BOOKINGS.find(b => b.code === code) || {};
+  const ses = trip.ses, fee = r => r === 'JEEP' ? (CONF.costs.jeepFee || {})[ses] || 0 : r === 'GUIDE' ? (CONF.costs.guideFee || {})[ses] || 0 : 0;
+  const ROLES = [['JEEP', 'Jeep + driver'], ['GUIDE', 'Tracker / guide'], ['MEALS', 'Meals'], ['OTHER', 'Other']];
+  const paid = d.lines.filter(l => l.paid);
+  let rows = d.lines.filter(l => !l.paid).map(l => ({ role: l.role, amount: l.amount, partner: l.partner, note: l.note }));
+  if (!rows.length && !paid.length) { rows = [{ role: 'JEEP', amount: fee('JEEP') || '', partner: trip.vendor || '', note: '' }]; if (trip.guide) rows.push({ role: 'GUIDE', amount: fee('GUIDE') || '', partner: trip.guide, note: '' }) }
+  const partnerOpts = cur => `<option value="">Not in the system (just a cost)</option>` + VENDORS.map(v => `<option value="${v.id}" ${v.id === String(cur) ? 'selected' : ''}>${esc(v.name)} · ${esc(v.type)}</option>`).join('');
+  const draw = () => {
+    openModal(`<h3>What we pay for ${esc(code)}</h3>
+    <p class="small muted" style="margin:6px 0 12px">Type what you give the driver, guide or meal supplier for this trip. These amounts go straight into <b>Profit</b>. Choose a partner if you want to pay them later from <b>Payments → Money out</b> (their bank details are saved there). Leave it as "Not in the system" if you hand the money over yourself.</p>
+    ${paid.length ? `<div class="note ok small" style="margin-bottom:10px">Already paid: ${paid.map(l => `${esc(l.partnerName || l.role)} ${fmt(l.amount)} (${esc(l.ref)})`).join(' · ')}</div>` : ''}
+    <div id="clRows">${rows.map((r, i) => `<div class="clrow" data-i="${i}"><select class="inp" data-f="role" aria-label="What for">${ROLES.map(([k, l]) => `<option value="${k}" ${k === r.role ? 'selected' : ''}>${l}</option>`).join('')}</select><input class="inp" data-f="amount" type="number" inputmode="numeric" min="0" step="500" value="${r.amount}" placeholder="Amount" aria-label="Amount"><select class="inp" data-f="partner" aria-label="Partner">${partnerOpts(r.partner)}</select><input class="inp" data-f="note" value="${esc(r.note || '')}" placeholder="Note (optional)" maxlength="80" aria-label="Note"><button type="button" class="btn sm danger" data-del="${i}" aria-label="Remove line">×</button></div>`).join('')}</div>
+    <button type="button" class="btn sm" id="clAdd" style="margin-top:8px">+ Add a line</button>
+    <div class="cltot"><span>Total we pay</span><b id="clTot"></b></div><div id="clErr" class="errmsg"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn" data-close>Cancel</button><button class="btn primary" id="clSave">Save costs</button></div>`);
+    $('#modal').classList.add('clm');
+    const read = () => $$('#clRows .clrow').map(r => ({ role: r.querySelector('[data-f=role]').value, amount: r.querySelector('[data-f=amount]').value, partner: r.querySelector('[data-f=partner]').value, note: r.querySelector('[data-f=note]').value }));
+    const tot = () => { $('#clTot').textContent = fmt(read().reduce((a, r) => a + (+r.amount || 0), 0)) };
+    $$('#clRows input,#clRows select').forEach(x => { x.oninput = tot; x.onchange = tot });
+    $$('[data-del]').forEach(b => b.onclick = () => { rows = read(); rows.splice(+b.dataset.del, 1); draw() });
+    $('#clAdd').onclick = () => { rows = read(); rows.push({ role: 'OTHER', amount: '', partner: '', note: '' }); draw() };
+    $('#clSave').onclick = async e => { const lines = read().map(r => ({ ...r, amount: +r.amount || 0 })); if (await act(() => PUT(`/api/admin/trips/${encodeURIComponent(code)}/costs`, { lines }), 'Costs saved · profit updated', e.target)) { await reload(); closeModal(); if (done) done() } };
+    tot();
+  };
+  draw();
 }

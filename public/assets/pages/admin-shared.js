@@ -128,11 +128,12 @@ function tOverview(t) {
   const p = paidOf(t), pend = pendOf(t).length, dn = isDone(t), started = t.status === 'Started';
   const step = (ok, label, hint, act) => `<li class="${ok ? 'ok' : 'todo'}"><span class="ck">${ok ? '✓' : '!'}</span><div><b>${label}</b>${hint ? `<div class="small muted">${hint}</div>` : ''}</div>${act || ''}</li>`;
   const steps = dn || started ? '' : `<h4 class="tph4">What to do next</h4><ul class="steps2">
-    ${step(p >= t.minSeats, `Enough paid seats (${p} of ${t.minSeats})`, p >= t.minSeats ? 'This jeep is going ahead.' : `${t.minSeats - p} more must pay. Auto-cancels ${shortDate(t.deadline)} ${t.deadlineTime} if not.`, p < t.minSeats ? `<button class="btn sm" data-go="share">Share link</button>` : '')}
+    ${step(p >= t.minSeats, `Enough paid seats (${p} of ${t.minSeats})`, p >= t.minSeats ? 'This jeep is going ahead.' : `${t.minSeats - p} more must pay. Auto-cancels ${shortDate(t.deadline)} ${t.deadlineTime} if not. If nobody joins, a guest can still go by paying ${gm((t.minSeats - p) * t.price, t)} extra for the empty seats.`, p < t.minSeats ? `<button class="btn sm" data-go="share">Share link</button>` : '')}
     ${step(!pend, pend ? `${pend} seat${pend > 1 ? 's' : ''} not paid yet` : 'Everyone has paid', pend ? 'Send a reminder or mark cash payments.' : '', pend ? `<button class="btn sm" data-go="money">Open money</button>` : '')}
     ${step(!!t.vendor, t.vendor ? `Jeep: ${esc(vendorName(t.vendor))}${stateNote(t.vendorState)}` : 'Assign a jeep and driver', t.vendor ? '' : 'The driver gets the job and the guest list.', `<button class="btn sm ${t.vendor ? '' : 'primary'}" data-go="team">${t.vendor ? 'Team' : 'Assign'}</button>`)}
     ${t.guideWanted ? step(!!t.guide, t.guide ? `Guide: ${esc(vendorName(t.guide))}` : 'A guest paid for a guide', t.guide ? '' : 'Assign a naturalist guide.', `<button class="btn sm" data-go="team">${t.guide ? 'Team' : 'Assign'}</button>`) : ''}
-    ${step(false, 'On the day: pickup run', 'The driver collects the guests (closest first) and starts the safari.', `<button class="btn sm" data-go="pickup">Open</button>`).replace('class="todo"', 'class="next"').replace('<span class="ck">!</span>', '<span class="ck">▶</span>')}</ul>`;
+    ${step(false, 'On the day: pickup run', 'The driver collects the guests (closest first) and starts the safari.', `<button class="btn sm" data-go="pickup">Open</button>`).replace('class="todo"', 'class="next"').replace('<span class="ck">!</span>', '<span class="ck">▶</span>')}
+    ${step(false, 'After the trip: pay the team and close it', 'Enter what you gave the driver, then mark the trip done. It then shows in Profit.', `<button class="btn sm" data-go="money">Enter costs</button>`).replace('class="todo"', 'class="next"').replace('<span class="ck">!</span>', '<span class="ck">$</span>')}</ul>`;
   return `${started ? `<div class="note ok" style="margin-bottom:12px">🚙 This safari is on the road (started ${t.startedAt}).</div>` : dn ? `<div class="note" style="margin-bottom:12px">This trip is ${status(t).toLowerCase()}.</div>` : ''}${steps}
     <h4 class="tph4">Seats <span class="muted">· tap a seat for the guest, or a free seat to add one</span></h4>${seatMapHTML(t)}
     ${t.guideWanted ? '<p class="small muted" style="margin-top:10px">🧭 A guest paid for a naturalist guide on this jeep.</p>' : ''}`;
@@ -159,11 +160,10 @@ function tGuests(t) {
 /* ---- Money: collected, waiting, partner costs ---- */
 function tMoney(t) {
   const bs = bookingsOf(t), live = t.seats.filter(x => x.pay !== 'Refunded'), got = live.filter(x => x.pay === 'Paid').reduce((a, x) => a + (x.amount || 0), 0), wait = live.filter(x => x.pay !== 'Paid').reduce((a, x) => a + (x.amount || 0), 0);
-  const lines = typeof PAYOUT_LINES !== 'undefined' ? PAYOUT_LINES.filter(l => l.code === t.id) : [], cost = lines.reduce((a, l) => a + l.amount, 0), fx = t.fx || 1;
   return `<div class="mkpis"><div class="ok"><span>Collected</span><b>${gm(got, t)}</b></div><div class="${wait ? 'warn' : ''}"><span>Still to pay</span><b>${gm(wait, t)}</b></div><div><span>Price per seat</span><b>${gm(t.price, t)}</b></div><div><span>If all ${t.seatsMax} seats sell</span><b>${gm(t.price * t.seatsMax, t)}</b></div></div>
     <div class="note" style="margin:12px 0">Shared seats are paid in full when booking. There is no advance.</div>
     <h4 class="tph4">Who pays what</h4><div class="tblw"><table class="t"><thead><tr><th>Guest</th><th>Seats</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>${bs.map(b => { const grp = t.seats.filter(y => y.code === b.code), pend = grp.filter(y => y.pay !== 'Paid'), tot = grp.reduce((a, y) => a + (y.amount || 0), 0); return `<tr><td><b>${esc(b.name)}</b></td><td>${grp.map(y => y.n).join(', ')}</td><td class="num">${gm(tot, t)}</td><td>${b.paid ? `<span class="tag ok">Paid</span><div class="tiny muted">${esc(b.payHow || 'card')}${b.paidAt ? ' · ' + shortDate(b.paidAt) : ''}</div>` : '<span class="tag warn">Not paid</span>'}</td><td>${!b.paid && !isDone(t) ? `<button class="btn sm ok" data-paid="${pend[0].n}">Mark paid</button>` : ''}</td></tr>` }).join('') || '<tr><td colspan="5" class="empty">No bookings yet</td></tr>'}</tbody></table></div>
-    <h4 class="tph4">What we pay partners for this trip</h4>${lines.length ? `<div class="tblw"><table class="t"><thead><tr><th>Partner</th><th>For</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>${lines.map(l => `<tr><td>${esc(vendorName(l.vendor))}</td><td>${esc(l.role)}</td><td class="num">${fmt(l.amount)}</td><td>${l.paid ? `<span class="tag ok">Paid</span>` : '<span class="tag warn">Unpaid</span>'}</td></tr>`).join('')}</tbody></table></div><p class="small" style="margin-top:8px">Profit so far: <b>${fmt(Math.round(got * fx) - cost)}</b> <span class="muted">(collected minus partner costs)</span></p>` : '<p class="small muted">Partner payments are created when the safari starts. You pay them in Payments & profit.</p>'}
+    <h4 class="tph4">What we pay for this trip <span class="muted">· driver, guide, meals</span></h4><div id="costBox"><div class="empty">Loading…</div></div>
     ${!isDone(t) && t.status !== 'Started' && pendOf(t).length ? `<div style="margin-top:14px"><button class="btn" id="remind2">Send payment reminders to ${pendOf(t).length} unpaid seat${pendOf(t).length > 1 ? 's' : ''}</button></div>` : ''}`;
 }
 /* ---- Team: jeep, guide, meals + WhatsApp ---- */
@@ -193,7 +193,16 @@ const wire = {
     if (TP.focus) { const el = $(`#tpBody details[data-code="${CSS.escape(TP.focus)}"]`); if (el) setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50) }
     if (TP.addSeat && af) setTimeout(() => $('#gn').focus(), 50);
   },
-  money(t) {
+  async money(t) {
+    const box = $('#costBox'), fx = t.fx || 1;
+    if (box) GET(`/api/admin/trips/${encodeURIComponent(t.id)}/costs`).then(d => {
+      if (!$('#costBox') || TP.id !== t.id || TP.tab !== 'money') return;
+      const got = t.seats.filter(x => x.pay === 'Paid').reduce((a, x) => a + (x.amount || 0), 0), cost = d.lines.reduce((a, l) => a + l.amount, 0), ROLE = { JEEP: 'Jeep + driver', GUIDE: 'Tracker / guide', MEALS: 'Meals', CAMERA: 'Camera', OTHER: 'Other' };
+      $('#costBox').innerHTML = (d.lines.length ? `<div class="tblw"><table class="t"><thead><tr><th>For</th><th>Paid to</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>${d.lines.map(l => `<tr><td>${ROLE[l.role]}${l.note ? `<div class="tiny muted">${esc(l.note)}</div>` : ''}</td><td>${l.partnerName ? esc(l.partnerName) : '<span class="muted">by hand</span>'}</td><td class="num">${fmt(l.amount)}</td><td>${l.paid ? `<span class="tag ok">Paid</span><div class="tiny muted">${esc(l.ref)}</div>` : l.partner ? '<span class="tag warn">To pay</span>' : '<span class="tag">Cost</span>'}</td></tr>`).join('')}</tbody></table></div><p class="small" style="margin:8px 0 0">Total cost <b>${fmt(cost)}</b> · profit so far <b>${fmt(Math.round(got * fx) - cost)}</b> <span class="muted">(collected minus costs)</span></p>`
+        : '<p class="small muted" style="margin:0 0 8px">No costs entered yet. Type what you give the driver and the profit page will show it.</p>')
+        + `<div style="margin-top:10px"><button class="btn ${d.lines.length ? '' : 'primary'}" id="editCosts">${d.lines.length ? 'Change costs' : 'Enter what we pay the driver'}</button></div>`;
+      $('#editCosts').onclick = () => costEditor(t.id, () => refreshTrip({ tab: 'money' }));
+    }).catch(() => { if ($('#costBox')) $('#costBox').innerHTML = '<div class="note bad">Could not load the costs.</div>' });
     $$('#tpBody [data-paid]').forEach(b => b.onclick = async e => { if (await act(() => POST(`/api/admin/shared/${t.id}/seats/${b.dataset.paid}/paid`), 'Marked as paid', e.target)) refreshTrip({ tab: 'money' }) });
     const r = $('#remind2'); if (r) r.onclick = () => act(async () => POST(`/api/admin/shared/${t.id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, r);
   },
@@ -218,11 +227,14 @@ const wire = {
 /* ---- Popup footer: reminders and cancel (cancel asks first, inside the popup) ---- */
 function drawFoot(t, confirming) {
   const el = $('#tpFoot'); if (!el) return; const lock = isDone(t) || t.status === 'Started';
-  if (lock) { el.innerHTML = `<button class="btn" data-close>Close</button>`; $$('#tpFoot [data-close]').forEach(b => b.onclick = closeModal); return }
+  const doneBtn = !isDone(t) && (t.status === 'Started' || paidOf(t) >= 1) ? `<button class="btn ok" id="doneBtn">Mark trip done</button>` : '';
+  const wireDone = () => { const d = $('#doneBtn'); if (d) d.onclick = async e => { if (!confirm(`Mark ${t.id} as done?\n\nGuests get a thank-you email and the partner costs go into Profit. Enter the driver's pay first (Money tab) if it is not the standard fee.`)) return; if (await act(() => POST(`/api/admin/shared/${t.id}/complete`), 'Trip marked as done · costs added to profit', e.target)) { await reload(); list(); closeModal() } } };
+  if (lock) { el.innerHTML = `${doneBtn}<span class="sp"></span><button class="btn" data-close>Close</button>`; $$('#tpFoot [data-close]').forEach(b => b.onclick = closeModal); wireDone(); return }
   const p = paidOf(t);
   if (confirming) { el.innerHTML = `<div class="cxq"><b>Cancel ${t.id}?</b><span class="small">All ${t.seats.length} guests are emailed and ${p} paid seat${p === 1 ? '' : 's'} (${gm(p * t.price, t)}) are refunded in full.</span></div><button class="btn" id="cxBack">Keep trip</button><button class="btn danger solid" id="cxYes">Yes, cancel trip</button>`;
     $('#cxBack').onclick = () => drawFoot(t); $('#cxYes').onclick = async e => { if (await act(() => POST(`/api/admin/shared/${t.id}/cancel`), 'Trip cancelled · guests emailed · refunds started', e.target)) { await reload(); list(); closeModal() } }; return }
-  el.innerHTML = `<button class="btn" id="remind" ${pendOf(t).length ? '' : 'disabled'}>Send reminders</button><button class="btn danger" id="cx">Cancel trip</button><span class="sp"></span><button class="btn" data-close>Close</button>`;
+  el.innerHTML = `<button class="btn" id="remind" ${pendOf(t).length ? '' : 'disabled'}>Send reminders</button><button class="btn danger" id="cx">Cancel trip</button>${doneBtn}<span class="sp"></span><button class="btn" data-close>Close</button>`;
+  wireDone();
   $$('#tpFoot [data-close]').forEach(b => b.onclick = closeModal);
   $('#remind').onclick = e => act(async () => POST(`/api/admin/shared/${t.id}/remind`), res => `Payment links re-sent to ${res.sent} guest(s)`, e.target);
   $('#cx').onclick = () => drawFoot(t, true);

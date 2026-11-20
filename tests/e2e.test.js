@@ -715,3 +715,69 @@ test('partner details: the office sees bank details and can correct them', async
   assert.equal((await fetch(base + '/api/admin/partners/999999', { method: 'PUT', headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
   assert.equal((await fetch(base + '/api/admin/partners/' + pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401, 'staff only');
 });
+
+test('manual partner costs: typed by the office, used by profit; finishing by hand fills in missing costs', async () => {
+  const date = U.addDays(U.todayStr(), 14);
+  const id = (await admin('POST', '/api/admin/shared', { date, ses: 'morning' })).json.id;
+  for (const n of [1, 2]) assert.equal((await admin('POST', `/api/admin/shared/${id}/seats/${n}`, { name: 'Cost Guest ' + n, phone: '77000000' + n, email: `cg${n}@x.com`, status: 'Paid' })).status, 200);
+  const hash = await require('../server/lib/auth').hashPassword('cost-pass-123');
+  const pid = (await query(`INSERT INTO partners(type,name,email,status,password_hash) VALUES('JEEP_DRIVER','Cost Driver','costdriver@t.lk','ACTIVE',$1) RETURNING id`, [hash])).rows[0].id;
+  // the office types what it gives the driver, plus a cost for a driver who is not in the system
+  const put = await admin('PUT', `/api/admin/trips/${id}/costs`, { lines: [{ role: 'JEEP', amount: 11000, partner: pid }, { role: 'OTHER', amount: 1500, note: 'park ticket' }] });
+  assert.equal(put.status, 200); assert.equal(put.json.total, 12500);
+  const got = (await admin('GET', `/api/admin/trips/${id}/costs`)).json.lines;
+  assert.equal(got.length, 2); assert.equal(got.find(l => l.role === 'OTHER').note, 'park ticket'); assert.equal(got.find(l => l.role === 'JEEP').partner, String(pid));
+  assert.equal((await admin('PUT', `/api/admin/trips/${id}/costs`, { lines: [{ role: 'BANANA', amount: 5 }] })).status, 400, 'unknown role');
+  assert.equal((await admin('PUT', `/api/admin/trips/${id}/costs`, { lines: [{ role: 'JEEP', amount: -5 }] })).status, 400, 'no negative amounts');
+  assert.equal((await api('PUT', `/api/admin/trips/${id}/costs`, { lines: [] })).status, 401, 'staff only');
+  // profit uses the typed numbers, not the estimate
+  const trip = (await admin('GET', '/api/admin/data')).json.trips.find(t => t.code === id);
+  assert.ok(trip && !trip.est, 'not an estimate any more'); assert.equal(trip.cost.jeep, 11000); assert.equal(trip.cost.other, 1500); assert.equal(trip.cost.total, 12500);
+  // the partner line can be paid from Payments, the cost with nobody behind it cannot
+  const lines = (await admin('GET', '/api/admin/data')).json.payoutLines.filter(l => l.code === id);
+  assert.equal(lines.length, 1); assert.equal(lines[0].amount, 11000);
+  // finishing by hand does not overwrite the typed costs
+  assert.equal((await admin('POST', `/api/admin/shared/${id}/complete`)).status, 200);
+  assert.equal((await query(`SELECT COUNT(*)::int n, SUM(amount)::int s FROM payout_lines WHERE trip_code=$1`, [id])).rows[0].s, 12500);
+  assert.equal((await admin('POST', `/api/admin/shared/${id}/complete`)).status, 409, 'cannot finish twice');
+  // a second trip finished by hand with no typed costs gets the standard fees so profit is complete
+  const id2 = (await admin('POST', '/api/admin/shared', { date: U.addDays(U.todayStr(), 15), ses: 'morning' })).json.id;
+  await admin('POST', `/api/admin/shared/${id2}/seats/1`, { name: 'Solo Guest', phone: '770000009', email: 'sg@x.com', status: 'Paid' });
+  assert.equal((await admin('POST', `/api/admin/shared/${id2}/complete`)).status, 200);
+  const fee = (await query(`SELECT SUM(amount)::int s FROM payout_lines WHERE trip_code=$1 AND role='JEEP'`, [id2])).rows[0].s;
+  assert.ok(fee > 0, 'standard jeep fee added');
+});
+
+test('park pages: each park has its own date page with its own title and search data, and no park switch', async () => {
+  const page = async q => { const r = await fetch(base + '/shared' + q, { redirect: 'manual' }); return { status: r.status, loc: r.headers.get('location'), html: await r.text() } };
+  const y = await page('?loc=yala');
+  assert.equal(y.status, 200);
+  assert.match(y.html, /<title>[^<]*Yala National Park[^<]*<\/title>/);
+  assert.match(y.html, /rel="canonical" href="[^"]*\/shared\?loc=yala"/);
+  assert.match(y.html, /application\/ld\+json/); assert.match(y.html, /FAQPage/);
+  assert.match(y.html, /<div id="locWrap" hidden>/, 'no park switch on a park page');
+  assert.match(y.html, /id="seoh"/, 'readable text for search engines');
+  const generic = await page('');
+  assert.equal(generic.status, 200); assert.doesNotMatch(generic.html, /id="seoh"/);
+  const bad = await page('?loc=narnia');
+  assert.equal(bad.status, 302); assert.match(bad.loc, /\/shared/); assert.doesNotMatch(bad.loc, /narnia/);
+  assert.equal((await fetch(base + '/parks/yala', { redirect: 'manual' })).status, 301);
+  const sm = await (await fetch(base + '/sitemap.xml')).text();
+  assert.match(sm, /<loc>[^<]*\/shared\?loc=yala<\/loc>/);
+  assert.match(await (await fetch(base + '/robots.txt')).text(), /Sitemap: .*\/sitemap\.xml/);
+});
+
+test('go-alone offer: a booking below the minimum is told what extra it would pay to still go', async () => {
+  const date = U.addDays(U.todayStr(), 11);
+  const made = await admin('POST', '/api/admin/shared', { date, ses: 'morning' }); assert.equal(made.status, 201, JSON.stringify(made.json));
+  const id = made.json.id;
+  const one = await api('POST', `/api/shared/${id}/seats`, { seats: [1], name: 'Lone Guest', cc: '+94', phone: '771234500', email: 'lone@x.com', pay: 'later' });
+  assert.equal(one.status, 201);
+  const min = (await api('GET', `/api/shared/${id}`)).json.minSeats;
+  assert.equal(one.json.solo.need, min - 1); assert.equal(one.json.solo.extra, (min - 1) * 7500); assert.ok(one.json.solo.cancelAt);
+  assert.ok((await emails('cust_shared_seat')).some(e => /If nobody else joins/.test(e.html || e.body || '')), 'the email carries the offer');
+  // enough seats at once: nothing to offer
+  const id2 = (await admin('POST', '/api/admin/shared', { date: U.addDays(date, 1), ses: 'morning' })).json.id;
+  const many = await api('POST', `/api/shared/${id2}/seats`, { seats: Array.from({ length: min }, (_, i) => i + 1), name: 'Group Guest', cc: '+94', phone: '771234501', email: 'group@x.com', pay: 'later' });
+  assert.equal(many.status, 201); assert.equal(many.json.solo, null);
+});

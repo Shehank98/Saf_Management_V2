@@ -236,6 +236,7 @@ async function markCompleted(code, actor) {
     const b = (await db.query('SELECT * FROM bookings WHERE id=$1 FOR UPDATE', [b0.id])).rows[0];
     if (!['STARTED', 'CONFIRMED'].includes(b.status)) throw U.conflict('This trip is not running.');
     const r = await db.query(`UPDATE bookings SET status='COMPLETED', completed_at=now() WHERE id=$1 RETURNING *`, [b.id]);
+    await require('./costs').ensureDefaultLines(db, b.code);   // finished by hand: make sure the profit report has the partner costs
     await activity.log(db, 'booking', b.code, 'Completed · thank-you email sent', actor);
     db.after(async () => { await tx(c => notify.thanks(c, r.rows[0])); live.publish('booking', { code: b.code }); });
     return r.rows[0];

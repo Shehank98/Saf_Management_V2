@@ -457,3 +457,9 @@ CREATE TABLE IF NOT EXISTS gallery_photos (
   active     boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Partner costs typed in by the office (partners are not using the app yet)
+ALTER TABLE payout_lines ADD COLUMN IF NOT EXISTS note text;
+ALTER TABLE payout_lines ADD COLUMN IF NOT EXISTS manual boolean NOT NULL DEFAULT false;
+ALTER TABLE payout_lines DROP CONSTRAINT IF EXISTS payout_lines_role_check;
+ALTER TABLE payout_lines ADD CONSTRAINT payout_lines_role_check CHECK (role IN ('JEEP','GUIDE','MEALS','CAMERA','OTHER'));

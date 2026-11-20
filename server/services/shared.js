@@ -120,7 +120,7 @@ async function publicView(tripId, token = '') {
     taken: seats.map(x => x.seat_no), paid: seats.filter(x => x.status === 'PAID').length, held: seats.length, allowLater: conf.shared.allowLater,
     locked: holds.filter(h => h.token !== token).map(h => h.seat_no),
     mine: holds.filter(h => token && h.token === token).map(h => ({ n: h.seat_no, until: h.expires_at })),
-    holdMin: PICK_MIN, full: seats.length >= t.seats,
+    holdMin: PICK_MIN, full: seats.length >= t.seats, cancelAt: t.auto_cancel_at,
   };
 }
 
@@ -217,6 +217,9 @@ async function evaluate(db, tripId) {
 }
 
 /** A guest picks seats on the shared link. */
+/** "Go alone": if too few guests join, a guest can still go by paying for the empty seats the jeep needs to run. */
+const soloOffer = (t, held) => { const need = Math.max(0, t.min_seats - held); return need ? { need, extra: need * t.seat_price, price: t.seat_price, cancelAt: t.auto_cancel_at, cur: t.currency || 'LKR' } : null; };
+
 async function takeSeats(tripId, raw, { admin = null } = {}) {
   const conf = await settings.load();
   const base = settings.baseUrl(conf);
@@ -283,10 +286,10 @@ async function takeSeats(tripId, raw, { admin = null } = {}) {
     const c = { conf, base };
     await notify.send(db, 'admin_new_shared', T.admin_new_shared({ trip: t, session, seats: seatsWanted, name, phone: `${cc} ${phone}`, payText: payNow ? 'Paying now (card)' : 'Reserved, not paid', held, paid, minSeats: t.min_seats, maxSeats: t.seats }, c), { to: await notify.toCompany(), entity: 'trip', entityId: t.id });
     if (!payNow && seats.find(s => s.code === code).status === 'RESERVED') { // otherwise the payment-link email already went out
-      await notify.send(db, 'cust_shared_seat', T.cust_shared_seat({ trip: t, session, seats: seatsWanted, code, variant: 'reserved', name, payUrl: payUrl(base, t.id, code), minSeats: t.min_seats, payWindowH: t.pay_window_h }, c), { to: email, entity: 'trip', entityId: t.id });
+      await notify.send(db, 'cust_shared_seat', T.cust_shared_seat({ trip: t, session, seats: seatsWanted, code, variant: 'reserved', name, payUrl: payUrl(base, t.id, code), minSeats: t.min_seats, payWindowH: t.pay_window_h, solo: soloOffer(t, held) }, c), { to: email, entity: 'trip', entityId: t.id });
     }
     const mine = seats.find(x => x.code === code);
-    return { trip: t, code, total, payment, status: after.status, seatStatus: mine ? mine.status : status, deadline: mine ? mine.pay_deadline : null, name, email, phone: `${cc}${phone}`, seats: seatsWanted };
+    return { trip: t, code, total, payment, status: after.status, seatStatus: mine ? mine.status : status, deadline: mine ? mine.pay_deadline : null, solo: soloOffer(t, held), name, email, phone: `${cc}${phone}`, seats: seatsWanted };
   });
   out.k = secrets.sign(out.code);
   return out;
@@ -320,7 +323,7 @@ async function applySeatPayment(db, pay) {
   const after = await evaluate(db, t.id);
   const ticketNow = ['CONFIRMED', 'FULL'].includes(after.status);
   if (first.email) {
-    await notify.send(db, 'cust_shared_seat', T.cust_shared_seat({ trip: t, session, seats: toPay.map(s => s.seat_no), code: pay.seat_code, variant: 'paid', name: first.name, minSeats: t.min_seats, payWindowH: t.pay_window_h, ticketNow }, { conf, base }), { to: first.email, entity: 'trip', entityId: t.id });
+    await notify.send(db, 'cust_shared_seat', T.cust_shared_seat({ trip: t, session, seats: toPay.map(s => s.seat_no), code: pay.seat_code, variant: 'paid', name: first.name, minSeats: t.min_seats, payWindowH: t.pay_window_h, solo: soloOffer(t, (await activeSeats(db, t.id)).length), ticketNow }, { conf, base }), { to: first.email, entity: 'trip', entityId: t.id });
   }
 }
 
@@ -508,4 +511,4 @@ async function assignPartners(tripId, { jeep, guide, meals }, actor) {
   });
 }
 
-module.exports = { holdSeat, liveHolds, ensureOpenJeep, openJeep, createTrip, publicView, evaluate, takeSeats, applySeatPayment, payLinkInfo, startPayment, releaseExpired, cancelTrip, autoCancel, addGuest, markPaid, removeGuest, remind, assignPartners, activeSeats, groupBy, payUrl };
+module.exports = { soloOffer, holdSeat, liveHolds, ensureOpenJeep, openJeep, createTrip, publicView, evaluate, takeSeats, applySeatPayment, payLinkInfo, startPayment, releaseExpired, cancelTrip, autoCancel, addGuest, markPaid, removeGuest, remind, assignPartners, activeSeats, groupBy, payUrl };

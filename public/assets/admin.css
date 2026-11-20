@@ -369,3 +369,10 @@ details.fold .fb>.sec-t:first-child{margin-top:0}
 .bkr>b{flex:1;min-width:0;font-size:15.5px;overflow-wrap:anywhere}
 .bkr.tot b{font-size:18px;color:var(--ok)}
 @media (max-width:520px){.bkr{flex-wrap:wrap;gap:4px 8px}.bkr>span{flex:1 1 100%}}
+
+/* partner cost editor */
+.clrow{display:grid;grid-template-columns:150px 120px minmax(0,1fr) minmax(0,1fr) 40px;gap:6px;margin-bottom:6px;align-items:center}
+.clrow .inp{min-height:42px;padding:6px 10px;min-width:0}
+.cltot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;border-radius:12px;background:var(--sand);font-weight:700}.cltot b{font-size:19px}
+.modal.clm>.card{max-width:860px}
+@media (max-width:760px){.clrow{grid-template-columns:1fr 1fr;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--card)}.clrow [data-f=partner],.clrow [data-f=note]{grid-column:1/-1}.clrow .btn{grid-column:1/-1}}
