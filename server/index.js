@@ -30,7 +30,7 @@ app.use(helmet({
       'media-src': ["'self'", 'blob:'],
       'worker-src': ["'self'"],
       'manifest-src': ["'self'"],
-      'frame-ancestors': ["'none'"],
+      'frame-ancestors': ["'self'"],   // only our own pages (the admin live preview) may frame the site
       'base-uri': ["'self'"],
       'form-action': ["'self'", 'https://www.payhere.lk', 'https://sandbox.payhere.lk'],
       'object-src': ["'none'"],
@@ -129,7 +129,7 @@ app.get('/parks/:id', (req, res) => res.redirect(301, '/shared?loc=' + encodeURI
 app.get('/sitemap.xml', U.wrap(async (req, res) => { const conf = await settings.load(); res.type('application/xml').set('Cache-Control', 'public, max-age=900').send(seo.sitemap(conf, settings.baseUrl(conf))); }));
 
 app.get('/admin/login', (req, res) => { res.set('X-Robots-Tag', 'noindex, nofollow'); page('admin/login.html')(req, res); });
-const admin = { '/admin': 'dashboard', '/admin/bookings': 'private', '/admin/shared': 'shared', '/admin/payments': 'payments', '/admin/partners': 'vendors', '/admin/check-in': 'checkin', '/admin/settings': 'settings' };
+const admin = { '/admin': 'dashboard', '/admin/bookings': 'private', '/admin/shared': 'shared', '/admin/payments': 'payments', '/admin/partners': 'vendors', '/admin/check-in': 'checkin', '/admin/settings': 'settings', '/admin/content': 'content' };
 app.get('/admin/bookings', U.wrap(async (req, res, next) => (await privateOn()) ? next() : res.redirect('/admin/shared')));
 for (const [route, f] of Object.entries(admin)) app.get(route, adminPage(`admin/${f}.html`));
 

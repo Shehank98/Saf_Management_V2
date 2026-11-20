@@ -59,6 +59,7 @@ function mealSummary(b) {
 }
 
 const ICONS = {
+  doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
   dash: '<path d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-18v6h8V3z"/>',
   priv: '<path d="M2 12 L6 12 L8 6 L18 6 L20 12 L23 13 L23 18 L1 18 Z"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>',
   shared: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c0-3 3-5 6-5s6 2 6 5M12 20c0-3 3-5 6-5"/>',
@@ -74,7 +75,7 @@ const ic = (k, sz = 18) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24
 
 const openRequests = () => BOOKINGS.filter(b => b.status === 'Request').length;
 const unpaidPartners = () => new Set(PAYOUT_LINES.filter(l => !l.paid).map(l => l.vendor)).size;
-const ADMIN_NAV = [['dashboard.html', 'Dashboard', 'dash'], ['private.html', 'Private bookings', 'priv', openRequests], ['shared.html', 'Shared trips', 'shared'], ['payments.html', 'Payments &amp; profit', 'money', unpaidPartners], ['vendors.html', 'Vendors', 'vend', () => APPLICATIONS.length], ['checkin.html', 'Ticket check-in', 'scan'], ['settings.html', 'Settings', 'set']].filter(n => CFG.privateOn || n[0] !== 'private.html');
+const ADMIN_NAV = [['dashboard.html', 'Dashboard', 'dash'], ['private.html', 'Private bookings', 'priv', openRequests], ['shared.html', 'Shared trips', 'shared'], ['payments.html', 'Payments &amp; profit', 'money', unpaidPartners], ['vendors.html', 'Vendors', 'vend', () => APPLICATIONS.length], ['checkin.html', 'Ticket check-in', 'scan'], ['content.html', 'Website text', 'doc'], ['settings.html', 'Settings', 'set']].filter(n => CFG.privateOn || n[0] !== 'private.html');
 const PRIVATE_ON = !!CFG.privateOn;
 const LOCS = CFG.locations || [];
 const locName = id => (LOCS.find(l => l.id === id) || (CONF && CONF.locations || []).find(l => l.id === id) || {}).name || id || '';

@@ -16,6 +16,7 @@ const DEFAULTS = {
   business: { name: 'Yala Wild Safaris', domain: 'yalawildsafaris.lk', phone: '+94 77 000 0000', email: 'bookings@yalawildsafaris.lk', office: 'Main Street, Tissamaharama', reviewUrl: '' },
   rules: { fleet: 4, maxPerJeep: 6, minLead: 'daybefore20', maxAheadMonths: 4 },
   policy: [[48, 100], [24, 50], [0, 0]],
+  content: {},
   shared: { seats: 6, minSeats: 4, payWindowH: 24, autoCancelH: 24, allowLater: true, privateUpgrade: true },
   // currency = what guests see and pay in (LKR or USD); usdRate = LKR per 1 USD, used to report everything in LKR.
   payments: { deposit: 0.3, allowFull: true, allowLater: true, currency: 'LKR', usdRate: 300 },

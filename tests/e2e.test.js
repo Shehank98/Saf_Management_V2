@@ -781,3 +781,22 @@ test('go-alone offer: a booking below the minimum is told what extra it would pa
   const many = await api('POST', `/api/shared/${id2}/seats`, { seats: Array.from({ length: min }, (_, i) => i + 1), name: 'Group Guest', cc: '+94', phone: '771234501', email: 'group@x.com', pay: 'later' });
   assert.equal(many.status, 201); assert.equal(many.json.solo, null);
 });
+
+test('website text: the office edits page text, only real changes are stored, the live site and park page use it', async () => {
+  const get = await admin('GET', '/api/admin/content');
+  assert.equal(get.status, 200); assert.ok(get.json.fields.length > 40); assert.ok(get.json.fields.every(f => f.key && f.def !== undefined && f.page));
+  assert.equal((await api('GET', '/api/admin/content')).status, 401, 'staff only');
+  const put = await admin('PUT', '/api/admin/content', { values: {
+    'hero.t1': 'Wild Yala,', 'hero.t2': get.json.fields.find(f => f.key === 'hero.t2').def,   // same as the default: not stored
+    'nope.key': 'ignored', 'faq.q1': '   ', 'park.h2': 'Safari in {park} with {brand}', 'incl.list': ' First line \n\n Second line ',
+  } });
+  assert.equal(put.status, 200); assert.deepEqual(Object.keys(put.json.values).sort(), ['hero.t1', 'incl.list', 'park.h2']);
+  assert.equal(put.json.values['incl.list'], 'First line\nSecond line');
+  assert.ok((await fetch(base + '/api/config.js').then(r => r.text())).includes('"hero.t1":"Wild Yala,"'), 'guest pages receive the text');
+  const park = await fetch(base + '/shared?loc=yala').then(r => r.text());
+  assert.match(park, /data-c="park\.h2">Safari in Yala National Park with /, 'park page text is server-rendered with the new wording');
+  // clearing a field brings the original text back
+  const back = await admin('PUT', '/api/admin/content', { values: {} });
+  assert.deepEqual(back.json.values, {});
+  assert.match(await fetch(base + '/shared?loc=yala').then(r => r.text()), /data-c="park\.h2">Yala National Park safari with /);
+});

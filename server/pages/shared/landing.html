@@ -374,18 +374,18 @@ body{background:var(--paper);overflow-x:clip}
 
   <div class="wrap heroin">
     <div class="herotext">
-      <span class="eyebrow rv">Shared jeep safaris · Sri Lanka</span>
-      <h1 class="rv d1">Wild Sri Lanka,<br><em>one seat at a time.</em></h1>
-      <p class="lead rv d2">Join a small group in an open 4×4 safari jeep. <span class="more">Pick your park and session, choose your exact seat, and get your QR e-ticket by email. Free hotel pickup near the park.</span></p>
-      <div class="chips rv d3"><span><i class="dot"></i>Live seat map</span><span><i class="dot"></i>Pay securely online</span><span><i class="dot"></i>Full refund if the jeep doesn't run</span></div>
+      <span class="eyebrow rv" data-c="hero.eyebrow">Shared jeep safaris · Sri Lanka</span>
+      <h1 class="rv d1"><span data-c="hero.t1">Wild Sri Lanka,</span><br><em data-c="hero.t2">one seat at a time.</em></h1>
+      <p class="lead rv d2"><span data-c="hero.lead">Join a small group in an open 4×4 safari jeep.</span> <span class="more" data-c="hero.lead2">Pick your park and session, choose your exact seat, and get your QR e-ticket by email. Free hotel pickup near the park.</span></p>
+      <div class="chips rv d3"><span><i class="dot"></i><span data-c="hero.chip1">Live seat map</span></span><span><i class="dot"></i><span data-c="hero.chip2">Pay securely online</span></span><span><i class="dot"></i><span data-c="hero.chip3">Full refund if the jeep doesn't run</span></span></div>
     </div>
     <form class="finder rv d3" id="quick" aria-label="Find a shared safari">
-      <div class="fhead"><b>Find your safari</b><span class="from" id="fromPrice"></span></div>
+      <div class="fhead"><b data-c="finder.title">Find your safari</b><span class="from" id="fromPrice"></span></div>
       <label class="f"><span>Park</span><select id="qLoc"></select></label>
       <label class="f"><span>Session</span><select id="qSes"></select></label>
       <label class="f"><span>Date</span><input type="date" id="qDate"></label>
-      <button class="btn primary block big" type="submit">See open seats <span aria-hidden="true">→</span></button>
-      <p class="fnote">No payment needed to look. Seats are held for 15 minutes while you book.</p>
+      <button class="btn primary block big" type="submit"><span data-c="finder.btn">See open seats</span> <span aria-hidden="true">→</span></button>
+      <p class="fnote" data-c="finder.note">No payment needed to look. Seats are held for 15 minutes while you book.</p>
     </form>
   </div>
   <a class="scrollcue" href="#parks" aria-label="Scroll down"><span></span></a>
@@ -396,21 +396,21 @@ body{background:var(--paper);overflow-x:clip}
 <main>
 <section class="sec" id="parks">
   <div class="wrap">
-    <div class="sh rv"><span class="kicker">Destinations</span><h2>Choose your park</h2><p>Each park has its own base, pickup area, sessions and seat price.</p></div>
+    <div class="sh rv"><span class="kicker" data-c="parks.kicker">Destinations</span><h2 data-c="parks.h2">Choose your park</h2><p data-c="parks.sub">Each park has its own base, pickup area, sessions and seat price.</p></div>
     <div class="parkgrid" id="parkGrid"></div>
   </div>
 </section>
 
 <section class="sec alt" id="sessions">
   <div class="wrap">
-    <div class="sh rv"><span class="kicker">Sessions</span><h2>Morning, evening or a full day</h2><p>Prices are per seat at <b id="sessPark"></b>. A shared jeep takes up to <span data-cfg="sharedSeats">6</span> guests.</p></div>
+    <div class="sh rv"><span class="kicker" data-c="sessions.kicker">Sessions</span><h2 data-c="sessions.h2">Morning, evening or a full day</h2><p>Prices are per seat at <b id="sessPark"></b>. A shared jeep takes up to <span data-cfg="sharedSeats">6</span> guests.</p></div>
     <div class="sessgrid" id="sessGrid"></div>
   </div>
 </section>
 
 <section class="sec gal" id="gallery" hidden>
   <div class="wrap">
-    <div class="sh rv"><span class="kicker">Gallery</span><h2>Moments from the wild</h2><p>Real moments from Sri Lanka's national parks. Tap a photo to see it full screen.</p></div>
+    <div class="sh rv"><span class="kicker" data-c="gallery.kicker">Gallery</span><h2 data-c="gallery.h2">Moments from the wild</h2><p data-c="gallery.sub">Real moments from Sri Lanka's national parks. Tap a photo to see it full screen.</p></div>
     <div class="galgrid" id="galGrid"></div>
     <p class="galnote" id="galNote"></p>
   </div>
@@ -426,12 +426,12 @@ body{background:var(--paper);overflow-x:clip}
 <section class="sec" id="how">
   <div class="wrap howwrap">
     <div>
-      <div class="sh left rv"><span class="kicker">How it works</span><h2>Book a seat in four steps</h2><p>Shared safaris are simple and fair. Everyone sees the same live seat map.</p></div>
+      <div class="sh left rv"><span class="kicker" data-c="how.kicker">How it works</span><h2 data-c="how.h2">Book a seat in four steps</h2><p data-c="how.sub">Shared safaris are simple and fair. Everyone sees the same live seat map.</p></div>
       <ol class="hsteps">
-        <li class="rv"><span class="n">1</span><div><b>Pick a park, session and date</b><p>Every open day shows how many seats are left on each jeep.</p></div></li>
-        <li class="rv d1"><span class="n">2</span><div><b>Choose your seats</b><p>Tap the seats you want. They are locked to you for 15 minutes, so nobody else can take them.</p></div></li>
-        <li class="rv d2"><span class="n">3</span><div><b>Pay now or reserve</b><p>Pay securely by card, or reserve for free and pay when the jeep fills up.</p></div></li>
-        <li class="rv d3"><span class="n">4</span><div><b>Get your e-ticket</b><p>Once <span data-cfg="minSeats">4</span> seats are paid the safari is on and your QR ticket is emailed.</p></div></li>
+        <li class="rv"><span class="n">1</span><div><b data-c="how.s1t">Pick a park, session and date</b><p data-c="how.s1p">Every open day shows how many seats are left on each jeep.</p></div></li>
+        <li class="rv d1"><span class="n">2</span><div><b data-c="how.s2t">Choose your seats</b><p data-c="how.s2p">Tap the seats you want. They are locked to you for 15 minutes, so nobody else can take them.</p></div></li>
+        <li class="rv d2"><span class="n">3</span><div><b data-c="how.s3t">Pay now or reserve</b><p data-c="how.s3p">Pay securely by card, or reserve for free and pay when the jeep fills up.</p></div></li>
+        <li class="rv d3"><span class="n">4</span><div><b data-c="how.s4t">Get your e-ticket</b><p data-c="how.s4p">Once <span data-cfg="minSeats">4</span> seats are paid the safari is on and your QR ticket is emailed.</p></div></li>
       </ol>
     </div>
     <div class="jeepdemo rv d2" aria-hidden="true">
@@ -445,7 +445,7 @@ body{background:var(--paper);overflow-x:clip}
 
 <section class="sec alt" id="day">
   <div class="wrap">
-    <div class="sh rv"><span class="kicker">Your day</span><h2>What to expect, hour by hour</h2><p>Times for <b id="dayPark"></b>. Choose a session:</p></div>
+    <div class="sh rv"><span class="kicker" data-c="day.kicker">Your day</span><h2 data-c="day.h2">What to expect, hour by hour</h2><p>Times for <b id="dayPark"></b>. Choose a session:</p></div>
     <div class="seg rv" id="daySeg" role="tablist"></div>
     <div class="timeline" id="dayLine"></div>
   </div>
@@ -453,7 +453,7 @@ body{background:var(--paper);overflow-x:clip}
 
 <section class="sec" id="wildlife">
   <div class="wrap">
-    <div class="sh rv"><span class="kicker">Wildlife</span><h2>Who you might meet</h2><p>Sri Lanka's parks are home to some remarkable animals. Sightings depend on nature and are never guaranteed, which is part of the magic.</p></div>
+    <div class="sh rv"><span class="kicker" data-c="wild.kicker">Wildlife</span><h2 data-c="wild.h2">Who you might meet</h2><p data-c="wild.sub">Sri Lanka's parks are home to some remarkable animals. Sightings depend on nature and are never guaranteed, which is part of the magic.</p></div>
     <div class="wildgrid" id="wildGrid"></div>
   </div>
 </section>
@@ -461,13 +461,13 @@ body{background:var(--paper);overflow-x:clip}
 <section class="sec alt" id="included">
   <div class="wrap incl">
     <div class="rv">
-      <span class="kicker">Included</span><h2>Everything for a great game drive</h2>
+      <span class="kicker" data-c="incl.kicker">Included</span><h2 data-c="incl.h2">Everything for a great game drive</h2>
       <ul class="ticks" id="inclList"></ul>
     </div>
     <div class="safe rv d2">
-      <h3>Book with confidence</h3>
+      <h3 data-c="safe.h3">Book with confidence</h3>
       <div class="srow"><b>Cancellation</b><p id="policyText"></p></div>
-      <div class="srow"><b>If the jeep doesn't fill</b><p>A shared jeep runs once <span data-cfg="minSeats">4</span> seats are paid. If it doesn't, it is cancelled and you get a full refund automatically.</p></div>
+      <div class="srow"><b data-c="safe.fill.t">If the jeep doesn't fill</b><p data-c="safe.fill.p">A shared jeep runs once <span data-cfg="minSeats">4</span> seats are paid. If it doesn't, it is cancelled and you get a full refund automatically.</p></div>
       <div class="srow"><b>Payments</b><p id="payList"></p></div>
       <div class="srow"><b>Need help?</b><p>Call or WhatsApp <a id="phoneLink" href="#"></a>, or email <a id="mailLink" href="#"></a>.</p></div>
     </div>
@@ -476,15 +476,15 @@ body{background:var(--paper);overflow-x:clip}
 
 <section class="sec" id="faq">
   <div class="wrap narrow">
-    <div class="sh rv"><span class="kicker">FAQ</span><h2>Good to know</h2></div>
+    <div class="sh rv"><span class="kicker" data-c="faq.kicker">FAQ</span><h2 data-c="faq.h2">Good to know</h2></div>
     <div class="faq">
-      <details class="rv"><summary>When is the shared jeep confirmed?</summary><p>As soon as <span data-cfg="minSeats">4</span> seats are paid. Everyone on that jeep gets their QR e-ticket by email at that moment, and other guests can still join the free seats.</p></details>
-      <details class="rv"><summary>What if not enough people book?</summary><p>If a jeep doesn't reach <span data-cfg="minSeats">4</span> paid seats before the deadline, it is cancelled and every payment is refunded in full.</p></details>
-      <details class="rv"><summary>Can I reserve now and pay later?</summary><p>Yes, where it is offered. When <span data-cfg="minSeats">4</span> seats are reserved we email everyone a payment link, and you have <span data-cfg="payWindowH">24</span> hours to pay before the seat is released.</p></details>
-      <details class="rv"><summary>Where do you pick me up?</summary><p>From your hotel, free, inside the pickup area of your park (you drop a pin on the map when you book). On the day you can see when your driver is on the way. Outside the area, you meet us at our office.</p></details>
-      <details class="rv"><summary>Can I cancel?</summary><p id="policyText2"></p></details>
-      <details class="rv"><summary>Are park entry tickets included?</summary><p>Park entry fees depend on the day and on your group. Message us and we'll confirm exactly what your price includes.</p></details>
-      <details class="rv"><summary>What should I bring?</summary><p>A hat, sunscreen, water, a light jacket for early mornings, your camera and your e-ticket. Neutral colours are best for wildlife watching.</p></details>
+      <details class="rv"><summary data-c="faq.q1">When is the shared jeep confirmed?</summary><p data-c="faq.a1">As soon as <span data-cfg="minSeats">4</span> seats are paid. Everyone on that jeep gets their QR e-ticket by email at that moment, and other guests can still join the free seats.</p></details>
+      <details class="rv"><summary data-c="faq.q2">What if not enough people book?</summary><p data-c="faq.a2">If a jeep doesn't reach <span data-cfg="minSeats">4</span> paid seats before the deadline, it is cancelled and every payment is refunded in full.</p></details>
+      <details class="rv"><summary data-c="faq.q3">Can I reserve now and pay later?</summary><p data-c="faq.a3">Yes, where it is offered. When <span data-cfg="minSeats">4</span> seats are reserved we email everyone a payment link, and you have <span data-cfg="payWindowH">24</span> hours to pay before the seat is released.</p></details>
+      <details class="rv"><summary data-c="faq.q4">Where do you pick me up?</summary><p data-c="faq.a4">From your hotel, free, inside the pickup area of your park (you drop a pin on the map when you book). On the day you can see when your driver is on the way. Outside the area, you meet us at our office.</p></details>
+      <details class="rv"><summary data-c="faq.q5">Can I cancel?</summary><p id="policyText2"></p></details>
+      <details class="rv"><summary data-c="faq.q6">Are park entry tickets included?</summary><p data-c="faq.a6">Park entry fees depend on the day and on your group. Message us and we'll confirm exactly what your price includes.</p></details>
+      <details class="rv"><summary data-c="faq.q7">What should I bring?</summary><p data-c="faq.a7">A hat, sunscreen, water, a light jacket for early mornings, your camera and your e-ticket. Neutral colours are best for wildlife watching.</p></details>
     </div>
   </div>
 </section>
@@ -492,16 +492,16 @@ body{background:var(--paper);overflow-x:clip}
 <section class="final">
   <div class="finalbg" aria-hidden="true"></div>
   <div class="wrap finalin rv">
-    <h2>Your seat in the wild is waiting</h2>
-    <p>Pick a date and see the live seat map. It takes about two minutes.</p>
-    <div class="finalcta"><a class="btn light big" href="/shared">Book a seat</a><a class="btn ghostlight big" href="#faq">Read the FAQ</a></div>
+    <h2 data-c="final.h2">Your seat in the wild is waiting</h2>
+    <p data-c="final.p">Pick a date and see the live seat map. It takes about two minutes.</p>
+    <div class="finalcta"><a class="btn light big" href="/shared" data-c="final.cta1">Book a seat</a><a class="btn ghostlight big" href="#faq" data-c="final.cta2">Read the FAQ</a></div>
   </div>
 </section>
 </main>
 
 <footer class="foot">
   <div class="wrap footgrid">
-    <div><a class="brand" href="/"><span data-cfg="brand">Safaris</span></a><p class="muted small" style="margin-top:8px;max-width:320px">Shared jeep safaris in Sri Lanka's national parks, with free hotel pickup and instant e-tickets.</p></div>
+    <div><a class="brand" href="/"><span data-cfg="brand">Safaris</span></a><p class="muted small" style="margin-top:8px;max-width:320px" data-c="foot.about">Shared jeep safaris in Sri Lanka's national parks, with free hotel pickup and instant e-tickets.</p></div>
     <div><b>Book</b><a href="/shared">Open dates</a><a href="#parks">Parks</a><a href="#sessions">Sessions</a></div>
     <div><b>Help</b><a href="#faq">FAQ</a><a id="fPhone" href="#"></a><a id="fMail" href="#"></a></div>
     <div><b>Work with us</b><a href="/partners/apply">Become a partner</a><a href="/partner">Partner login</a></div>
@@ -511,6 +511,7 @@ body{background:var(--paper);overflow-x:clip}
 
 <script defer src="/api/config.js"></script>
 <script defer src="/assets/core.js"></script>
+<script defer src="/assets/content.js"></script>
 <script defer src="/assets/customer.js"></script>
 <script defer src="/assets/fancy-select.js"></script>
 <script defer src="/assets/pages/landing.js"></script>

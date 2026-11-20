@@ -39,7 +39,7 @@ function publicConfig(conf) {
     providers: providers.list(), today: U.todayStr(),
     mealOptions: pricing.MEAL_OPTIONS,
     currency: settings.money(conf).cur, usdRate: conf.payments.usdRate || 300,
-    privateOn: !!(conf.features && conf.features.private), locations: locationsForClient(conf), defaultLoc: conf.defaultLoc,
+    privateOn: !!(conf.features && conf.features.private), locations: locationsForClient(conf), defaultLoc: conf.defaultLoc, content: conf.content || {},
   };
 }
 

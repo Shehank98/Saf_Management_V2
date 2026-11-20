@@ -1,6 +1,7 @@
 /* Search-engine pages: every park has its own "choose your date" page (/shared?loc=yala) with its own
    title, description, structured data and readable text, so people who search for that park land on it. */
 const U = require('./util');
+const content = require('./content');
 const settings = require('./settings');
 
 const esc = U.esc;
@@ -38,8 +39,8 @@ function parkSeo(conf, l, base) {
 <meta name="twitter:card" content="summary">
 ${ld.map(o => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`).join('\n')}`;
   const body = `<section class="seo" aria-labelledby="seoh">
-  <h2 id="seoh">${esc(l.name)} safari with ${esc(brand)}</h2>
-  <p>${esc(String(l.tagline || `Join a small group in an open 4×4 jeep and look for wildlife in ${l.name}`).replace(/[.\s]+$/, ''))}. Pick a date above, choose your seat on the live seat map and pay securely online. Your QR e-ticket arrives by email.</p>
+  <h2 id="seoh" data-c="park.h2">${esc(content.text(conf, 'park.h2', { park: l.name, brand }))}</h2>
+  <p data-c="park.intro">${esc(content.text(conf, 'park.intro', { park: l.name, brand, tagline: String(l.tagline || `Join a small group in an open 4×4 jeep and look for wildlife in ${l.name}`).replace(/[.\s]+$/, '') }))}</p>
   ${ses.length ? `<h3>Sessions in ${esc(l.name)}</h3><ul class="seolist">${ses.map(s => `<li><b>${esc(s.name)}</b> · ${esc(s.time)} · pickup from ${esc(s.pickup)} · ${lkr(s.seat)} per seat</li>`).join('')}</ul>` : ''}
   <h3>Good to know</h3>
   <ul class="seolist"><li>Free hotel pickup within ${l.radiusKm} km${l.office ? `, or meet us at ${esc(l.office)}` : ''}.</li><li>A shared jeep goes ahead once ${minSeats} seats are paid. If not, you get a full refund.</li><li>Seats are held for you while you book.</li></ul>

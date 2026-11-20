@@ -128,6 +128,8 @@ function included() {
     'Live pickup updates: see when your driver is on the way',
   ];
   if (EXTRAS.meals) items.push(`Optional meal pack (${fmt(EXTRAS.meals.price)} per seat): veg, vegan, halal and more`);
+  const custom = typeof C === 'function' ? C('incl.list', { km: l ? l.radiusKm : CFG.radiusKm }) : undefined;
+  if (custom) { items.length = 0; custom.split('\n').filter(Boolean).forEach(t => items.push(t)) }
   $('#inclList').innerHTML = items.map(t => `<li>${esc(t)}</li>`).join('');
   const pk = $('#pickupKm'); if (pk) pk.textContent = l ? l.radiusKm : CFG.radiusKm;
 }
@@ -193,3 +195,5 @@ if (!reduceMotion()) {
 motes(hero, 16);
 parks(); pick(loc);
 requestAnimationFrame(() => $$('.hero .rv').forEach(el => el.classList.add('in')));
+// the office's wording (and live drafts in the admin preview) can change the list of what is included
+document.addEventListener('content-applied', () => { try { included() } catch (e) { } });

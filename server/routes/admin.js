@@ -104,6 +104,18 @@ r.get('/activity', staff, U.wrap(async (req, res) => {
 
 r.get('/live', staff, (req, res) => live.subscribe(req, res));
 
+/* ---------------- Website text ---------------- */
+r.get('/content', staff, U.wrap(async (req, res) => {
+  const conf = await settings.load(), c = require('../lib/content');
+  res.set('Cache-Control', 'no-store').json({ fields: c.FIELDS, values: conf.content || {}, parks: conf.locList.map(id => conf.locations[id]).filter(l => l && l.active).map(l => ({ id: l.id, name: l.name })) });
+}));
+r.put('/content', staff, U.wrap(async (req, res) => {
+  const c = require('../lib/content'), values = c.clean((req.body || {}).values);
+  await settings.set('content', values);
+  await query('INSERT INTO activity_log(entity, entity_id, message, actor) VALUES($1,$2,$3,$4)', ['settings', 'content', `Website text saved (${Object.keys(values).length} changed field${Object.keys(values).length === 1 ? '' : 's'})`, who(req)]);
+  res.json({ ok: true, changed: Object.keys(values).length, values });
+}));
+
 /* ---------------- Private bookings ---------------- */
 r.post('/bookings', staff, U.wrap(async (req, res) => {
   const out = await bookings.create({ ...req.body, pay: 'later' }, { admin: { name: who(req), enforceLead: false } });

@@ -25,7 +25,7 @@
 <body>
 <main class="wrap">
   <div style="max-width:860px;margin:0 auto;padding:64px 0 60px">
-    <div class="head fade"><div class="dsteps"><b>1</b>Date<i></i><span class="d"><b style="background:var(--line);color:var(--muted)">2</b>Seats</span><i></i><span class="d"><b style="background:var(--line);color:var(--muted)">3</b>Pay</span></div><h1 id="h1">Choose your date</h1><p class="parkline" id="parkline"<!--PARKLINE_ATTR-->><!--PARKLINE--></p><p>Join a shared jeep and split the cost. A shared jeep goes ahead once <span data-cfg="minSeats">4</span> seats are paid; if it doesn't, you get a full refund.</p></div>
+    <div class="head fade"><div class="dsteps"><b>1</b>Date<i></i><span class="d"><b style="background:var(--line);color:var(--muted)">2</b>Seats</span><i></i><span class="d"><b style="background:var(--line);color:var(--muted)">3</b>Pay</span></div><h1 id="h1" data-c="date.h1">Choose your date</h1><p class="parkline" id="parkline"<!--PARKLINE_ATTR-->><!--PARKLINE--></p><p data-c="date.intro">Join a shared jeep and split the cost. A shared jeep goes ahead once <span data-cfg="minSeats">4</span> seats are paid; if it doesn't, you get a full refund.</p></div>
     <div class="pickrow fade" style="margin:14px 0 12px"><div id="locWrap"<!--LOCKED_ATTR-->><span class="small muted lbl">Park</span><div class="seg" id="locSeg"></div></div><div><span class="small muted lbl">Session</span><div class="seg" id="sesSeg"></div></div></div>
     <div class="card fade">
       <div class="calhead"><h3 id="mon"></h3><div class="nav"><button id="prev" aria-label="Previous month">‹</button><button id="nxt" aria-label="Next month">›</button></div></div>
@@ -40,6 +40,7 @@
 
 <script defer src="/api/config.js"></script>
 <script defer src="/assets/core.js"></script>
+<script defer src="/assets/content.js"></script>
 <script defer src="/assets/customer.js"></script>
 <script defer src="/assets/fancy-select.js"></script>
 <script defer src="/assets/pages/shared-index.js"></script>
